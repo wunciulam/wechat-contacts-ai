@@ -1,0 +1,5 @@
+{
+  "name": "微信通讯录 AI 助手",
+  "description": "智能微信联系人管理工具，支持通过屏幕截图或录屏自动提取微信号、昵称、备注和标签。",
+  "requestFramePermissions": []
+}
