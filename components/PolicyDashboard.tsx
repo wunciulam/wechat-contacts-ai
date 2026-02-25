@@ -77,33 +77,36 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
   };
 
   return (
-    <div className="flex-1 h-full w-full overflow-hidden flex flex-col bg-slate-50/50 relative">
-      <div className="sticky top-0 z-20 shrink-0 backdrop-blur-xl bg-white/70 border-b border-white/20 shadow-sm">
-        <div className="p-4 md:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-             <button onClick={handleSelectAll} className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all">
-                {allSelected ? <CheckSquare size={22} className="text-emerald-500" /> : <Square size={22} />}
-             </button>
-             <div>
-              <h2 className="text-lg md:text-2xl font-bold text-slate-800 flex items-center gap-2 md:gap-3 tracking-tight">
-                保单管理
-                {filterTags.size > 0 && <span className="text-[10px] md:text-xs font-bold text-emerald-600 bg-emerald-100/50 border border-emerald-100 px-2 py-0.5 rounded-full">筛选: {filterTags.size}</span>}
-                <span className="text-[10px] md:text-xs font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full ml-1">共 {filteredContactsWithPolicies.length}</span>
-              </h2>
-              <p className="text-[10px] md:text-xs font-medium text-slate-400 mt-0.5">Insurance Policy Dashboard</p>
-            </div>
-          </div>
+<div className="flex-1 h-full w-full overflow-hidden flex flex-col bg-gray-50 relative">
+      <div className="sticky top-0 z-20 shrink-0 bg-white border-b border-gray-100 shadow-sm">
+        <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+              <button onClick={handleSelectAll} className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all">
+                 {allSelected ? <CheckSquare size={20} className="text-primary-600" /> : <Square size={20} />}
+              </button>
+              <div>
+               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                 保单管理
+                 {filterTags.size > 0 && <span className="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">筛选: {filterTags.size}</span>}
+                 <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full ml-1">共 {filteredContactsWithPolicies.length}</span>
+               </h2>
+               <p className="text-xs text-gray-400 mt-0.5">Insurance Policy Dashboard</p>
+             </div>
+           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto ml-auto">
-            <button onClick={onAddPolicy} className="group bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-200 hover:shadow-emerald-300 active:scale-95 flex items-center gap-2 transition-all shrink-0 text-sm"><Plus size={18} /><span>录入保单</span></button>
-            <div className="relative w-full sm:w-80 group"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={18} /><input type="text" placeholder="搜索客户、保单号、险种..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-11 pr-4 py-2 md:py-2.5 rounded-xl border-0 bg-slate-100/80 hover:bg-slate-100 focus:bg-white outline-none ring-emerald-500/20 focus:ring-2 transition-all text-xs md:text-sm font-medium" /></div>
+           <div className="flex items-center gap-3 w-full sm:w-auto ml-auto">
+             <button onClick={onAddPolicy} className="btn btn-primary text-sm"><Plus size={16} /><span>录入保单</span></button>
+             <div className="relative w-full sm:w-72">
+               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+               <input type="text" placeholder="搜索客户、保单号、险种..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input" />
+             </div>
           </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 custom-scrollbar space-y-4 md:space-y-6">
         {filteredContactsWithPolicies.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-slate-300"><Shield size={64} className="mb-4 opacity-50" /><p className="text-lg font-medium">暂无保单数据</p><p className="text-sm mt-2 opacity-60">{filterTags.size > 0 ? '没有匹配选中标签的投保记录' : '当前没有任何投保记录'}</p></div>
+          <div className="flex flex-col items-center justify-center h-full text-gray-300"><Shield size={64} className="mb-4 opacity-50" /><p className="text-lg font-medium">暂无保单数据</p><p className="text-sm mt-2 opacity-60">{filterTags.size > 0 ? '没有匹配选中标签的投保记录' : '当前没有任何投保记录'}</p></div>
         ) : (
           filteredContactsWithPolicies.map(contact => {
             const { count, totalPremium } = getTotals(contact.policies || []);

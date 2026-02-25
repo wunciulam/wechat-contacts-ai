@@ -79,27 +79,27 @@ const FollowUpDashboard: React.FC<FollowUpDashboardProps> = ({
   };
 
   return (
-    <div ref={dashboardRef} className="flex-1 h-full w-full overflow-hidden flex flex-col bg-slate-50 relative">
-      <div className="sticky top-0 z-20 shrink-0 backdrop-blur-xl bg-white/80 border-b border-slate-200 shadow-sm">
-        <div className="px-4 md:px-6 py-4 flex flex-col gap-3">
+    <div ref={dashboardRef} className="flex-1 h-full w-full overflow-hidden flex flex-col bg-gray-50 relative">
+      <div className="sticky top-0 z-20 shrink-0 bg-white border-b border-gray-100 shadow-sm">
+        <div className="px-5 py-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2 tracking-tight">跟进工作台</h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Follow-up CRM</p>
+              <h2 className="text-lg font-semibold text-gray-900">跟进工作台</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Follow-up CRM</p>
             </div>
             <button 
               onClick={() => onAddProgress()}
-              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white px-4 md:px-5 py-2 rounded-xl font-bold shadow-lg shadow-emerald-200 hover:shadow-emerald-300 active:scale-95 flex items-center gap-2 transition-all text-sm"
+              className="btn btn-primary text-sm"
             >
-              <Plus size={18} strokeWidth={2.5} /><span>写跟进</span>
+              <Plus size={16} /><span>写跟进</span>
             </button>
           </div>
-          <div className="flex p-1 bg-slate-100 rounded-xl w-fit border border-slate-200/50">
-            <button onClick={() => setActiveTab('following')} className={`px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'following' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-              <CircleDashed size={16} />跟进中 <span className="opacity-50 text-[10px]">{counts.following}</span>
+          <div className="flex p-0.5 bg-gray-100 rounded-lg w-fit border border-gray-200">
+            <button onClick={() => setActiveTab('following')} className={`px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'following' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              <CircleDashed size={14} />跟进中 <span className="opacity-50 text-xs">{counts.following}</span>
             </button>
-            <button onClick={() => setActiveTab('contacted')} className={`px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'contacted' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-              <CheckCircle2 size={16} />已沟通 <span className="opacity-50 text-[10px]">{counts.contacted}</span>
+            <button onClick={() => setActiveTab('contacted')} className={`px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'contacted' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              <CheckCircle2 size={14} />已沟通 <span className="opacity-50 text-xs">{counts.contacted}</span>
             </button>
           </div>
         </div>

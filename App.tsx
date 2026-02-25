@@ -732,7 +732,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden font-sans">
+    <div className="flex flex-col md:flex-row h-screen w-full bg-gray-50 overflow-hidden font-sans">
       <Sidebar 
         tags={allTags}
         selectedTags={selectedTags}
@@ -757,14 +757,14 @@ const App: React.FC = () => {
 
       <div className="flex-1 h-full overflow-hidden relative flex flex-col">
         {/* Mobile Header */}
-        <div className="md:hidden h-14 bg-white border-b border-slate-200 flex items-center px-4 shrink-0 z-20">
+        <div className="md:hidden h-14 bg-white border-b border-gray-200 flex items-center px-4 shrink-0 z-20">
           <button 
             onClick={() => setIsMobileSidebarOpen(true)}
-            className="p-2 -ml-2 text-slate-500 hover:text-slate-700"
+            className="p-2 -ml-2 text-gray-500 hover:text-gray-700"
           >
             <Menu size={24} />
           </button>
-          <span className="ml-2 font-bold text-slate-800">
+          <span className="ml-2 font-semibold text-gray-900">
             {currentView === 'contacts' 
               ? `全部联系人 (${contacts.length})` 
               : currentView === 'followups' 
@@ -778,31 +778,31 @@ const App: React.FC = () => {
         </div>
 
         {/* Mobile Bottom Navigation */}
-        <div className="md:hidden h-16 bg-white border-t border-slate-200 flex items-center justify-around px-2 shrink-0 z-20 pb-safe">
+        <div className="md:hidden h-16 bg-white border-t border-gray-200 flex items-center justify-around px-2 shrink-0 z-20 pb-safe">
           <button 
             onClick={() => setCurrentView('contacts')}
-            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all ${currentView === 'contacts' ? 'text-emerald-600' : 'text-slate-400'}`}
+            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all ${currentView === 'contacts' ? 'text-primary-600' : 'text-gray-400'}`}
           >
-            <Users size={20} className={currentView === 'contacts' ? 'fill-emerald-50/50' : ''} />
+            <Users size={20} className={currentView === 'contacts' ? 'fill-primary-50/50' : ''} />
             <span className="text-[10px] font-bold">通讯录</span>
           </button>
           <button 
             onClick={() => setCurrentView('followups')}
-            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all ${currentView === 'followups' ? 'text-emerald-600' : 'text-slate-400'}`}
+            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all ${currentView === 'followups' ? 'text-primary-600' : 'text-gray-400'}`}
           >
-            <ClipboardList size={20} className={currentView === 'followups' ? 'fill-emerald-50/50' : ''} />
+            <ClipboardList size={20} className={currentView === 'followups' ? 'fill-primary-50/50' : ''} />
             <span className="text-[10px] font-bold">工作台</span>
           </button>
           <button 
             onClick={() => setCurrentView('policies')}
-            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all ${currentView === 'policies' ? 'text-emerald-600' : 'text-slate-400'}`}
+            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all ${currentView === 'policies' ? 'text-primary-600' : 'text-gray-400'}`}
           >
-            <FileText size={20} className={currentView === 'policies' ? 'fill-emerald-50/50' : ''} />
+            <FileText size={20} className={currentView === 'policies' ? 'fill-primary-50/50' : ''} />
             <span className="text-[10px] font-bold">保单</span>
           </button>
           <button 
             onClick={() => setIsMobileSidebarOpen(true)}
-            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all text-slate-400`}
+            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all text-gray-400`}
           >
             <Menu size={20} />
             <span className="text-[10px] font-bold">更多</span>
