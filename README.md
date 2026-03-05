@@ -33,6 +33,7 @@ cp .env.example .env.local
 # - VITE_GEMINI_API_KEY: Gemini API 密钥（用于AI识别，可选）
 # - VITE_SUPABASE_URL: Supabase 项目 URL（用于云端同步）
 # - VITE_SUPABASE_ANON_KEY: Supabase anon public 密钥
+# - VITE_APP_ID: （推荐）你的“同步ID”，用于跨设备/跨域名共享同一份云端数据（例如：wechat-contacts）
 
 # 3. 运行开发服务器
 npm run dev
