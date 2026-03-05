@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Contact, ProgressRecord } from '../types';
-import { X, Edit2, Trash2, Plus, Calendar, Tag, User, Target, ShoppingBag, Clock, RotateCcw, CheckCircle2, AlertCircle, Gift, ArrowRight, Send } from 'lucide-react';
+import { X, Edit2, Trash2, Plus, Calendar, Tag, User, Target, ShoppingBag, Clock, RotateCcw, CheckCircle2, CircleDashed, AlertCircle, Gift, ArrowRight, Send, Shield, FileText } from 'lucide-react';
 
 interface ContactDetailSidebarProps {
   contact: Contact | null;
@@ -10,7 +10,7 @@ interface ContactDetailSidebarProps {
   onDelete: (id: string) => void;
   onAddProgress: (contactId: string) => void;
   onDeleteProgress: (contactId: string, progressId: string) => void;
-  onUpdateStatus: (contactId: string, newStatus: 'following' | 'contacted') => void;
+  onUpdateStatus: (contactId: string, newStatus: 'idle' | 'following' | 'contacted') => void;
   onAddToFollowing: (contactId: string) => void;
   onRemoveTag: (contactId: string, tag: string) => void;
   showAddToFollowing?: boolean; // 是否显示"添加到待跟进"按钮
@@ -121,31 +121,31 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
     <>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity duration-300"
+        className="fixed inset-0 bg-black/30 z-40 transition-opacity duration-300"
         onClick={onClose}
       />
       
       {/* Sidebar */}
-      <div className="fixed right-0 top-0 h-full w-[500px] bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="fixed right-0 top-0 h-full w-[500px] bg-white shadow-lg z-50 flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-lg">
+            <div className="w-10 h-10 rounded-lg bg-gray-900 flex items-center justify-center text-white font-medium text-lg">
               {contact.remarkName?.[0] || contact.nickname?.[0] || '?'}
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-800">
+              <h2 className="text-lg font-medium text-gray-900">
                 {contact.remarkName || contact.nickname || "未知名称"}
               </h2>
               {contact.remarkName && contact.nickname && contact.remarkName !== contact.nickname && (
-                <p className="text-xs text-slate-400">{contact.nickname}</p>
+                <p className="text-xs text-gray-400">{contact.nickname}</p>
               )}
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => onEdit(contact)}
-              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
               title="编辑联系人"
             >
               <Edit2 size={18} />
@@ -155,14 +155,14 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                 onDelete(contact.id);
                 onClose();
               }}
-              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+              className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
               title="删除联系人"
             >
               <Trash2 size={18} />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors ml-2"
+              className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors ml-2"
               title="关闭"
             >
               <X size={20} />
@@ -173,29 +173,59 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
         {/* Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           {/* Status Bar */}
-          <div className="px-6 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-4">
               {/* Follow-up Status */}
               <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
                   contact.followUpStatus === 'following' 
-                    ? 'bg-blue-100 text-blue-700' 
-                    : 'bg-emerald-100 text-emerald-700'
+                    ? 'bg-gray-900 text-white' 
+                    : contact.followUpStatus === 'contacted'
+                    ? 'bg-gray-100 text-gray-700'
+                    : 'bg-gray-50 text-gray-400'
                 }`}>
                   {contact.followUpStatus === 'following' ? (
                     <><Clock size={12} /> 跟进中</>
-                  ) : (
+                  ) : contact.followUpStatus === 'contacted' ? (
                     <><CheckCircle2 size={12} /> 已沟通</>
+                  ) : (
+                    <><CircleDashed size={12} /> 暂未跟进</>
                   )}
                 </span>
                 
-                {/* Status Toggle Button */}
-                <button
-                  onClick={() => onUpdateStatus(contact.id, contact.followUpStatus === 'following' ? 'contacted' : 'following')}
-                  className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
-                >
-                  {contact.followUpStatus === 'following' ? '标记为已沟通' : '重新开始跟进'}
-                </button>
+                {/* Status Toggle Buttons */}
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => onUpdateStatus(contact.id, 'following')}
+                    className={`text-xs px-2 py-1 rounded transition-colors ${
+                      contact.followUpStatus === 'following'
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-400 hover:text-gray-900 hover:bg-gray-100'
+                    }`}
+                  >
+                    跟进中
+                  </button>
+                  <button
+                    onClick={() => onUpdateStatus(contact.id, 'contacted')}
+                    className={`text-xs px-2 py-1 rounded transition-colors ${
+                      contact.followUpStatus === 'contacted'
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-400 hover:text-gray-900 hover:bg-gray-100'
+                    }`}
+                  >
+                    已沟通
+                  </button>
+                  <button
+                    onClick={() => onUpdateStatus(contact.id, 'idle')}
+                    className={`text-xs px-2 py-1 rounded transition-colors ${
+                      !contact.followUpStatus || contact.followUpStatus === 'idle'
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-400 hover:text-gray-900 hover:bg-gray-100'
+                    }`}
+                  >
+                    暂未跟进
+                  </button>
+                </div>
               </div>
 
               {/* Reminders */}
@@ -217,7 +247,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
             {showAddToFollowing && contact.followUpStatus !== 'following' && (
               <button
                 onClick={() => onAddToFollowing(contact.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-gray-900 text-white hover:bg-gray-800 transition-colors"
               >
                 <RotateCcw size={12} />
                 添加到待跟进
@@ -226,31 +256,29 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
           </div>
 
           {/* Progress Records Section (Priority 1) */}
-          <div className="p-6 border-b border-slate-100">
+          <div className="p-6 border-b border-gray-100">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Calendar size={16} className="text-blue-500" />
+              <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                <Calendar size={16} className="text-gray-900" />
                 跟进记录
-                <span className="text-xs font-normal text-slate-400">
+                <span className="text-xs font-normal text-gray-400">
                   ({contact.progressHistory?.length || 0})
                 </span>
               </h3>
             </div>
             
             {/* 常驻输入框 */}
-            <div className="mb-6 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden transition-all duration-200 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-400">
-              {/* 日期选择器 - 仅在聚焦时显示 */}
-              {isInputFocused && (
-                <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2 animate-in slide-in-from-top-1">
-                  <Calendar size={14} className="text-slate-400" />
-                  <input
-                    type="date"
-                    value={progressDate}
-                    onChange={(e) => setProgressDate(e.target.value)}
-                    className="text-sm text-slate-600 bg-transparent outline-none"
-                  />
-                </div>
-              )}
+            <div className="mb-6 bg-white border border-gray-200 rounded-lg overflow-hidden transition-all duration-200 focus-within:border-gray-400">
+              {/* 日期选择器 - 始终显示 */}
+              <div className="px-3 py-2 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+                <Calendar size={14} className="text-gray-400" />
+                <input
+                  type="date"
+                  value={progressDate}
+                  onChange={(e) => setProgressDate(e.target.value)}
+                  className="text-sm text-gray-600 bg-transparent outline-none cursor-pointer"
+                />
+              </div>
               
               {/* 输入区域 */}
               <div className="relative">
@@ -262,7 +290,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                   onKeyDown={handleKeyDown}
                   placeholder="输入跟进内容，按回车发送..."
                   rows={1}
-                  className="w-full px-3 py-3 pr-12 text-sm text-slate-700 placeholder:text-slate-400 outline-none resize-none bg-transparent min-h-[44px]"
+                  className="w-full px-3 py-3 pr-12 text-sm text-gray-700 placeholder:text-gray-400 outline-none resize-none bg-transparent min-h-[44px]"
                   style={{ maxHeight: '120px' }}
                 />
                 
@@ -270,7 +298,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                 <button
                   onClick={handleSubmitProgress}
                   disabled={!progressContent.trim()}
-                  className="absolute right-2 bottom-2 p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 disabled:text-slate-300 disabled:hover:bg-transparent transition-colors"
+                  className="absolute right-2 bottom-2 p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:text-gray-300 disabled:hover:bg-transparent transition-colors"
                   title="发送 (Enter)"
                 >
                   <Send size={16} className={progressContent.trim() ? 'rotate-0' : 'rotate-45 opacity-50'} />
@@ -279,11 +307,11 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
               
               {/* 快捷键提示 - 仅在聚焦时显示 */}
               {isInputFocused && (
-                <div className="px-3 py-1.5 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-[10px] text-slate-400 animate-in slide-in-from-bottom-1">
+                <div className="px-3 py-1.5 border-t border-gray-100 bg-gray-50 flex items-center justify-between text-[10px] text-gray-400 animate-in slide-in-from-bottom-1">
                   <span>Enter 发送，Shift+Enter 换行</span>
                   <button
                     onClick={() => setIsInputFocused(false)}
-                    className="text-slate-400 hover:text-slate-600"
+                    className="text-gray-400 hover:text-gray-900"
                   >
                     收起
                   </button>
@@ -292,12 +320,12 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
             </div>
             
             {(!contact.progressHistory || contact.progressHistory.length === 0) ? (
-              <div className="text-center py-8 text-slate-400">
-                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <Calendar size={20} className="text-slate-300" />
+              <div className="text-center py-8 text-gray-400">
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <Calendar size={20} className="text-gray-300" />
                 </div>
                 <p className="text-sm">暂无跟进记录</p>
-                <p className="text-xs text-slate-400 mt-1">在上方输入框添加第一条跟进</p>
+                <p className="text-xs text-gray-400 mt-1">在上方输入框添加第一条跟进</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -305,27 +333,27 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                   <div key={record.id || idx} className="relative pl-6 pb-4 last:pb-0">
                     {/* Timeline line */}
                     {idx < (contact.progressHistory?.length || 0) - 1 && (
-                      <div className="absolute left-[5px] top-3 bottom-0 w-0.5 bg-slate-200"></div>
+                      <div className="absolute left-[5px] top-3 bottom-0 w-0.5 bg-gray-200"></div>
                     )}
                     {/* Timeline dot */}
-                    <div className={`absolute left-0 top-1.5 w-3 h-3 rounded-full border-2 border-white shadow-sm ${
-                      idx === 0 ? 'bg-blue-500' : 'bg-slate-300'
+                    <div className={`absolute left-0 top-1.5 w-3 h-3 rounded-full border-2 border-white ${
+                      idx === 0 ? 'bg-gray-900' : 'bg-gray-300'
                     }`}></div>
                     
-                    <div className="bg-slate-50 rounded-xl p-4 group">
+                    <div className="bg-gray-50 rounded-lg p-4 group">
                       <div className="flex items-center justify-between mb-2">
-                        <span className={`text-xs font-mono font-bold ${idx === 0 ? 'text-blue-600' : 'text-slate-500'}`}>
+                        <span className={`text-xs font-mono font-medium ${idx === 0 ? 'text-gray-900' : 'text-gray-500'}`}>
                           {record.date}
                         </span>
                         <button
                           onClick={() => onDeleteProgress(contact.id, record.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-all"
+                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded transition-all"
                           title="删除此记录"
                         >
                           <Trash2 size={14} />
                         </button>
                       </div>
-                      <p className={`text-sm leading-relaxed whitespace-pre-wrap ${idx === 0 ? 'text-slate-800 font-medium' : 'text-slate-600'}`}>
+                      <p className={`text-sm leading-relaxed whitespace-pre-wrap ${idx === 0 ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>
                         {record.content}
                       </p>
                     </div>
@@ -337,8 +365,8 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
 
           {/* Basic Info Section (Priority 2) */}
           <div className="p-6">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
-              <User size={16} className="text-emerald-500" />
+            <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2 mb-4">
+              <User size={16} className="text-gray-900" />
               基本信息
             </h3>
             
@@ -346,18 +374,18 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
               {/* WeChat ID */}
               {contact.wxid && (
                 <div className="flex items-start gap-3">
-                  <span className="text-xs font-bold text-slate-400 w-16 shrink-0 pt-1">微信号</span>
+                  <span className="text-xs font-medium text-gray-400 w-16 shrink-0 pt-1">微信号</span>
                   <div 
                     className="flex items-center gap-2 cursor-pointer group"
                     onClick={(e) => handleCopyWxid(e, contact.wxid)}
                   >
-                    <span className="text-sm font-mono text-slate-700 bg-slate-100 px-2 py-1 rounded group-hover:bg-emerald-50 group-hover:text-emerald-700 transition-colors">
+                    <span className="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded group-hover:bg-gray-200 group-hover:text-gray-900 transition-colors">
                       {contact.wxid}
                     </span>
                     {copiedWxid === contact.wxid ? (
-                      <span className="text-xs text-emerald-600">已复制</span>
+                      <span className="text-xs text-gray-900">已复制</span>
                     ) : (
-                      <span className="text-xs text-slate-400 opacity-0 group-hover:opacity-100">点击复制</span>
+                      <span className="text-xs text-gray-400 opacity-0 group-hover:opacity-100">点击复制</span>
                     )}
                   </div>
                 </div>
@@ -366,11 +394,11 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
               {/* Birthday */}
               {contact.birthday && (
                 <div className="flex items-start gap-3">
-                  <span className="text-xs font-bold text-slate-400 w-16 shrink-0 pt-1">生日</span>
+                  <span className="text-xs font-medium text-gray-400 w-16 shrink-0 pt-1">生日</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-700">{contact.birthday}</span>
+                    <span className="text-sm text-gray-700">{contact.birthday}</span>
                     {birthdaySoon && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-100 text-pink-700">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-900 text-white">
                         <Gift size={10} />
                         快过生日
                       </span>
@@ -382,16 +410,16 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
               {/* Tags */}
               {contact.tags?.length > 0 && (
                 <div className="flex items-start gap-3">
-                  <span className="text-xs font-bold text-slate-400 w-16 shrink-0 pt-1">标签</span>
+                  <span className="text-xs font-medium text-gray-400 w-16 shrink-0 pt-1">标签</span>
                   <div className="flex flex-wrap gap-1.5">
                     {contact.tags.map(tag => (
                       <span 
                         key={tag} 
-                        className="group inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
+                        className="group inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900 transition-colors cursor-pointer"
                         onClick={() => onRemoveTag(contact.id, tag)}
                       >
                         {tag}
-                        <span className="opacity-0 group-hover:opacity-100 text-rose-500">×</span>
+                        <span className="opacity-0 group-hover:opacity-100 text-gray-900">×</span>
                       </span>
                     ))}
                   </div>
@@ -401,7 +429,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
               {/* Deal Products */}
               {contact.dealProducts?.length > 0 && (
                 <div className="flex items-start gap-3">
-                  <span className="text-xs font-bold text-slate-400 w-16 shrink-0 pt-1">
+                  <span className="text-xs font-medium text-gray-400 w-16 shrink-0 pt-1">
                     <ShoppingBag size={12} className="inline mr-1" />
                     成交产品
                   </span>
@@ -409,7 +437,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                     {contact.dealProducts.map(product => (
                       <span 
                         key={product} 
-                        className="px-2.5 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-700 border border-orange-100"
+                        className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200"
                       >
                         {product}
                       </span>
@@ -421,7 +449,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
               {/* Intent Products */}
               {contact.intentProducts?.length > 0 && (
                 <div className="flex items-start gap-3">
-                  <span className="text-xs font-bold text-slate-400 w-16 shrink-0 pt-1">
+                  <span className="text-xs font-medium text-gray-400 w-16 shrink-0 pt-1">
                     <Target size={12} className="inline mr-1" />
                     意向产品
                   </span>
@@ -429,7 +457,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                     {contact.intentProducts.map(product => (
                       <span 
                         key={product} 
-                        className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100"
+                        className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200"
                       >
                         {product}
                       </span>
@@ -441,22 +469,89 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
               {/* Remark Info */}
               {contact.remarkInfo && (
                 <div className="flex items-start gap-3">
-                  <span className="text-xs font-bold text-slate-400 w-16 shrink-0 pt-1">备注</span>
-                  <p className="text-sm text-slate-700 leading-relaxed flex-1">
+                  <span className="text-xs font-medium text-gray-400 w-16 shrink-0 pt-1">备注</span>
+                  <p className="text-sm text-gray-700 leading-relaxed flex-1">
                     {contact.remarkInfo}
                   </p>
                 </div>
               )}
 
               {/* Added At */}
-              <div className="flex items-start gap-3 pt-4 border-t border-slate-100">
-                <span className="text-xs font-bold text-slate-400 w-16 shrink-0 pt-1">添加时间</span>
-                <span className="text-xs text-slate-400">
+              <div className="flex items-start gap-3 pt-4 border-t border-gray-100">
+                <span className="text-xs font-medium text-gray-400 w-16 shrink-0 pt-1">添加时间</span>
+                <span className="text-xs text-gray-400">
                   {new Date(contact.addedAt).toLocaleDateString('zh-CN')}
                 </span>
               </div>
             </div>
           </div>
+
+          {/* Policies Section */}
+          {contact.policies && contact.policies.length > 0 && (
+            <div className="p-6 border-t border-gray-100">
+              <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2 mb-4">
+                <Shield size={16} className="text-gray-900" />
+                保单信息
+                <span className="text-xs font-normal text-gray-400">
+                  ({contact.policies.length})
+                </span>
+              </h3>
+              
+              <div className="space-y-3">
+                {contact.policies.map((policy, idx) => (
+                  <div key={policy.id || idx} className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="font-medium text-gray-900">{policy.productName}</div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                        policy.status.includes('有效') ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {policy.status}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-gray-400">保单号</span>
+                        <p className="font-mono text-gray-600 truncate">{policy.policyNumber || '-'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">保险公司</span>
+                        <p className="text-gray-600">{policy.company || '-'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">保费</span>
+                        <p className="font-medium text-gray-900">¥ {policy.premium}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">生效日期</span>
+                        <p className="text-gray-600">{policy.effectiveDate || '-'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">缴费年限</span>
+                        <p className="text-gray-600">{policy.paymentYears || '-'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">投保人/被保人</span>
+                        <p className="text-gray-600">{policy.applicant} / {policy.insured}</p>
+                      </div>
+                      {policy.coverage && (
+                        <div>
+                          <span className="text-gray-400">保额</span>
+                          <p className="text-gray-600">{policy.coverage}</p>
+                        </div>
+                      )}
+                      {policy.insuranceType && (
+                        <div>
+                          <span className="text-gray-400">险种类型</span>
+                          <p className="text-gray-600">{policy.insuranceType}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

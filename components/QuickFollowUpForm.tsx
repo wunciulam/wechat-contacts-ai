@@ -122,7 +122,7 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
           <button 
             type="button"
             onClick={() => handleToggleTodo(item.id)}
-            className={`shrink-0 transition-colors ${item.completed ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`shrink-0 transition-colors ${item.completed ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
           >
             {item.completed ? <CheckSquare size={18} strokeWidth={2.5} /> : <Square size={18} strokeWidth={2.5} />}
           </button>
@@ -140,14 +140,14 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
               }
             }}
             placeholder="填写跟进内容..."
-            className={`flex-1 bg-transparent border-0 focus:ring-0 p-1 text-sm font-bold text-slate-800 placeholder:text-slate-400 ${item.completed ? 'text-slate-400 line-through font-normal' : ''}`}
+            className={`flex-1 bg-transparent border-0 focus:ring-0 p-1 text-sm font-medium text-gray-900 placeholder:text-gray-400 ${item.completed ? 'text-gray-400 line-through' : ''}`}
             autoFocus={idx === todoItems.length - 1 && isExpanded}
           />
           {!initialRecord && (
             <button 
               type="button"
               onClick={() => handleRemoveTodo(item.id)}
-              className="opacity-0 group-hover/todo:opacity-100 p-1.5 text-slate-300 hover:text-rose-600 transition-all"
+              className="opacity-0 group-hover/todo:opacity-100 p-1.5 text-gray-300 hover:text-gray-600 transition-all"
             >
               <Trash2 size={16} />
             </button>
@@ -158,7 +158,7 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
         <button 
           type="button"
           onClick={handleAddTodo}
-          className="flex items-center gap-2 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 mt-2 pl-7 transition-colors"
+          className="flex items-center gap-2 text-[10px] font-medium text-gray-500 hover:text-gray-900 mt-2 pl-7 transition-colors"
         >
           <Plus size={12} strokeWidth={3} />
           <span>添加新记录项</span>
@@ -169,14 +169,14 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
 
   if (variant === 'compact') {
       return (
-          <div ref={containerRef} className={`bg-white/95 backdrop-blur-xl border shadow-2xl rounded-2xl transition-all duration-300 w-full overflow-visible ${isExpanded ? 'p-3 md:p-3.5 border-emerald-500/20' : 'p-2 border-slate-200'}`}>
+          <div ref={containerRef} className={`bg-white border shadow-md rounded-lg transition-all duration-300 w-full overflow-visible ${isExpanded ? 'p-3 md:p-3.5 border-gray-300' : 'p-2 border-gray-200'}`}>
               <div className="flex flex-col gap-2.5 md:gap-3">
                   <div className={`flex items-center gap-1.5 md:gap-2 ${!isExpanded && !selectedContactId ? 'hidden' : 'flex animate-in fade-in slide-in-from-bottom-2 duration-300'}`}>
                        <div className="relative">
                            <button 
                              ref={triggerRef}
                              onClick={() => !initialRecord && setIsDropdownOpen(!isDropdownOpen)}
-                             className={`flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 rounded-xl text-[10px] md:text-[11px] font-bold transition-all border ${selectedContactId ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
+                              className={`flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 rounded-md text-[10px] md:text-[11px] font-medium transition-all border ${selectedContactId ? 'bg-gray-900 text-white border-gray-900' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'}`}
                              disabled={!!initialRecord}
                            >
                                <User size={12} className="shrink-0 md:w-[14px] md:h-[14px]" />
@@ -184,63 +184,60 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
                                {!initialRecord && (isDropdownOpen ? <ChevronUp size={12} className="md:w-[14px] md:h-[14px]" /> : <ChevronDown size={12} className="md:w-[14px] md:h-[14px]" />)}
                            </button>
                            {isDropdownOpen && (
-                               <div ref={dropdownRef} className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-[100] flex flex-col max-h-[300px] animate-in slide-in-from-top-2">
-                                   <div className="p-2.5 border-b border-slate-100 bg-slate-50/50">
-                                       <div className="relative">
-                                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                                           <input type="text" className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:border-emerald-500 transition-all font-bold" placeholder="搜索客户..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} autoFocus />
-                                       </div>
-                                   </div>
-                                   <div className="overflow-y-auto custom-scrollbar flex-1 p-1.5">
-                                       {filteredContacts.length === 0 ? <div onClick={() => { setIsCreatingNew(true); setNewContactName(searchTerm); setIsDropdownOpen(false); setSelectedContactId(''); }} className="p-3 text-center text-xs font-bold text-emerald-600 cursor-pointer hover:bg-emerald-50 rounded-lg border border-dashed border-emerald-100">无此客户，点此创建: "{searchTerm}"</div> : filteredContacts.map(c => <div key={c.id} onClick={() => { setSelectedContactId(c.id); setIsCreatingNew(false); setIsDropdownOpen(false); }} className="flex items-center gap-3 p-2 hover:bg-slate-50 cursor-pointer rounded-xl transition-colors"><div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 border border-slate-200">{c.remarkName?.[0] || c.nickname?.[0]}</div><div className="text-sm font-bold text-slate-700 truncate">{c.remarkName || c.nickname}</div>{c.id === selectedContactId && <Check size={14} className="text-emerald-500 ml-auto" strokeWidth={3} />}</div>)}
+                                <div ref={dropdownRef} className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-[100] flex flex-col max-h-[300px] animate-in slide-in-from-top-2">
+                                    <div className="p-2.5 border-b border-gray-100 bg-gray-50">
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                                            <input type="text" className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-md outline-none focus:border-gray-400 transition-all font-medium" placeholder="搜索客户..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} autoFocus />
+                                        </div>
+                                    </div>
+                                    <div className="overflow-y-auto custom-scrollbar flex-1 p-1.5">
+                                        {filteredContacts.length === 0 ? <div onClick={() => { setIsCreatingNew(true); setNewContactName(searchTerm); setIsDropdownOpen(false); setSelectedContactId(''); }} className="p-3 text-center text-xs font-medium text-gray-900 cursor-pointer hover:bg-gray-100 rounded-md border border-dashed border-gray-200">无此客户，点此创建: "{searchTerm}"</div> : filteredContacts.map(c => <div key={c.id} onClick={() => { setSelectedContactId(c.id); setIsCreatingNew(false); setIsDropdownOpen(false); }} className="flex items-center gap-3 p-2 hover:bg-gray-50 cursor-pointer rounded-md transition-colors"><div className="w-7 h-7 rounded-md bg-gray-100 flex items-center justify-center text-[10px] font-medium text-gray-500 border border-gray-200">{c.remarkName?.[0] || c.nickname?.[0]}</div><div className="text-sm font-medium text-gray-700 truncate">{c.remarkName || c.nickname}</div>{c.id === selectedContactId && <Check size={14} className="text-gray-900 ml-auto" strokeWidth={3} />}</div>)}
                                    </div>
                                </div>
                            )}
                        </div>
-                       <div className="relative">
-                           <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 transition-all shadow-sm">
-                             <Calendar size={14} /><span>{date}</span>
-                           </button>
-                           <input 
-                             type="date" 
-                             value={date} 
-                             onChange={e => setDate(e.target.value)} 
-                             className="absolute inset-0 opacity-0 cursor-pointer z-10" 
-                           />
-                       </div>
+                        <div className="relative">
+                            <input 
+                              type="date" 
+                              value={date} 
+                              onChange={e => setDate(e.target.value)} 
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 transition-all cursor-pointer"
+                            />
+                        </div>
                   </div>
                   <div className="relative flex flex-col gap-2.5">
                        {isExpanded ? (
-                          <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-100 shadow-inner">
+                           <div className="bg-gray-50 rounded-md p-3 border border-gray-100">
                              {renderTodoItems()}
                           </div>
                        ) : (
                           <div className="flex items-center gap-2">
-                            {!selectedContactId && <button onClick={() => { setIsExpanded(true); setIsDropdownOpen(true); }} className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all border border-slate-200 bg-white"><UserPlus size={18} /></button>}
+                            {!selectedContactId && <button onClick={() => { setIsExpanded(true); setIsDropdownOpen(true); }} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all border border-gray-200 bg-white"><UserPlus size={18} /></button>}
                             <div 
                               onClick={() => setIsExpanded(true)} 
-                              className="flex-1 p-2.5 text-sm text-slate-400 cursor-text min-h-[44px] flex items-center font-bold bg-slate-50 rounded-xl border border-slate-200/50 hover:bg-white hover:border-emerald-300 transition-all"
+                              className="flex-1 p-2.5 text-sm text-gray-400 cursor-text min-h-[44px] flex items-center font-medium bg-gray-50 rounded-md border border-gray-200 hover:bg-white hover:border-gray-300 transition-all"
                             >
                               输入今日跟进事项...
                             </div>
                             <button 
                               onClick={handleSave} 
                               disabled={(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim())} 
-                              className={`shrink-0 px-4 md:px-8 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-bold shadow-lg transition-all active:scale-95 ${(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim()) ? 'bg-slate-200 text-slate-400 shadow-none' : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white shadow-emerald-200/50'}`}
+                              className={`shrink-0 px-4 md:px-8 py-2 md:py-2.5 rounded-md text-xs md:text-sm font-medium transition-all ${(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim()) ? 'bg-gray-200 text-gray-400' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
                             >
                               立即录入
                             </button>
                           </div>
                        )}
                        <div className={`flex justify-end items-center gap-3 mt-1 px-1 ${!isExpanded ? 'hidden' : ''}`}>
-                          {isExpanded && !initialRecord && (
-                            <button onClick={() => setIsExpanded(false)} className="text-[11px] font-bold text-slate-400 hover:text-slate-600">收起</button>
-                          )}
-                          <button 
-                            onClick={handleSave} 
-                            disabled={(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim())} 
-                            className={`shrink-0 px-6 md:px-10 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-bold shadow-lg transition-all active:scale-95 ${(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim()) ? 'bg-slate-200 text-slate-400 shadow-none' : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white shadow-emerald-200/50'}`}
-                          >
+                           {isExpanded && !initialRecord && (
+                             <button onClick={() => setIsExpanded(false)} className="text-[11px] font-medium text-gray-400 hover:text-gray-900">收起</button>
+                           )}
+                           <button 
+                             onClick={handleSave} 
+                             disabled={(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim())} 
+                             className={`shrink-0 px-6 md:px-10 py-2 md:py-2.5 rounded-md text-xs md:text-sm font-medium transition-all ${(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim()) ? 'bg-gray-200 text-gray-400' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
+                           >
                             {initialRecord ? '保存修改' : '立即录入'}
                           </button>
                        </div>
@@ -251,36 +248,71 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
   }
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`space-y-4 ${className}`}>
            <div className="space-y-2 relative">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block ml-1">关联客户对象</label>
+              <label className="text-xs font-medium text-gray-700 block ml-1">关联客户对象</label>
               {isCreatingNew ? (
                   <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
-                      <div className="relative flex-1"><UserPlus className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-600" size={18} strokeWidth={2.5} /><input type="text" value={newContactName} onChange={(e) => setNewContactName(e.target.value)} className="w-full pl-10 pr-4 py-3.5 rounded-2xl border-2 border-emerald-100 bg-emerald-50/10 text-slate-900 focus:bg-white focus:border-emerald-500 outline-none font-bold shadow-sm" placeholder="客户姓名" autoFocus /></div>
-                      <button onClick={() => setIsCreatingNew(false)} className="text-xs font-bold text-slate-400 hover:text-slate-600 underline">返回搜索</button>
+                      <div className="relative flex-1"><UserPlus className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><input type="text" value={newContactName} onChange={(e) => setNewContactName(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-md border border-gray-200 bg-white text-gray-900 focus:bg-white focus:border-gray-400 outline-none font-medium" placeholder="客户姓名" autoFocus /></div>
+                      <button onClick={() => setIsCreatingNew(false)} className="text-xs font-medium text-gray-400 hover:text-gray-900 underline">返回搜索</button>
                   </div>
               ) : selectedContactId ? (
-                  <div className="flex items-center justify-between p-4 bg-emerald-50/20 border border-emerald-100 rounded-2xl shadow-sm"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-sm font-bold text-emerald-700 shadow-inner border border-emerald-100">{selectedContact?.remarkName?.[0] || selectedContact?.nickname?.[0] || '?'}</div><div><div className="font-bold text-slate-800">{selectedContact?.remarkName || selectedContact?.nickname}</div></div></div>{!initialRecord && <button onClick={() => setSelectedContactId('')} className="text-xs text-emerald-600 font-bold px-3 py-1.5 hover:bg-emerald-50 border border-emerald-100 rounded-xl shadow-sm transition-all">更换</button>}</div>
-              ) : (
-                  <div className="relative group"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={18} /><input type="text" placeholder="搜索或输入直接创建..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setIsDropdownOpen(true); }} onFocus={() => setIsDropdownOpen(true)} className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 outline-none transition-all shadow-sm font-bold text-slate-900" />{isDropdownOpen && <div className="absolute left-0 right-0 top-full bg-white rounded-2xl shadow-2xl border border-slate-200 max-h-60 overflow-y-auto z-[60] mt-3 p-2 space-y-1 animate-in fade-in slide-in-from-top-2">{filteredContacts.length === 0 ? <div onClick={() => { setIsCreatingNew(true); setNewContactName(searchTerm); setIsDropdownOpen(false); setSelectedContactId(''); }} className="p-4 text-center cursor-pointer hover:bg-emerald-50 text-emerald-600 font-bold flex items-center justify-center gap-2 rounded-xl transition-colors border border-dashed border-emerald-200"><UserPlus size={18} /> 创建并关联: "{searchTerm}"</div> : <>{filteredContacts.map(c => <div key={c.id} onClick={() => { setSelectedContactId(c.id); setIsDropdownOpen(false); }} className="p-3 hover:bg-slate-50 cursor-pointer flex items-center gap-3 rounded-xl transition-all"><div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 shadow-inner border border-slate-200">{c.remarkName?.[0] || c.nickname?.[0]}</div><div className="font-bold text-slate-800">{c.remarkName || c.nickname}</div></div>)}{searchTerm && <div onClick={() => { setIsCreatingNew(true); setNewContactName(searchTerm); setIsDropdownOpen(false); setSelectedContactId(''); }} className="p-4 bg-emerald-50/30 hover:bg-emerald-50 cursor-pointer border-t border-emerald-100 text-emerald-700 text-sm font-bold flex items-center justify-center gap-2 sticky bottom-0 rounded-b-xl"><Plus size={16} /> 创建新客户 "{searchTerm}"</div>}</>}</div>}</div>
-              )}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-md"><div className="flex items-center gap-3"><div className="w-9 h-9 rounded-md bg-gray-100 flex items-center justify-center text-sm font-medium text-gray-700 border border-gray-200">{selectedContact?.remarkName?.[0] || selectedContact?.nickname?.[0] || '?'}</div><div><div className="font-medium text-gray-900 text-sm">{selectedContact?.remarkName || selectedContact?.nickname}</div></div></div>{!initialRecord && <button onClick={() => setSelectedContactId('')} className="text-xs text-gray-600 font-medium px-3 py-1.5 hover:bg-gray-100 border border-gray-200 rounded-md transition-all">更换</button>}</div>
+               ) : (
+                   <div className="relative group">
+                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-900 transition-colors" size={18} />
+                     <input 
+                       type="text" 
+                       placeholder="搜索或输入直接创建..." 
+                       value={searchTerm} 
+                       onChange={(e) => { setSearchTerm(e.target.value); setIsDropdownOpen(true); }} 
+                       onFocus={() => setIsDropdownOpen(true)} 
+                       className="w-full pl-11 pr-4 py-2.5 rounded-md bg-white border border-gray-200 focus:bg-white focus:border-gray-400 outline-none transition-all font-medium text-gray-900" 
+                     />
+                     {isDropdownOpen && (
+                       <div className="absolute left-0 right-0 top-full bg-white rounded-md shadow-lg border border-gray-200 max-h-60 overflow-y-auto z-[60] mt-2 p-2 space-y-1 animate-in fade-in slide-in-from-top-2">
+                         {filteredContacts.length === 0 ? (
+                           <div onClick={() => { setIsCreatingNew(true); setNewContactName(searchTerm); setIsDropdownOpen(false); setSelectedContactId(''); }} className="p-3 text-center cursor-pointer hover:bg-gray-50 text-gray-600 font-medium flex items-center justify-center gap-2 rounded-md transition-colors border border-dashed border-gray-200">
+                             <UserPlus size={16} /> 创建并关联："{searchTerm}"
+                           </div>
+                         ) : (
+                           <>
+                             {filteredContacts.map(c => (
+                               <div key={c.id} onClick={() => { setSelectedContactId(c.id); setIsDropdownOpen(false); }} className="p-2.5 hover:bg-gray-50 cursor-pointer flex items-center gap-3 rounded-md transition-all">
+                                 <div className="w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600 border border-gray-200">
+                                   {c.remarkName?.[0] || c.nickname?.[0]}
+                                 </div>
+                                 <div className="font-medium text-gray-700 text-sm">{c.remarkName || c.nickname}</div>
+                               </div>
+                             ))}
+                             {searchTerm && (
+                               <div onClick={() => { setIsCreatingNew(true); setNewContactName(searchTerm); setIsDropdownOpen(false); setSelectedContactId(''); }} className="p-3 hover:bg-gray-50 cursor-pointer border-t border-gray-100 text-gray-700 text-sm font-medium flex items-center justify-center gap-2 sticky bottom-0 bg-white rounded-b-md">
+                                 <UserPlus size={16} /> 创建新客户："{searchTerm}"
+                               </div>
+                             )}
+                           </>
+                         )}
+                       </div>
+                     )}
+                   </div>
+               )}
            </div>
-           <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block ml-1">沟通日期</label>
-              <div className="relative group"><Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500" size={18} /><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 outline-none transition-all shadow-sm font-bold text-slate-900" /></div>
-           </div>
-           <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block ml-1">{initialRecord ? '更新记录详情' : '跟进事项清单'}</label>
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 shadow-inner">
-                {renderTodoItems()}
-              </div>
-           </div>
-           <div className="flex justify-end gap-4 pt-6 border-t border-slate-100">
-               {onCancel && <button onClick={onCancel} className="px-6 py-2.5 text-sm font-bold text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all">取消</button>}
-               <button onClick={handleSave} disabled={(!selectedContactId && !newContactName) || !todoItems.some(t => t.text.trim())} className="px-14 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white rounded-2xl font-bold shadow-xl shadow-emerald-200 transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50 disabled:shadow-none">
-                 <Check size={20} strokeWidth={3} /><span>{initialRecord ? '保存修改' : '保存记录'}</span>
-               </button>
-           </div>
+            <div className="space-y-2">
+               <label className="text-xs font-medium text-gray-700 block ml-1">沟通日期</label>
+               <div className="relative group"><Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-900" size={18} /><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full pl-11 pr-4 py-2.5 rounded-md bg-white border border-gray-200 focus:bg-white focus:border-gray-400 outline-none transition-all font-medium text-gray-900" /></div>
+            </div>
+            <div className="space-y-2">
+               <label className="text-xs font-medium text-gray-700 block ml-1">{initialRecord ? '更新记录详情' : '跟进事项清单'}</label>
+               <div className="bg-gray-50 rounded-md p-3 border border-gray-100">
+                 {renderTodoItems()}
+               </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                {onCancel && <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all">取消</button>}
+                <button onClick={handleSave} disabled={(!selectedContactId && !newContactName) || !todoItems.some(t => t.text.trim())} className="px-6 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-md font-medium transition-all disabled:opacity-50 flex items-center gap-2">
+                  <Check size={18} strokeWidth={3} /><span>{initialRecord ? '保存修改' : '保存记录'}</span>
+                </button>
+            </div>
     </div>
   );
 };

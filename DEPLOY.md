@@ -30,6 +30,7 @@
 ```env
 VITE_SUPABASE_URL=你的Project URL
 VITE_SUPABASE_ANON_KEY=你的anon key
+VITE_APP_ID=wechat-contacts  # 推荐：固定同步ID，跨设备/跨域名访问同一份数据
 ```
 
 ## 3. 部署到 Vercel

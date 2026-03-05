@@ -23,7 +23,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
   const [formData, setFormData] = useState<NewContact>({
     wxid: '', nickname: '', remarkName: '', remarkInfo: '', tags: [],
     dealProducts: [], intentProducts: [], lastDate: '', progressHistory: [],
-    followUpStatus: 'following', policies: []
+    followUpStatus: 'idle', policies: []
   });
 
   const [tagInput, setTagInput] = useState('');
@@ -47,7 +47,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
         });
         setActiveTab('manual');
       } else {
-        setFormData({ wxid: '', nickname: '', remarkName: '', remarkInfo: '', tags: [], dealProducts: [], intentProducts: [], lastDate: new Date().toISOString().split('T')[0], progressHistory: [], followUpStatus: 'following', policies: [] });
+        setFormData({ wxid: '', nickname: '', remarkName: '', remarkInfo: '', tags: [], dealProducts: [], intentProducts: [], lastDate: new Date().toISOString().split('T')[0], progressHistory: [], followUpStatus: 'idle', policies: [] });
         setActiveTab('ai');
         setExtractedList([]);
         setExtractedTableData(null);
@@ -82,7 +82,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
         const base64Data = (reader.result as string).split(',')[1];
         if (mode === 'contact') {
           const results = await extractContactsFromMedia(base64Data, file.type);
-          setExtractedList(results.map(r => ({ ...r, wxid: r.wxid || '', nickname: r.nickname || '', remarkName: r.remarkName || '', remarkInfo: r.remarkInfo || '', tags: r.tags || [], dealProducts: r.dealProducts || [], intentProducts: r.intentProducts || [], lastDate: new Date().toISOString().split('T')[0], progressHistory: [], followUpStatus: 'following', policies: [] })));
+          setExtractedList(results.map(r => ({ ...r, wxid: r.wxid || '', nickname: r.nickname || '', remarkName: r.remarkName || '', remarkInfo: r.remarkInfo || '', tags: r.tags || [], dealProducts: r.dealProducts || [], intentProducts: r.intentProducts || [], lastDate: new Date().toISOString().split('T')[0], progressHistory: [], followUpStatus: 'idle', policies: [] })));
         } else {
           const tableResult = await extractTableFromMedia(base64Data, file.type);
           setExtractedTableData(tableResult);
@@ -144,6 +144,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
             insuredName: getRowValue(row, '被保人', '被保人') || '',
             phoneNumber: getRowValue(row, '手机号', '手机号') || '',
             idCard: getRowValue(row, '证件号', '证件号') || '',
+            paymentYears: getRowValue(row, '缴费年限', '缴费年限') || '',
+            insuranceType: getRowValue(row, '险种类型', '险种类型') || '',
+            coverage: getRowValue(row, '保额', '保额') || '',
           }))
         };
       } else if (isCustomerTable || columns.includes('客户姓名')) {
@@ -266,22 +269,22 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-900">{initialData ? '编辑联系人资料' : '添加联系人'}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer">
+      <div className="bg-white shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] rounded-2xl border border-slate-200">
+        <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
+          <h2 className="text-base font-semibold text-slate-800">{initialData ? '编辑联系人资料' : '添加联系人'}</h2>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all cursor-pointer">
             <X size={20} />
           </button>
         </div>
         {!initialData && (
-          <div className="px-6 pt-4 pb-0 flex gap-2 overflow-x-auto">
-            <button onClick={() => setActiveTab('ai')} className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'ai' ? 'bg-primary-50 text-primary-700' : 'text-gray-500 hover:bg-gray-50'} cursor-pointer`}>Excel导入</button>
-            <button onClick={() => setActiveTab('table')} className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'table' ? 'bg-primary-50 text-primary-700' : 'text-gray-500 hover:bg-gray-50'} cursor-pointer`}>截图识别</button>
-            <button onClick={() => setActiveTab('manual')} className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'manual' ? 'bg-primary-50 text-primary-700' : 'text-gray-500 hover:bg-gray-50'} cursor-pointer`}>手动录入</button>
+          <div className="px-5 pt-4 pb-0 flex gap-2 overflow-x-auto">
+            <button onClick={() => setActiveTab('ai')} className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'ai' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:bg-slate-50'} cursor-pointer`}>Excel导入</button>
+            <button onClick={() => setActiveTab('table')} className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'table' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:bg-slate-50'} cursor-pointer`}>截图识别</button>
+            <button onClick={() => setActiveTab('manual')} className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'manual' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:bg-slate-50'} cursor-pointer`}>手动录入</button>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {error && <div className="p-4 bg-red-50 text-red-700 rounded-lg flex gap-2 text-sm border border-red-100"><AlertCircle size={18} />{error}</div>}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {error && <div className="p-4 bg-red-50 text-red-700 rounded-xl flex gap-2 text-sm border border-red-100"><AlertCircle size={18} />{error}</div>}
 
           {activeTab === 'manual' && (
             <div className="space-y-5">
@@ -307,10 +310,10 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
               <div className="space-y-1.5 relative" ref={tagInputContainerRef}>
                 <label className="text-xs font-medium text-gray-700">标签管理</label>
                 <div
-                  className={`flex flex-wrap gap-2 p-3 min-h-[50px] border rounded-lg transition-all ${showTagSuggestions ? 'border-primary-500 ring-1 ring-primary-500/20' : 'border-gray-200'}`}
+                  className={`flex flex-wrap gap-2 p-3 min-h-[50px] border rounded-lg transition-all ${showTagSuggestions ? 'border-gray-900 ring-1 ring-gray-900/10' : 'border-gray-200'}`}
                   onClick={() => setShowTagSuggestions(true)}
                 >
-                  {formData.tags.map(t => <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 border border-primary-100 rounded-full text-xs font-medium text-primary-700">{t}<button onClick={(e) => { e.stopPropagation(); setFormData({...formData, tags: formData.tags.filter(x => x !== t)}); }} className="hover:text-red-600 transition-colors"><X size={10} strokeWidth={3}/></button></span>)}
+                  {formData.tags.map(t => <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700">{t}<button onClick={(e) => { e.stopPropagation(); setFormData({...formData, tags: formData.tags.filter(x => x !== t)}); }} className="hover:text-gray-900 transition-colors"><X size={10} strokeWidth={3}/></button></span>)}
                   <input
                     type="text"
                     placeholder="输入标签..."
@@ -324,15 +327,15 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
                 {showTagSuggestions && (tagSuggestions.length > 0 || tagInput.trim()) && (
                   <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden max-h-48 overflow-y-auto">
                     {tagSuggestions.map(tag => (
-                      <button key={tag} onClick={() => addTag(tag)} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors cursor-pointer flex items-center justify-between">
+                      <button key={tag} onClick={() => addTag(tag)} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors cursor-pointer flex items-center justify-between">
                         <span>{tag}</span>
                         <Tag size={14} className="text-gray-300" />
                       </button>
                     ))}
                     {tagInput.trim() && !tagSuggestions.includes(tagInput.trim()) && !formData.tags.includes(tagInput.trim()) && (
-                       <button onClick={() => addTag(tagInput)} className="w-full text-left px-4 py-2 text-sm text-primary-700 bg-primary-50/50 hover:bg-primary-100 transition-colors flex items-center gap-2 cursor-pointer">
+                       <button onClick={() => addTag(tagInput)} className="w-full text-left px-4 py-2 text-sm text-gray-900 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center gap-2 cursor-pointer">
                          <Plus size={14} />
-                         <span>新增标签: "{tagInput}"</span>
+                         <span>新增标签："{tagInput}"</span>
                        </button>
                     )}
                   </div>
@@ -392,16 +395,58 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
                 </div>
               </div>
 
+              {/* 跟进状态设置 */}
               <div className="space-y-3 pt-4 border-t border-gray-100">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm font-medium text-gray-700"><Clock size={16} strokeWidth={2}/> 跟进历史</div>
-                  <button
-                    onClick={() => setShowHistoryAdd(!showHistoryAdd)}
-                    className="text-xs font-medium text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                  >
-                    <Plus size={14} /> 新增记录
-                  </button>
+                  <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <Clock size={16} strokeWidth={2}/> 跟进状态
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, followUpStatus: 'following'})}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        formData.followUpStatus === 'following'
+                          ? 'bg-gray-900 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      跟进中
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, followUpStatus: 'contacted'})}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        formData.followUpStatus === 'contacted'
+                          ? 'bg-gray-900 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      已沟通
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, followUpStatus: 'idle'})}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        !formData.followUpStatus || formData.followUpStatus === 'idle'
+                          ? 'bg-gray-900 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      暂未跟进
+                    </button>
+                  </div>
                 </div>
+
+                 <div className="flex items-center justify-between">
+                   <div className="flex items-center gap-2 text-sm font-medium text-gray-700"><Clock size={16} strokeWidth={2}/> 跟进历史</div>
+                   <button
+                     onClick={() => setShowHistoryAdd(!showHistoryAdd)}
+                     className="text-xs font-medium text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                   >
+                     <Plus size={14} /> 新增记录
+                   </button>
+                 </div>
 
                 {showHistoryAdd && (
                   <div className="p-4 bg-gray-50 rounded-lg space-y-3 animate-fade-in">
@@ -425,7 +470,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
                 )}
 
                 <div className="space-y-2">
-                  {(formData.progressHistory || []).map((record) => (
+                  {[...(formData.progressHistory || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((record) => (
                     <div key={record.id} className="p-4 bg-white border border-gray-200 rounded-lg group relative hover:border-gray-300 transition-all">
                       {editingHistoryId === record.id ? (
                         <div className="space-y-3 py-1">
@@ -461,16 +506,11 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
                   ))}
                 </div>
               </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 sticky bottom-0 bg-white -mx-6 px-6 py-4">
-                <button onClick={onClose} className="btn btn-secondary text-sm">放弃修改</button>
-                <button onClick={handleManualSave} className="btn btn-primary text-sm">保存资料</button>
-              </div>
             </div>
           )}
 
           {activeTab === 'ai' && !loading && extractedList.length === 0 && !extractedTableData && (
-            <div onClick={() => excelFileInputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl p-12 flex flex-col items-center justify-center text-gray-400 hover:border-primary-300 hover:bg-primary-50/20 transition-all cursor-pointer min-h-[280px]">
+            <div onClick={() => excelFileInputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl p-12 flex flex-col items-center justify-center text-gray-400 hover:border-gray-400 hover:bg-gray-50/20 transition-all cursor-pointer min-h-[280px]">
               <div className="w-16 h-16 bg-gray-50 rounded-xl flex items-center justify-center mb-4"><FileSpreadsheet size={28} className="text-gray-300" strokeWidth={2} /></div>
               <p className="font-medium text-gray-700 text-lg">上传 Excel 表格</p>
               <p className="text-sm text-gray-500 mt-2 text-center max-w-sm">支持客户信息表和保单信息表，自动识别表头并去重合并。</p>
@@ -480,7 +520,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
           )}
 
           {activeTab === 'table' && !loading && !extractedTableData && (
-            <div onClick={() => tableFileInputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl p-12 flex flex-col items-center justify-center text-gray-400 hover:border-primary-300 hover:bg-primary-50/20 transition-all cursor-pointer min-h-[280px]">
+            <div onClick={() => tableFileInputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl p-12 flex flex-col items-center justify-center text-gray-400 hover:border-gray-400 hover:bg-gray-50/20 transition-all cursor-pointer min-h-[280px]">
               <div className="w-16 h-16 bg-gray-50 rounded-xl flex items-center justify-center mb-4"><FileSpreadsheet size={28} className="text-gray-300" strokeWidth={2} /></div>
               <p className="font-medium text-gray-700 text-lg">上传保单/客户表截图</p>
               <p className="text-sm text-gray-500 mt-2 text-center max-w-sm">AI 将自动识别表格类型并提取数据。</p>
@@ -527,18 +567,26 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
                   ))}
                </div>
 
-               <button
-                 onClick={handleTableConfirm}
-                 className="w-full btn btn-primary"
-               >
-                 确认导入表格数据
-               </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
+                <button
+                  onClick={handleTableConfirm}
+                  className="w-full btn btn-primary"
+                >
+                  确认导入表格数据
+                </button>
+             </div>
+           )}
+         </div>
+
+         {/* 底部操作区 - 仅在手动录入时显示 */}
+         {(activeTab === 'manual' || initialData) && (
+           <div className="px-5 py-4 border-t border-gray-100 bg-white flex justify-end gap-2 shrink-0">
+             <button onClick={onClose} className="btn btn-secondary text-xs py-2">取消</button>
+             <button onClick={handleManualSave} className="btn btn-primary text-xs py-2">保存</button>
+           </div>
+         )}
+       </div>
+     </div>
+   );
+ };
 
 export default ImportModal;

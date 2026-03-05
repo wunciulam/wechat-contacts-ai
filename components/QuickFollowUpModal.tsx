@@ -18,21 +18,21 @@ const QuickFollowUpModal: React.FC<QuickFollowUpModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-300">
-      <div className="bg-white rounded-none sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform scale-100 transition-all flex flex-col h-full sm:h-auto sm:max-h-[90vh] ring-1 ring-white/20">
-        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
-          <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-            <div className={`p-1.5 sm:p-2 rounded-lg ${initialRecord ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'} shadow-inner`}>
-               {initialRecord ? <Edit3 size={18} /> : <Clock size={18} />}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-0 sm:p-4 animate-in fade-in duration-300">
+      <div className="bg-white rounded-none sm:rounded-lg shadow-lg w-full max-w-lg overflow-hidden transform scale-100 transition-all flex flex-col h-full sm:h-auto sm:max-h-[85vh]">
+        <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
+          <h3 className="text-sm sm:text-base font-medium text-gray-900 flex items-center gap-2">
+            <div className={`p-1.5 rounded-md ${initialRecord ? 'bg-gray-100 text-gray-700' : 'bg-gray-100 text-gray-700'}`}>
+               {initialRecord ? <Edit3 size={16} /> : <Clock size={16} />}
             </div>
             {initialRecord ? '编辑跟进记录' : '快速记录跟进'}
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-rose-500 p-2 rounded-full hover:bg-rose-50 transition-all">
-            <X size={20} />
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-900 p-1.5 rounded-full hover:bg-gray-100 transition-all">
+            <X size={18} />
           </button>
         </div>
 
-        <div className="p-4 sm:p-8 flex-1 overflow-y-auto custom-scrollbar">
+        <div className="p-4 sm:p-5 flex-1 overflow-y-auto custom-scrollbar">
             <QuickFollowUpForm 
                 contacts={contacts}
                 onSave={(...args) => { onSave(...args); onClose(); }}

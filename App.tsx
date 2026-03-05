@@ -8,10 +8,9 @@ import ImportModal from './components/ImportModal';
 import BatchTagModal from './components/BatchTagModal';
 import ConfirmModal from './components/ConfirmModal';
 import QuickFollowUpModal from './components/QuickFollowUpModal';
-import ProductSpecModal from './components/ProductSpecModal';
 import ManualPolicyModal from './components/ManualPolicyModal';
 import { Contact, NewContact, ProgressRecord, ExtractedTableData, Policy } from './types';
-import { saveToCloud, loadFromCloud, isSupabaseConfigured } from './services/supabaseService';
+import { saveToCloud, loadFromCloud, isSupabaseConfigured, loadLegacyContactsTable } from './services/supabaseService';
 
 const FOLLOW_UP_TAG = '跟进中';
 const CONTACTED_TAG = '沟通过';
@@ -32,30 +31,14 @@ const getPolicyCategory = (name: string): string | null => {
 
 /**
  * Helper to automatically apply tags based on business rules:
- * 1. followUpStatus is following -> Apply "跟进中"
- * 2. followUpStatus is contacted -> Apply "沟通过"
- * 3. Has policy records -> Apply "成交客户"
+ * Only auto-apply "成交客户" tag for contacts with policies.
+ * Other tags are managed manually by users.
  */
 const applyAutoTags = (contact: Contact): Contact => {
   let newTagsSet = new Set(contact.tags);
   let changed = false;
   
-  // 1. Check followUpStatus
-  if (contact.followUpStatus === 'contacted') {
-      if (!newTagsSet.has(CONTACTED_TAG)) {
-          newTagsSet.add(CONTACTED_TAG);
-          newTagsSet.delete(FOLLOW_UP_TAG);
-          changed = true;
-      }
-  } else if (contact.followUpStatus === 'following') {
-      if (!newTagsSet.has(FOLLOW_UP_TAG)) {
-          newTagsSet.add(FOLLOW_UP_TAG);
-          newTagsSet.delete(CONTACTED_TAG);
-          changed = true;
-      }
-  }
-
-  // 2. Check for policy records
+  // Only auto-apply "成交客户" tag for policy records
   const hasPolicies = contact.policies && contact.policies.length > 0;
   if (hasPolicies && !newTagsSet.has(CLOSED_CUSTOMER_TAG)) {
     newTagsSet.add(CLOSED_CUSTOMER_TAG);
@@ -81,9 +64,11 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'contacts' | 'followups' | 'policies'>('contacts');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
+  // 跟进状态筛选
+  const [followUpFilter, setFollowUpFilter] = useState<'idle' | 'following' | 'contacted' | null>(null);
+  
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   
   // Quick Follow Up Modal
@@ -111,47 +96,48 @@ const App: React.FC = () => {
     isDestructive?: boolean;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, onCancel: () => {} });
 
-  // 1. Load Data
+  // Debug: capture runtime style system + navigation state
+  useEffect(() => {
+    try {
+      const rootStyles = getComputedStyle(document.documentElement);
+      const bodyStyles = getComputedStyle(document.body);
+      const primary600 = rootStyles.getPropertyValue('--color-primary-600')?.trim();
+      const bodyBg = bodyStyles.backgroundColor;
+
+      // Detect whether .btn/.btn-primary rules are actually active
+      const probe = document.createElement('button');
+      probe.className = 'btn btn-primary';
+      probe.style.position = 'absolute';
+      probe.style.left = '-9999px';
+      probe.textContent = 'probe';
+      document.body.appendChild(probe);
+      const probeStyles = getComputedStyle(probe);
+      const probeBg = probeStyles.backgroundColor;
+      const probeMinH = probeStyles.minHeight;
+      probe.remove();
+
+      console.log('Style system check:', { origin: window.location.origin, bodyBg, primary600, probeBg, probeMinH });
+    } catch (e) {
+      console.error('Style system check failed:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    console.log('Navigation state:', { currentView, selectedTagsCount: selectedTags.size, contactsCount: contacts.length, selectedContactIdsCount: selectedContactIds.size, isLoaded });
+  }, [currentView, selectedTags, contacts.length, selectedContactIds, isLoaded]);
+
+  // 1. Load Data - 优先从云端加载
   useEffect(() => {
     const loadData = async () => {
       console.log('Supabase配置状态:', isSupabaseConfigured());
       
-      // 优先从本地存储加载
-      const saved = localStorage.getItem('wechat-contacts');
-      if (saved) {
-        try {
-          const parsedData = JSON.parse(saved);
-          if (Array.isArray(parsedData)) {
-            const migratedData = parsedData.map(c => {
-              const baseContact: Contact = {
-                ...c,
-                dealProducts: Array.isArray(c.dealProducts) ? c.dealProducts : (c.dealProducts ? [c.dealProducts] : []),
-                intentProducts: Array.isArray(c.intentProducts) ? c.intentProducts : [],
-                policies: c.policies || []
-              };
-              return applyAutoTags(baseContact);
-            });
-            setContacts(migratedData);
-            setIsLoaded(true);
-            
-            // 后台尝试云端同步
-            if (isSupabaseConfigured() && migratedData.length > 0) {
-              console.log('正在同步到云端...');
-              const success = await saveToCloud('contacts', migratedData);
-              console.log('云端同步结果:', success ? '成功' : '失败');
-            }
-            return;
-          }
-        } catch (e) {
-          console.error('本地数据解析失败:', e);
-        }
-      }
-
-      // 本地没有数据，尝试从云端加载
+      // 优先从云端加载
       if (isSupabaseConfigured()) {
         try {
+          console.log('正在从云端加载数据...');
           const cloudData = await loadFromCloud('contacts');
           if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
+            console.log('从云端加载成功，联系人数量:', cloudData.length);
             const migratedData = cloudData.map(c => {
               const baseContact: Contact = {
                 ...c,
@@ -163,27 +149,124 @@ const App: React.FC = () => {
             });
             setContacts(migratedData);
             localStorage.setItem('wechat-contacts', JSON.stringify(migratedData));
+            localStorage.setItem('wechat-contacts-backup', JSON.stringify(migratedData));
             setIsLoaded(true);
+            console.log('从云端加载成功，联系人数量:', cloudData.length);
+            return;
+          } else {
+            console.log('云端没有数据');
+          }
+
+          // 兼容旧版：如果 app_data 没数据，尝试从 contacts 表恢复
+          console.log('尝试从旧版 contacts 表恢复...');
+          const legacyRows = await loadLegacyContactsTable();
+          if (legacyRows && Array.isArray(legacyRows) && legacyRows.length > 0) {
+            const migratedData = legacyRows.map((r: any) => {
+              const baseContact: Contact = {
+                id: String(r.id),
+                wxid: r.wxid || '',
+                nickname: r.nickname || '',
+                remarkName: r.remark_name || r.remarkName || r.nickname || '',
+                remarkInfo: r.remark_info || r.remarkInfo || '',
+                tags: Array.isArray(r.tags) ? r.tags : (r.tags ? (Array.isArray(r.tags) ? r.tags : []) : []),
+                avatarUrl: r.avatar_url || r.avatarUrl,
+                addedAt: Number(r.added_at || r.addedAt || Date.now()),
+                lastDate: r.last_date || r.lastDate,
+                progressHistory: Array.isArray(r.progress_history) ? r.progress_history : (r.progressHistory || []),
+                progress: r.progress || undefined,
+                dealProducts: Array.isArray(r.deal_products) ? r.deal_products : (r.dealProducts ? (Array.isArray(r.dealProducts) ? r.dealProducts : [r.dealProducts]) : []),
+                intentProducts: Array.isArray(r.intent_products) ? r.intent_products : (r.intentProducts || []),
+                followUpStatus: r.follow_up_status || r.followUpStatus,
+                policies: []
+              };
+              return applyAutoTags(baseContact);
+            });
+
+            console.log('旧版 contacts 表恢复成功，联系人数量:', migratedData.length);
+            setContacts(migratedData);
+            localStorage.setItem('wechat-contacts', JSON.stringify(migratedData));
+            localStorage.setItem('wechat-contacts-backup', JSON.stringify(migratedData));
+
+            // 写回新同步表，避免下次再丢
+            await saveToCloud('contacts', migratedData);
+            setIsLoaded(true);
+            console.log('旧版 contacts 表恢复成功，联系人数量:', migratedData.length);
+            return;
+          } else {
+            console.log('旧版 contacts 表也没有数据');
+          }
+        } catch (e) {
+          console.error('从云端加载失败:', e);
+        }
+      }
+
+      // 云端没有数据，从本地存储加载
+      const saved = localStorage.getItem('wechat-contacts');
+      if (saved) {
+        try {
+          const parsedData = JSON.parse(saved);
+          if (Array.isArray(parsedData) && parsedData.length > 0) {
+            console.log('从本地存储加载，联系人数量:', parsedData.length);
+            const migratedData = parsedData.map(c => {
+              const baseContact: Contact = {
+                ...c,
+                dealProducts: Array.isArray(c.dealProducts) ? c.dealProducts : (c.dealProducts ? [c.dealProducts] : []),
+                intentProducts: Array.isArray(c.intentProducts) ? c.intentProducts : [],
+                policies: c.policies || []
+              };
+              return applyAutoTags(baseContact);
+            });
+            setContacts(migratedData);
+            
+            // 同步到云端备份
+            if (isSupabaseConfigured() && migratedData.length > 0) {
+              console.log('正在同步到云端...');
+              await saveToCloud('contacts', migratedData);
+            }
+            setIsLoaded(true);
+            console.log('从本地存储加载，联系人数量:', parsedData.length);
             return;
           }
         } catch (e) {
-          console.log('从云端加载失败，使用本地数据');
+          console.error('本地数据解析失败:', e);
+        }
+      }
+
+      // 尝试从备份恢复
+      const backup = localStorage.getItem('wechat-contacts-backup');
+      if (backup) {
+        try {
+          const parsedData = JSON.parse(backup);
+          if (Array.isArray(parsedData) && parsedData.length > 0) {
+            console.log('从备份恢复数据...');
+            setContacts(parsedData);
+            localStorage.setItem('wechat-contacts', JSON.stringify(parsedData));
+            setIsLoaded(true);
+            console.log('从备份恢复数据...');
+            return;
+          }
+        } catch (e) {
+          console.error('备份恢复失败:', e);
         }
       }
 
       setIsLoaded(true);
+      console.log('没有找到任何数据');
     };
 
     loadData();
   }, []);
 
-  // 2. Save Data
+  // 2. Save Data - 强制保存到云端
   useEffect(() => {
-    if (isLoaded) {
+    if (isLoaded && contacts.length > 0) {
+      // 保存到本地
       localStorage.setItem('wechat-contacts', JSON.stringify(contacts));
-      // 自动同步到云端
+      localStorage.setItem('wechat-contacts-backup', JSON.stringify(contacts));
+      
+      // 强制保存到云端
       if (isSupabaseConfigured()) {
-        console.log('正在保存并同步到云端, 联系人数量:', contacts.length);
+        console.log('正在强制保存到云端, 联系人数量:', contacts.length);
         saveToCloud('contacts', contacts).then(success => {
           console.log('云端保存结果:', success ? '成功' : '失败');
         }).catch(e => console.log('云端同步失败:', e));
@@ -234,8 +317,11 @@ const App: React.FC = () => {
       setEditingContact(null);
     } else {
       const newContacts: Contact[] = newContactDataArray.map(data => {
+        // 手动录入新客户时，如果没有其他标签，自动添加"潜在客户"
+        const tags = data.tags && data.tags.length > 0 ? data.tags : ['潜在客户'];
         const c: Contact = {
           ...data,
+          tags,
           id: generateId(),
           addedAt: Date.now(),
           followUpStatus: 'following',
@@ -342,7 +428,10 @@ const App: React.FC = () => {
                effectiveDate: String(item.effectiveDate || ''),
                status: String(item.status || '有效'),
                applicant: String(item.applicantName || ''),
-               insured: String(item.insuredName || '')
+               insured: String(item.insuredName || ''),
+               paymentYears: String(item.paymentYears || ''),
+               insuranceType: String(item.insuranceType || ''),
+               coverage: String(item.coverage || '')
           };
 
           if (ownerIndex >= 0) {
@@ -441,10 +530,18 @@ const App: React.FC = () => {
         if (c.id === contactId) {
            let updatedHistory;
            if (existingRecordId) {
+              // 编辑现有记录：保持当前状态不变
               updatedHistory = (c.progressHistory || []).map(r => 
                  r.id === existingRecordId ? { ...r, date, content, completed: completed ?? r.completed } : r
               );
+              const updated = {
+                ...c,
+                progressHistory: updatedHistory,
+                lastDate: date
+              };
+              return updated;
            } else {
+              // 添加新记录：自动设为跟进中
               const newRecord: ProgressRecord = {
                 id: Date.now().toString(),
                 date: date,
@@ -452,19 +549,19 @@ const App: React.FC = () => {
                 completed: completed ?? false
               };
               updatedHistory = [newRecord, ...(c.progressHistory || [])];
+              const updated = {
+                ...c,
+                progressHistory: updatedHistory,
+                lastDate: date,
+                followUpStatus: 'following'  // 自动设为跟进中
+              };
+              return updated;
            }
-           
-           const updated = {
-             ...c,
-             progressHistory: updatedHistory,
-             lastDate: date,
-             followUpStatus: newStatus
-           };
-           return applyAutoTags(updated);
         }
         return c;
       }));
     } else if (newContactName) {
+      // 创建新联系人并添加跟进记录
       const newRecord: ProgressRecord = {
          id: Date.now().toString(),
          date: date,
@@ -483,10 +580,10 @@ const App: React.FC = () => {
         intentProducts: [],
         progressHistory: [newRecord],
         lastDate: date,
-        followUpStatus: newStatus,
+        followUpStatus: 'following',  // 自动设为跟进中
         policies: []
       };
-      setContacts(prev => [applyAutoTags(newContact), ...prev]);
+      setContacts(prev => [newContact, ...prev]);
     }
   };
 
@@ -505,10 +602,13 @@ const App: React.FC = () => {
   const handleDeleteProgress = (contactId: string, progressId: string) => {
       setContacts(prev => prev.map(c => {
           if (c.id === contactId) {
-              return {
+              const newProgressHistory = c.progressHistory?.filter(p => p.id !== progressId);
+              const hasRemainingRecords = (newProgressHistory && newProgressHistory.length > 0) || c.progress;
+              const updatedContact = {
                   ...c,
-                  progressHistory: c.progressHistory?.filter(p => p.id !== progressId)
+                  progressHistory: newProgressHistory
               };
+              return applyAutoTags(updatedContact);
           }
           return c;
       }));
@@ -650,13 +750,20 @@ const App: React.FC = () => {
      });
   };
 
-  const handleUpdateStatus = (contactId: string, newStatus: 'following' | 'contacted') => {
+  const handleUpdateStatus = (contactId: string, newStatus: 'idle' | 'following' | 'contacted') => {
       setContacts(prev => prev.map(c => {
           if (c.id === contactId) {
               const updatedContact = { ...c, followUpStatus: newStatus };
-              // Tag behavior as requested:
-              // If moved to contacted -> remove '跟进中', add '沟通过'
-              // If moved to following -> remove '沟通过', add '跟进中'
+              return applyAutoTags(updatedContact);
+          }
+          return c;
+      }));
+  };
+
+  const handleBatchUpdateStatus = (ids: string[], newStatus: 'idle' | 'following' | 'contacted') => {
+      setContacts(prev => prev.map(c => {
+          if (ids.includes(c.id)) {
+              const updatedContact = { ...c, followUpStatus: newStatus };
               return applyAutoTags(updatedContact);
           }
           return c;
@@ -675,6 +782,7 @@ const App: React.FC = () => {
                     }}
                     onDelete={handleDeleteContact}
                     filterTags={selectedTags}
+                    followUpFilter={followUpFilter}
                     selectedIds={selectedContactIds}
                     onToggleSelect={handleToggleSelect}
                     onSelectAll={handleSelectAll}
@@ -684,6 +792,8 @@ const App: React.FC = () => {
                     onBatchDelete={handleBatchDelete}
                     onRemoveTagFromContact={handleRemoveTagFromContact}
                     onClearTags={() => setSelectedTags(new Set())}
+                    onUpdateStatus={handleUpdateStatus}
+                    onBatchUpdateStatus={handleBatchUpdateStatus}
                   />
               );
           case 'followups':
@@ -691,6 +801,7 @@ const App: React.FC = () => {
                   <FollowUpDashboard 
                      contacts={contacts}
                      filterTags={selectedTags}
+                    followUpFilter={followUpFilter}
                      onAddProgress={(id) => {
                          setEditingRecord(null);
                          setQuickFollowUpContactId(id);
@@ -716,6 +827,7 @@ const App: React.FC = () => {
                   <PolicyDashboard 
                      contacts={contacts}
                      filterTags={selectedTags}
+                    followUpFilter={followUpFilter}
                      onEditContact={(contact) => {
                          setEditingContact(contact);
                          setIsModalOpen(true);
@@ -732,11 +844,13 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full bg-gray-50 overflow-hidden font-sans">
+    <div className="flex flex-col md:flex-row h-screen w-full bg-white overflow-hidden font-sans">
       <Sidebar 
         tags={allTags}
         selectedTags={selectedTags}
         onSelectTag={handleToggleTag}
+        followUpFilter={followUpFilter}
+        onFollowUpFilter={setFollowUpFilter}
         onAddNew={() => {
           setEditingContact(null);
           setIsModalOpen(true);
@@ -746,29 +860,28 @@ const App: React.FC = () => {
         onBatchDeleteTags={handleBatchDeleteTags}
         onToggleAllTags={handleToggleAllTags}
         totalContacts={contacts.length}
-        followUpCount={contacts.filter(c => c.followUpStatus === 'following' && (c.progressHistory?.length || c.progress)).length}
+        followUpCount={contacts.filter(c => c.followUpStatus === 'following').length}
         policyCount={contacts.filter(c => c.policies && c.policies.length > 0).length}
         currentView={currentView}
         onChangeView={setCurrentView}
-        onOpenSpecs={() => setIsSpecModalOpen(true)}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
       <div className="flex-1 h-full overflow-hidden relative flex flex-col">
         {/* Mobile Header */}
-        <div className="md:hidden h-14 bg-white border-b border-gray-200 flex items-center px-4 shrink-0 z-20">
-          <button 
+        <div className="md:hidden h-14 bg-white border-b border-gray-100 flex items-center px-4 shrink-0 z-20">
+          <button
             onClick={() => setIsMobileSidebarOpen(true)}
-            className="p-2 -ml-2 text-gray-500 hover:text-gray-700"
+            className="p-2 -ml-2 text-gray-500 hover:text-gray-900"
           >
             <Menu size={24} />
           </button>
           <span className="ml-2 font-semibold text-gray-900">
-            {currentView === 'contacts' 
-              ? `全部联系人 (${contacts.length})` 
-              : currentView === 'followups' 
-                ? `跟进工作台 (${contacts.filter(c => c.followUpStatus === 'following' && (c.progressHistory?.length || c.progress)).length})` 
+            {currentView === 'contacts'
+              ? `客户管理 (${contacts.length})`
+              : currentView === 'followups'
+                ? `跟进记录 (${contacts.filter(c => (c.progressHistory && c.progressHistory.length > 0) || c.progress).length})`
                 : `保单管理 (${contacts.filter(c => c.policies && c.policies.length > 0).length})`}
           </span>
         </div>
@@ -778,34 +891,34 @@ const App: React.FC = () => {
         </div>
 
         {/* Mobile Bottom Navigation */}
-        <div className="md:hidden h-16 bg-white border-t border-gray-200 flex items-center justify-around px-2 shrink-0 z-20 pb-safe">
-          <button 
+        <div className="md:hidden h-16 bg-white border-t border-gray-100 flex items-center justify-around px-2 shrink-0 z-20 pb-safe">
+          <button
             onClick={() => setCurrentView('contacts')}
-            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all ${currentView === 'contacts' ? 'text-primary-600' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all ${currentView === 'contacts' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`}
           >
-            <Users size={20} className={currentView === 'contacts' ? 'fill-primary-50/50' : ''} />
-            <span className="text-[10px] font-bold">通讯录</span>
+            <Users size={18} />
+            <span className="text-[9px] font-medium">联系人</span>
           </button>
           <button 
             onClick={() => setCurrentView('followups')}
-            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all ${currentView === 'followups' ? 'text-primary-600' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all ${currentView === 'followups' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`}
           >
-            <ClipboardList size={20} className={currentView === 'followups' ? 'fill-primary-50/50' : ''} />
-            <span className="text-[10px] font-bold">工作台</span>
+            <ClipboardList size={18} />
+            <span className="text-[9px] font-medium">工作台</span>
           </button>
           <button 
             onClick={() => setCurrentView('policies')}
-            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all ${currentView === 'policies' ? 'text-primary-600' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all ${currentView === 'policies' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`}
           >
-            <FileText size={20} className={currentView === 'policies' ? 'fill-primary-50/50' : ''} />
-            <span className="text-[10px] font-bold">保单</span>
+            <FileText size={18} />
+            <span className="text-[9px] font-medium">保单</span>
           </button>
           <button 
             onClick={() => setIsMobileSidebarOpen(true)}
-            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all text-gray-400`}
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all text-gray-400"
           >
-            <Menu size={20} />
-            <span className="text-[10px] font-bold">更多</span>
+            <Menu size={18} />
+            <span className="text-[9px] font-medium">更多</span>
           </button>
         </div>
       </div>
@@ -849,11 +962,6 @@ const App: React.FC = () => {
         onClose={() => setIsManualPolicyOpen(false)}
         contacts={contacts}
         onSave={handleManualAddPolicy}
-      />
-
-      <ProductSpecModal 
-        isOpen={isSpecModalOpen}
-        onClose={() => setIsSpecModalOpen(false)}
       />
     </div>
   );

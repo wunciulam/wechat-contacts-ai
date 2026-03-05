@@ -50,46 +50,46 @@ const BatchTagModal: React.FC<BatchTagModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-none sm:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-100 transition-all flex flex-col h-full sm:h-auto sm:max-h-[90vh] ring-1 ring-white/20">
-        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
-          <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-            <div className={`p-1.5 sm:p-2 rounded-lg ${mode === 'add' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500"}`}>
-               <Tag size={18} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="bg-white shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[85vh] rounded-2xl border border-gray-200">
+        <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+          <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+            <div className={`p-1.5 rounded-lg ${mode === 'add' ? 'bg-primary-50 text-primary-600' : 'bg-rose-50 text-rose-600'}`}>
+               {mode === 'add' ? <Tag size={14} /> : <Tag size={14} />}
             </div>
             {mode === 'add' ? '批量添加标签' : '批量移除标签'}
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-50 transition-colors">
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all cursor-pointer">
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-8 flex-1 overflow-y-auto custom-scrollbar flex flex-col">
-          <p className="text-xs sm:text-sm text-slate-500 mb-4 sm:mb-6 bg-slate-50 p-3 rounded-xl border border-slate-100">
-            已选中 <span className="font-bold text-slate-800">{selectedCount}</span> 位联系人
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5">
+          <p className="text-xs text-gray-500 mb-4 bg-gray-50 p-3 rounded-xl border border-gray-100">
+            已选中 <span className="font-bold text-gray-700">{selectedCount}</span> 位联系人
           </p>
 
           {mode === 'add' && (
-            <div className="mb-4 sm:mb-6">
-              <label className="block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">输入新标签 (可选)</label>
+            <div className="mb-4">
+              <label className="block text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-2">输入新标签 (可选)</label>
               <input
                 type="text"
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 placeholder="例如：重要客户"
-                className="w-full rounded-xl border-0 bg-slate-50 px-4 py-2.5 sm:py-3 text-sm sm:text-base text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all placeholder:text-slate-400 font-medium"
+                className="input"
               />
             </div>
           )}
 
-          <div className="flex-1">
-             <label className="block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">选择现有标签</label>
+          <div>
+             <label className="block text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-3">选择现有标签</label>
              {existingTags.length === 0 ? (
-                 <div className="text-center py-4 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                   <p className="text-xs text-slate-400 italic">暂无其他可用标签</p>
+                 <div className="text-center py-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                   <p className="text-xs text-gray-400 italic">暂无其他可用标签</p>
                  </div>
              ) : (
-                 <div className="flex flex-wrap gap-2 max-h-48 sm:max-h-64 overflow-y-auto p-1 custom-scrollbar">
+                 <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
                      {existingTags.map(tag => {
                        const isSelected = selectedTags.has(tag);
                        return (
@@ -97,15 +97,15 @@ const BatchTagModal: React.FC<BatchTagModalProps> = ({
                              key={tag}
                              type="button"
                              onClick={() => toggleTag(tag)}
-                             className={`px-3 py-2 text-xs sm:text-sm font-medium rounded-xl border flex items-center gap-2 transition-all duration-200 ${
+                             className={`px-3 py-1.5 text-xs font-medium rounded-lg border flex items-center gap-1.5 transition-all duration-150 ${
                                  isSelected
                                   ? mode === 'add' 
-                                    ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' 
-                                    : 'bg-rose-50 border-rose-500 text-rose-700 shadow-sm'
-                                  : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-300 hover:text-emerald-600'
+                                    ? 'bg-primary-50 border-primary-400 text-primary-700' 
+                                    : 'bg-rose-50 border-rose-400 text-rose-700'
+                                  : 'bg-white border-gray-200 text-gray-600 hover:border-primary-300 hover:text-primary-600'
                              }`}
                          >
-                             {isSelected ? <CheckCircle2 size={14} /> : <Circle size={14} className="text-slate-300" />}
+                             {isSelected ? <CheckCircle2 size={12} /> : <Circle size={12} className="text-gray-300" />}
                              {tag}
                          </button>
                        );
@@ -113,29 +113,30 @@ const BatchTagModal: React.FC<BatchTagModalProps> = ({
                  </div>
              )}
           </div>
-
-          <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-slate-50">
-             <button
-               type="button"
-               onClick={onClose}
-               className="order-2 sm:order-1 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-xl transition-colors"
-             >
-               取消
-             </button>
-             <button
-               type="submit"
-               disabled={mode === 'add' ? (!tagInput && selectedTags.size === 0) : selectedTags.size === 0}
-               className={`order-1 sm:order-2 px-6 py-3 sm:py-2.5 text-sm text-white rounded-xl shadow-lg font-bold transition-all transform hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-2 ${
-                   mode === 'add' 
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-emerald-200' 
-                    : 'bg-rose-500 hover:bg-rose-600 shadow-rose-200'
-               } disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none`}
-             >
-               {mode === 'add' ? <Check size={18} /> : <Trash2 size={18} />}
-               {mode === 'add' ? '确认添加' : '确认移除'}
-             </button>
-          </div>
         </form>
+
+        <div className="px-5 py-4 border-t border-gray-100 bg-white flex justify-end gap-2 shrink-0">
+           <button
+             type="button"
+             onClick={onClose}
+             className="btn btn-secondary text-xs py-2"
+           >
+             取消
+           </button>
+           <button
+             type="submit"
+             onClick={handleSubmit}
+             disabled={mode === 'add' ? (!tagInput && selectedTags.size === 0) : selectedTags.size === 0}
+             className={`btn text-xs py-2 font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                 mode === 'add' 
+                  ? 'btn-primary' 
+                  : 'bg-gray-900 hover:bg-gray-800 text-white'
+             } disabled:opacity-50 disabled:cursor-not-allowed`}
+           >
+             {mode === 'add' ? <Check size={12} /> : <Trash2 size={12} />}
+             {mode === 'add' ? '确认添加' : '确认移除'}
+           </button>
+        </div>
       </div>
     </div>
   );

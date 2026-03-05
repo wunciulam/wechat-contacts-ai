@@ -27,19 +27,19 @@ const ProductSpecModal: React.FC<ProductSpecModalProps> = ({ isOpen, onClose }) 
   );
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-300">
-      <div className="bg-white rounded-none sm:rounded-3xl shadow-2xl w-full max-w-5xl h-full sm:h-[85vh] overflow-hidden flex flex-col ring-1 ring-white/20">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="bg-white shadow-2xl w-full max-w-5xl h-full sm:h-[85vh] overflow-hidden flex flex-col rounded-2xl border border-slate-200">
         
         {/* Header */}
-        <div className="px-4 sm:px-8 py-4 sm:py-5 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
-          <div className="flex items-center gap-2 sm:gap-3">
-             <div className="p-1.5 sm:p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                <FileText size={18} className="sm:w-5 sm:h-5" />
+        <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+          <div className="flex items-center gap-3">
+             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl shadow-sm">
+                <FileText size={20} />
              </div>
-             <div>
-                <h2 className="text-base sm:text-xl font-bold text-slate-800 tracking-tight line-clamp-1">微信通讯录 AI 助手 - PRD</h2>
-                <p className="text-[10px] text-slate-400 font-mono">Ver 2.0.0 | Powered by Gemini 2.5 Flash</p>
-             </div>
+              <div>
+                 <h2 className="text-base font-bold text-slate-800">保险跟单仔 - PRD</h2>
+                 <p className="text-xs text-slate-400 font-mono">Ver 2.0.0 | Powered by Gemini 2.5 Flash</p>
+              </div>
           </div>
           <button onClick={onClose} className="bg-slate-50 hover:bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600 transition-colors">
             <X size={20} />

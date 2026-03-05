@@ -16,6 +16,9 @@ export interface Policy {
   status: string;
   applicant: string;
   insured: string;
+  paymentYears?: string;
+  insuranceType?: string;
+  coverage?: string;
 }
 
 export interface Contact {
@@ -32,6 +35,7 @@ export interface Contact {
   idCard?: string;
   address?: string;
   bankAccount?: string;
+  birthday?: string;
   
   lastDate?: string;
   progressHistory?: ProgressRecord[];
@@ -42,7 +46,7 @@ export interface Contact {
   
   policies?: Policy[];
   
-  followUpStatus?: 'following' | 'contacted';
+  followUpStatus?: 'idle' | 'following' | 'contacted';
 }
 
 export type NewContact = Omit<Contact, 'id' | 'addedAt'>;
@@ -96,4 +100,7 @@ export interface ExcelPolicyRow {
   '有无照会记录'?: string;
   '有无委托协议号'?: string;
   '保费过期未付后续处理方式'?: string;
+  '缴费年限'?: string;
+  '险种类型'?: string;
+  '保额'?: string;
 }
