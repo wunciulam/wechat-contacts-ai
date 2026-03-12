@@ -84,8 +84,14 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
     const count = policies.length;
     let totalPremium = 0;
     policies.forEach(p => {
-      // 只计算生效的保单（status 包含"有效"）
-      if (p.status && p.status.includes('有效')) {
+      // 只计算生效的保单（status 包含"有效"或"正式"，排除"终止"、"退保"、"撤单"）
+      const status = p.status || '';
+      const isActive = (status.includes('有效') || status.includes('正式')) && 
+                       !status.includes('终止') && 
+                       !status.includes('退保') && 
+                       !status.includes('撤单');
+      
+      if (isActive) {
         const premiumStr = String(p.premium || '0');
         const val = parseFloat(premiumStr.replace(/[^0-9.]/g, ''));
         if (!isNaN(val)) totalPremium += val;
