@@ -10,7 +10,7 @@ import ConfirmModal from './components/ConfirmModal';
 import QuickFollowUpModal from './components/QuickFollowUpModal';
 import ManualPolicyModal from './components/ManualPolicyModal';
 import { Contact, NewContact, ProgressRecord, ExtractedTableData, Policy } from './types';
-import { saveToCloud, loadFromCloud, isSupabaseConfigured, loadLegacyContactsTable } from './services/supabaseService';
+import { saveToCloud, loadFromCloud, isSupabaseConfigured, loadLegacyContactsTable, subscribeToDataChanges, broadcastDataChange } from './services/supabaseService';
 
 const FOLLOW_UP_TAG = '跟进中';
 const CONTACTED_TAG = '沟通过';
@@ -266,13 +266,19 @@ const App: React.FC = () => {
       
       // 强制保存到云端
       if (isSupabaseConfigured()) {
-        console.log('正在强制保存到云端, 联系人数量:', contacts.length);
+        console.log('正在强制保存到云端，联系人数量:', contacts.length);
         saveToCloud('contacts', contacts).then(success => {
           console.log('云端保存结果:', success ? '成功' : '失败');
         }).catch(e => console.log('云端同步失败:', e));
       }
     }
   }, [contacts, isLoaded]);
+
+  // 3. 订阅实时数据变化（暂时禁用，调试用）
+  useEffect(() => {
+    // console.log('⏸️ 实时订阅已禁用');
+    return () => {};
+  }, []);
 
   // Derived State
   const allTags = Array.from(new Set(contacts.flatMap(c => c.tags))).sort();
@@ -352,6 +358,20 @@ const App: React.FC = () => {
                 dealProducts: Array.from(currentDealProducts)
             };
             
+            return applyAutoTags(updatedContact);
+        }
+        return c;
+    }));
+  };
+  
+  const handleDeletePolicy = (contactId: string, policyId: string) => {
+    setContacts(prev => prev.map(c => {
+        if (c.id === contactId) {
+            const updatedPolicies = (c.policies || []).filter(p => p.id !== policyId);
+            const updatedContact: Contact = {
+                ...c,
+                policies: updatedPolicies
+            };
             return applyAutoTags(updatedContact);
         }
         return c;
@@ -621,7 +641,13 @@ const App: React.FC = () => {
       message: '确定要删除这位联系人吗？此操作无法撤销。',
       isDestructive: true,
       onConfirm: () => {
-        setContacts(prev => prev.filter(c => c.id !== id));
+        const updatedContacts = contacts.filter(c => c.id !== id);
+        setContacts(updatedContacts);
+        localStorage.setItem('wechat-contacts', JSON.stringify(updatedContacts));
+        localStorage.setItem('wechat-contacts-backup', JSON.stringify(updatedContacts));
+        if (isSupabaseConfigured() && updatedContacts.length > 0) {
+          saveToCloud('contacts', updatedContacts);
+        }
         if (selectedContactIds.has(id)) {
             const newSet = new Set(selectedContactIds);
             newSet.delete(id);
@@ -736,18 +762,24 @@ const App: React.FC = () => {
   };
 
   const handleBatchDelete = () => {
-     setConfirmModal({
-        isOpen: true,
-        title: '批量删除',
-        message: `确定要删除选中的 ${selectedContactIds.size} 位联系人吗？此操作无法撤销。`,
-        isDestructive: true,
-        onConfirm: () => {
-           setContacts(prev => prev.filter(c => !selectedContactIds.has(c.id)));
-           handleDeselectAll();
-           setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        },
-        onCancel: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
-     });
+      setConfirmModal({
+         isOpen: true,
+         title: '批量删除',
+         message: `确定要删除选中的 ${selectedContactIds.size} 位联系人吗？此操作无法撤销。`,
+         isDestructive: true,
+         onConfirm: () => {
+            const updatedContacts = contacts.filter(c => !selectedContactIds.has(c.id));
+            setContacts(updatedContacts);
+            localStorage.setItem('wechat-contacts', JSON.stringify(updatedContacts));
+            localStorage.setItem('wechat-contacts-backup', JSON.stringify(updatedContacts));
+            if (isSupabaseConfigured() && updatedContacts.length > 0) {
+              saveToCloud('contacts', updatedContacts);
+            }
+            handleDeselectAll();
+            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+         },
+         onCancel: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      });
   };
 
   const handleUpdateStatus = (contactId: string, newStatus: 'idle' | 'following' | 'contacted') => {
@@ -836,8 +868,9 @@ const App: React.FC = () => {
                      onBatchDeleteContacts={(ids) => {
                         setContacts(prev => prev.filter(c => !ids.includes(c.id)));
                      }}
-                  />
-              );
+                     onDeletePolicy={handleDeletePolicy}
+                   />
+               );
           default:
               return null;
       }

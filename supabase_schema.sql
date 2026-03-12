@@ -54,8 +54,9 @@ CREATE POLICY "Allow full access for authenticated users" ON contacts
   USING (true)
   WITH CHECK (true);
 
--- Enable realtime
+-- Enable realtime for both tables
 ALTER PUBLICATION supabase_realtime ADD TABLE contacts;
+ALTER PUBLICATION supabase_realtime ADD TABLE app_data;
 
 -- Create index for better performance
 CREATE INDEX IF NOT EXISTS idx_contacts_added_at ON contacts(added_at DESC);

@@ -11,9 +11,10 @@ interface PolicyDashboardProps {
   onEditContact: (contact: Contact) => void;
   onAddPolicy: () => void;
   onBatchDeleteContacts?: (ids: string[]) => void;
+  onDeletePolicy?: (contactId: string, policyId: string) => void;
 }
 
-const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags, followUpFilter, onEditContact, onAddPolicy, onBatchDeleteContacts }) => {
+const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags, followUpFilter, onEditContact, onAddPolicy, onBatchDeleteContacts, onDeletePolicy }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedContactIds, setExpandedContactIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -39,20 +40,31 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
 
   const filteredContactsWithPolicies = useMemo(() => {
     let result = contacts.filter(c => c.policies && c.policies.length > 0);
-    if (filterTags.size > 0) result = result.filter(c => c.tags.some(tag => filterTags.has(tag)));
-    if (followUpFilter !== null) result = result.filter(c => c.followUpStatus === followUpFilter);
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
+    
+    if (filterTags.size > 0) {
+      result = result.filter(c => c.tags.some(tag => filterTags.has(tag)));
+    }
+    
+    if (followUpFilter !== null) {
+      result = result.filter(c => c.followUpStatus === followUpFilter);
+    }
+    
+    if (searchTerm && searchTerm.trim()) {
+      const lower = searchTerm.trim().toLowerCase();
       result = result.filter(c => {
         const matchesContact = (c.remarkName && c.remarkName.toLowerCase().includes(lower)) || 
                                (c.nickname && c.nickname.toLowerCase().includes(lower)) ||
-                               (c.phoneNumber && c.phoneNumber.includes(lower));
-        const matchesPolicy = c.policies?.some(p => p.policyNumber.toLowerCase().includes(lower) || p.productName.toLowerCase().includes(lower));
+                               (c.phoneNumber && String(c.phoneNumber).includes(lower));
+        const matchesPolicy = c.policies?.some(p => 
+          (p.policyNumber && p.policyNumber.toLowerCase().includes(lower)) || 
+          (p.productName && p.productName.toLowerCase().includes(lower))
+        );
         return matchesContact || matchesPolicy;
       });
     }
+    
     return result;
-  }, [contacts, searchTerm, filterTags]);
+  }, [contacts, searchTerm, filterTags, followUpFilter]);
 
   const allSelected = filteredContactsWithPolicies.length > 0 && filteredContactsWithPolicies.every(c => selectedIds.has(c.id));
 
@@ -93,8 +105,14 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
           }
           searchBox={
             <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
-              <input type="text" placeholder="搜索客户、保单号、险种..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={17} />
+              <input 
+                type="text" 
+                placeholder="搜索客户、保单号、险种..." 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+                className="w-full pl-10 pr-4 py-2 text-sm bg-white border border-gray-200 rounded-md placeholder:text-gray-400 focus:bg-white focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-200 transition-all min-h-[38px]" 
+              />
             </div>
           }
         />
@@ -132,7 +150,49 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                 {isExpanded && (
                   <div className="border-t border-gray-100 bg-gray-50 p-4 animate-in slide-in-from-top-2">
                     <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto no-scrollbar">
-                      <table className="w-full text-left text-sm min-w-[800px]"><thead className="bg-gray-50 text-gray-500 font-medium text-[10px] uppercase tracking-wider border-b border-gray-200"><tr className="divide-x divide-gray-100"><th className="px-4 py-3">险种名称</th><th className="px-4 py-3">保单号</th><th className="px-4 py-3 text-right">保费</th><th className="px-4 py-3">缴费年限</th><th className="px-4 py-3">投保人/被保人</th><th className="px-4 py-3">生效日期</th><th className="px-4 py-3">状态</th></tr></thead><tbody className="divide-y divide-gray-100">{contact.policies?.map(policy => (<tr key={policy.id} className="hover:bg-gray-50 transition-colors"><td className="px-4 py-3 font-medium text-gray-700">{policy.productName}</td><td className="px-4 py-3 font-mono text-gray-500 text-xs">{policy.policyNumber}</td><td className="px-4 py-3 text-right font-mono font-medium text-gray-900">¥ {policy.premium}</td><td className="px-4 py-3 text-gray-500 text-xs">{policy.paymentYears || '-'}</td><td className="px-4 py-3 text-gray-600">{policy.applicant} / {policy.insured}</td><td className="px-4 py-3 text-gray-500 text-xs">{policy.effectiveDate}</td><td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] font-medium ${policy.status.includes('有效') ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'}`}>{policy.status}</span></td></tr>))}</tbody></table>
+                      <table className="w-full text-left text-sm min-w-[800px]">
+                        <thead className="bg-gray-50 text-gray-500 font-medium text-[10px] uppercase tracking-wider border-b border-gray-200">
+                          <tr className="divide-x divide-gray-100">
+                            <th className="px-4 py-3">险种名称</th>
+                            <th className="px-4 py-3">保单号</th>
+                            <th className="px-4 py-3 text-right">保费</th>
+                            <th className="px-4 py-3">缴费年限</th>
+                            <th className="px-4 py-3">投保人/被保人</th>
+                            <th className="px-4 py-3">生效日期</th>
+                            <th className="px-4 py-3">状态</th>
+                            <th className="px-4 py-3 text-right">操作</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {contact.policies?.map(policy => (
+                            <tr key={policy.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 font-medium text-gray-700">{policy.productName}</td>
+                              <td className="px-4 py-3 font-mono text-gray-500 text-xs">{policy.policyNumber}</td>
+                              <td className="px-4 py-3 text-right font-mono font-medium text-gray-900">¥ {policy.premium}</td>
+                              <td className="px-4 py-3 text-gray-500 text-xs">{policy.paymentYears || '-'}</td>
+                              <td className="px-4 py-3 text-gray-600">{policy.applicant} / {policy.insured}</td>
+                              <td className="px-4 py-3 text-gray-500 text-xs">{policy.effectiveDate}</td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${policy.status.includes('有效') ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                                  {policy.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <button 
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    if (onDeletePolicy) onDeletePolicy(contact.id, policy.id); 
+                                  }} 
+                                  className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md transition-colors" 
+                                  title="删除保单"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 )}
