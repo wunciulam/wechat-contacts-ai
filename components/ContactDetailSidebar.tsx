@@ -13,8 +13,11 @@ interface ContactDetailSidebarProps {
   onUpdateStatus: (contactId: string, newStatus: 'idle' | 'following' | 'contacted') => void;
   onAddToFollowing: (contactId: string) => void;
   onRemoveTag: (contactId: string, tag: string) => void;
-  showAddToFollowing?: boolean; // 是否显示"添加到待跟进"按钮
-  onQuickAddProgress?: (contactId: string, date: string, content: string) => void; // 常驻输入框添加跟进
+  showAddToFollowing?: boolean;
+  onQuickAddProgress?: (contactId: string, date: string, content: string) => void;
+  onAddPolicy?: (contactId: string) => void;
+  onDeletePolicy?: (contactId: string, policyId: string) => void;
+  onEditPolicy?: (contactId: string, policy: any) => void;
 }
 
 const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
@@ -29,7 +32,10 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
   onAddToFollowing,
   onRemoveTag,
   showAddToFollowing = false,
-  onQuickAddProgress
+  onQuickAddProgress,
+  onAddPolicy,
+  onDeletePolicy,
+  onEditPolicy
 }) => {
   const [copiedWxid, setCopiedWxid] = useState<string | null>(null);
   
@@ -426,22 +432,44 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                 </div>
               )}
 
-              {/* Deal Products */}
+              {/* Deal Products - 表格展示 */}
               {contact.dealProducts?.length > 0 && (
                 <div className="flex items-start gap-3">
                   <span className="text-xs font-medium text-gray-400 w-16 shrink-0 pt-1">
                     <ShoppingBag size={12} className="inline mr-1" />
                     成交产品
                   </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {contact.dealProducts.map(product => (
-                      <span 
-                        key={product} 
-                        className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200"
-                      >
-                        {product}
-                      </span>
-                    ))}
+                  <div className="flex-1 bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-100 text-gray-500 text-xs font-medium">
+                        <tr>
+                          <th className="px-3 py-2 text-left">产品名称</th>
+                          <th className="px-3 py-2 text-right">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {contact.dealProducts.map((product, idx) => (
+                          <tr key={`${product}-${idx}`} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 text-gray-700">{product}</td>
+                            <td className="px-3 py-2 text-right">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // 删除成交产品标签
+                                  const updatedDealProducts = contact.dealProducts?.filter((_, i) => i !== idx) || [];
+                                  // 触发更新（通过编辑联系人方式）
+                                  onEdit({ ...contact, dealProducts: updatedDealProducts });
+                                }}
+                                className="text-gray-400 hover:text-red-600 p-1"
+                                title="删除产品标签"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
@@ -486,69 +514,86 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
             </div>
           </div>
 
-          {/* Policies Section */}
+          {/* Policies Section - 表格展示 */}
           {contact.policies && contact.policies.length > 0 && (
             <div className="p-6 border-t border-gray-100">
-              <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2 mb-4">
-                <Shield size={16} className="text-gray-900" />
-                保单信息
-                <span className="text-xs font-normal text-gray-400">
-                  ({contact.policies.length})
-                </span>
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                  <Shield size={16} className="text-gray-900" />
+                  保单信息
+                  <span className="text-xs font-normal text-gray-400">
+                    ({contact.policies.length})
+                  </span>
+                </h3>
+                {onAddPolicy && (
+                  <button
+                    onClick={() => onAddPolicy(contact.id)}
+                    className="text-xs flex items-center gap-1 text-gray-600 hover:text-gray-900"
+                  >
+                    <Plus size={14} />
+                    添加保单
+                  </button>
+                )}
+              </div>
               
-              <div className="space-y-3">
-                {contact.policies.map((policy, idx) => (
-                  <div key={policy.id || idx} className="bg-gray-50 rounded-lg p-4 border border-gray-100">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="font-medium text-gray-900">{policy.productName}</div>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
-                        policy.status.includes('有效') ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {policy.status}
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-gray-400">保单号</span>
-                        <p className="font-mono text-gray-600 truncate">{policy.policyNumber || '-'}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">保险公司</span>
-                        <p className="text-gray-600">{policy.company || '-'}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">保费</span>
-                        <p className="font-medium text-gray-900">¥ {policy.premium}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">生效日期</span>
-                        <p className="text-gray-600">{policy.effectiveDate || '-'}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">缴费年限</span>
-                        <p className="text-gray-600">{policy.paymentYears || '-'}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">投保人/被保人</span>
-                        <p className="text-gray-600">{policy.applicant} / {policy.insured}</p>
-                      </div>
-                      {policy.coverage && (
-                        <div>
-                          <span className="text-gray-400">保额</span>
-                          <p className="text-gray-600">{policy.coverage}</p>
-                        </div>
-                      )}
-                      {policy.insuranceType && (
-                        <div>
-                          <span className="text-gray-400">险种类型</span>
-                          <p className="text-gray-600">{policy.insuranceType}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-x-auto">
+                <table className="w-full text-sm min-w-[600px]">
+                  <thead className="bg-gray-100 text-gray-500 text-xs font-medium">
+                    <tr>
+                      <th className="px-3 py-2 text-left">险种名称</th>
+                      <th className="px-3 py-2 text-left">保单号</th>
+                      <th className="px-3 py-2 text-right">保费</th>
+                      <th className="px-3 py-2 text-center">状态</th>
+                      <th className="px-3 py-2 text-right">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {contact.policies.map((policy, idx) => (
+                      <tr key={policy.id || idx} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 font-medium text-gray-700">{policy.productName}</td>
+                        <td className="px-3 py-2 font-mono text-gray-600 text-xs">{policy.policyNumber || '-'}</td>
+                        <td className="px-3 py-2 text-right font-medium text-gray-900">¥ {policy.premium}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                            policy.status.includes('有效') ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {policy.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {onEditPolicy && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditPolicy(contact.id, policy);
+                                }}
+                                className="text-gray-400 hover:text-blue-600 p-1"
+                                title="编辑保单"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                            )}
+                            {onDeletePolicy && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`确定要删除这份保单吗？\n\n${policy.productName}\n保单号：${policy.policyNumber}`)) {
+                                    onDeletePolicy(contact.id, policy.id);
+                                  }
+                                }}
+                                className="text-gray-400 hover:text-red-600 p-1"
+                                title="删除保单"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

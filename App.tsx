@@ -367,10 +367,21 @@ const App: React.FC = () => {
   const handleDeletePolicy = (contactId: string, policyId: string) => {
     setContacts(prev => prev.map(c => {
         if (c.id === contactId) {
+            const deletedPolicy = (c.policies || []).find(p => p.id === policyId);
             const updatedPolicies = (c.policies || []).filter(p => p.id !== policyId);
+            
+            // 同步更新 dealProducts - 检查删除的保单产品是否还有其他保单在使用
+            const updatedDealProducts = deletedPolicy?.productName 
+                ? c.dealProducts?.filter(product => {
+                    // 如果还有其他保单使用这个产品名称，保留它
+                    return updatedPolicies.some(p => p.productName === product);
+                  })
+                : c.dealProducts;
+            
             const updatedContact: Contact = {
                 ...c,
-                policies: updatedPolicies
+                policies: updatedPolicies,
+                dealProducts: updatedDealProducts || []
             };
             return applyAutoTags(updatedContact);
         }
