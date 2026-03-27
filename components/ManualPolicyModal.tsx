@@ -50,7 +50,7 @@ const ManualPolicyModal: React.FC<ManualPolicyModalProps> = ({ isOpen, onClose, 
   const handleSave = () => {
     if (selectedContactId && policyData.productName) {
         const newPolicy: Policy = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+            id: Math.random().toString(36).substr(2, 9),
             productName: policyData.productName,
             policyNumber: policyData.policyNumber || '暂无单号',
             company: policyData.company || '',

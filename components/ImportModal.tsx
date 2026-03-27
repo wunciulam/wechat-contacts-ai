@@ -215,7 +215,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
   const handleAddHistory = () => {
     if (historyForm.content?.trim()) {
       const newRecord: ProgressRecord = {
-        id: Date.now().toString(),
+        id: Math.random().toString(36).substr(2, 9),
         date: historyForm.date || new Date().toISOString().split('T')[0],
         content: historyForm.content.trim(),
         completed: false

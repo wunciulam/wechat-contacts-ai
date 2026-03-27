@@ -574,7 +574,7 @@ const App: React.FC = () => {
            } else {
               // 添加新记录：自动设为跟进中
               const newRecord: ProgressRecord = {
-                id: Date.now().toString(),
+                id: generateId(),
                 date: date,
                 content: content,
                 completed: completed ?? false
@@ -594,7 +594,7 @@ const App: React.FC = () => {
     } else if (newContactName) {
       // 创建新联系人并添加跟进记录
       const newRecord: ProgressRecord = {
-         id: Date.now().toString(),
+         id: generateId(),
          date: date,
          content: content,
          completed: completed ?? false

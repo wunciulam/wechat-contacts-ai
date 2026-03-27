@@ -67,8 +67,8 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
   }, [variant, todoItems, selectedContactId, isDropdownOpen, initialRecord]);
 
   const handleAddTodo = () => {
-    if (initialRecord) return; 
-    setTodoItems(prev => [...prev, { id: Date.now().toString(), text: '', completed: false }]);
+    if (initialRecord) return;
+    setTodoItems(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), text: '', completed: false }]);
   };
 
   const handleUpdateTodo = (id: string, text: string) => {
