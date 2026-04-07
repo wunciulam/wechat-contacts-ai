@@ -1,0 +1,39 @@
+<view class="container">
+  <view class="header">
+    <text class="title">保单管理</text>
+    <text class="subtitle">共 {{policies.length}} 份保单</text>
+  </view>
+
+  <view class="stats-bar">
+    <view class="stat-item">
+      <text class="stat-value">{{totalPremium}}</text>
+      <text class="stat-label">总保费</text>
+    </view>
+    <view class="stat-item">
+      <text class="stat-value">{{activeCount}}</text>
+      <text class="stat-label">有效保单</text>
+    </view>
+  </view>
+
+  <view wx:if="{{policies.length === 0}}" class="empty">
+    <text>暂无保单数据</text>
+  </view>
+
+  <view class="policy-list">
+    <view wx:for="{{policies}}" wx:key="id" class="policy-card" bindtap="goToContact" data-id="{{item.contactId}}">
+      <view class="policy-header">
+        <text class="policy-name">{{item.productName}}</text>
+        <view class="status {{item.status === '有效' ? 'active' : 'inactive'}}">{{item.status}}</view>
+      </view>
+      <view class="policy-info">
+        <text class="info-item">保单号: {{item.policyNumber}}</text>
+        <text class="info-item">保费: ¥{{item.premium}}</text>
+        <text class="info-item">投保人: {{item.applicant}}</text>
+        <text class="info-item">生效日: {{item.effectiveDate}}</text>
+      </view>
+      <view class="policy-footer">
+        <text class="contact">客户: {{item.contactName}}</text>
+      </view>
+    </view>
+  </view>
+</view>

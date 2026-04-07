@@ -1,0 +1,23 @@
+<view class="container">
+  <view class="header">
+    <text class="title">跟进记录</text>
+    <text class="subtitle">待跟进: {{pendingCount}} 条</text>
+  </view>
+
+  <view wx:if="{{records.length === 0}}" class="empty">
+    <text>暂无跟进记录</text>
+  </view>
+
+  <view class="record-list">
+    <view wx:for="{{records}}" wx:key="id" class="record-item" bindtap="goToContact" data-id="{{item.contactId}}">
+      <view class="record-date">{{item.date}}</view>
+      <view class="record-content">{{item.content}}</view>
+      <view class="record-footer">
+        <text class="contact-name">{{item.contactName}}</text>
+        <view class="status {{item.completed ? 'completed' : 'pending'}}">
+          {{item.completed ? '已完成' : '待跟进'}}
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

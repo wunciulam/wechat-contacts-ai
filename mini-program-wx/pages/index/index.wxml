@@ -1,0 +1,109 @@
+<view class="container">
+  <!-- 搜索栏 -->
+  <view class="search-wrapper">
+    <view class="search-bar">
+      <text class="search-icon">🔍</text>
+      <input
+        type="text"
+        placeholder="搜索客户姓名、手机号..."
+        placeholder-class="search-placeholder"
+        bindinput="onSearch"
+        value="{{searchTerm}}"
+      />
+      <view wx:if="{{searchTerm}}" class="clear-btn" bindtap="clearSearch">✕</view>
+    </view>
+  </view>
+
+  <!-- 统计栏 -->
+  <view class="stats-wrapper">
+    <view class="stat-item">
+      <text class="stat-number">{{contacts.length}}</text>
+      <text class="stat-label">总客户</text>
+    </view>
+    <view class="stat-divider"></view>
+    <view class="stat-item">
+      <text class="stat-number">{{followingCount}}</text>
+      <text class="stat-label">跟进中</text>
+    </view>
+    <view class="stat-divider"></view>
+    <view class="stat-item">
+      <text class="stat-number">{{policyCount}}</text>
+      <text class="stat-label">有保单</text>
+    </view>
+  </view>
+
+  <!-- 状态筛选 -->
+  <view class="filter-wrapper">
+    <scroll-view scroll-x class="filter-scroll" show-scrollbar="false">
+      <view class="filter-list">
+        <view
+          class="filter-item {{statusFilter === '' ? 'active' : ''}}"
+          bindtap="filterByStatus"
+          data-status=""
+        >全部</view>
+        <view
+          class="filter-item {{statusFilter === 'following' ? 'active' : ''}}"
+          bindtap="filterByStatus"
+          data-status="following"
+        >跟进中</view>
+        <view
+          class="filter-item {{statusFilter === 'contacted' ? 'active' : ''}}"
+          bindtap="filterByStatus"
+          data-status="contacted"
+        >已沟通</view>
+        <view
+          class="filter-item {{statusFilter === 'idle' ? 'active' : ''}}"
+          bindtap="filterByStatus"
+          data-status="idle"
+        >暂未跟进</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 客户列表 -->
+  <scroll-view scroll-y class="contact-list" enable-back-to-top>
+    <view wx:for="{{filteredContacts}}" wx:key="id" class="contact-card" bindtap="goToDetail" data-id="{{item.id}}">
+      <view class="contact-main">
+        <view class="contact-header">
+          <text class="contact-name">{{item.remarkName || item.nickname || '未命名'}}</text>
+          <view class="status-tag {{item.followUpStatus || 'idle'}}">
+            {{statusText[item.followUpStatus || 'idle']}}
+          </view>
+        </view>
+
+        <view wx:if="{{item.phoneNumber}}" class="contact-phone">
+          {{item.phoneNumber}}
+        </view>
+
+        <view wx:if="{{item.tags.length > 0}}" class="contact-tags">
+          <text wx:for="{{item.tags}}" wx:key="*this" wx:for-item="tag" class="tag">{{tag}}</text>
+        </view>
+      </view>
+
+      <view wx:if="{{item.policies && item.policies.length > 0}}" class="contact-side">
+        <view class="policy-badge">
+          <text class="policy-icon">📋</text>
+          <text class="policy-count">{{item.policies.length}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 空状态 -->
+    <view wx:if="{{filteredContacts.length === 0 && !loading}}" class="empty-state">
+      <view class="empty-icon">👤</view>
+      <text class="empty-title">暂无客户</text>
+      <text class="empty-desc">点击下方按钮添加您的第一位客户</text>
+      <view class="empty-btn" bindtap="addContact">添加客户</view>
+    </view>
+
+    <!-- 底部占位 -->
+    <view class="list-footer"></view>
+  </scroll-view>
+
+  <!-- 添加按钮 -->
+  <view class="fab-wrapper">
+    <view class="fab" bindtap="addContact">
+      <text class="fab-icon">+</text>
+    </view>
+  </view>
+</view>

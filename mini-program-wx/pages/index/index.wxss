@@ -1,0 +1,304 @@
+/* 首页样式 - 黑白灰极简风格 */
+
+.container {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+/* 搜索栏 */
+.search-wrapper {
+  padding: 24rpx 24rpx 16rpx;
+  background-color: #fff;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  height: 72rpx;
+  background-color: #f5f5f5;
+  border-radius: 36rpx;
+  padding: 0 24rpx;
+}
+
+.search-icon {
+  font-size: 28rpx;
+  margin-right: 16rpx;
+  color: #999;
+}
+
+.search-bar input {
+  flex: 1;
+  height: 100%;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.search-placeholder {
+  color: #999;
+}
+
+.clear-btn {
+  width: 40rpx;
+  height: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ddd;
+  border-radius: 50%;
+  font-size: 22rpx;
+  color: #fff;
+}
+
+/* 统计栏 */
+.stats-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 32rpx 24rpx;
+  background-color: #fff;
+  margin-bottom: 16rpx;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.stat-number {
+  font-size: 40rpx;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 8rpx;
+}
+
+.stat-divider {
+  width: 1rpx;
+  height: 48rpx;
+  background-color: #e5e5e5;
+}
+
+/* 状态筛选 */
+.filter-wrapper {
+  background-color: #fff;
+  padding: 0 24rpx 24rpx;
+  margin-bottom: 16rpx;
+}
+
+.filter-scroll {
+  white-space: nowrap;
+}
+
+.filter-list {
+  display: inline-flex;
+  gap: 16rpx;
+}
+
+.filter-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12rpx 28rpx;
+  background-color: #f5f5f5;
+  border-radius: 28rpx;
+  font-size: 26rpx;
+  color: #666;
+  transition: all 0.15s;
+}
+
+.filter-item.active {
+  background-color: #333;
+  color: #fff;
+}
+
+/* 客户列表 */
+.contact-list {
+  height: calc(100vh - 340rpx);
+  padding: 0 24rpx;
+}
+
+.contact-card {
+  display: flex;
+  align-items: flex-start;
+  background-color: #fff;
+  border-radius: 12rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.02);
+}
+
+.contact-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.contact-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+}
+
+.contact-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-tag {
+  padding: 4rpx 12rpx;
+  border-radius: 4rpx;
+  font-size: 20rpx;
+  margin-left: 16rpx;
+  flex-shrink: 0;
+}
+
+.status-tag.following {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.status-tag.contacted {
+  background-color: #f5f5f5;
+  color: #666;
+}
+
+.status-tag.idle {
+  background-color: #f5f5f5;
+  color: #999;
+}
+
+.contact-phone {
+  font-size: 24rpx;
+  color: #666;
+  margin-bottom: 12rpx;
+}
+
+.contact-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+}
+
+.tag {
+  padding: 4rpx 12rpx;
+  background-color: #f5f5f5;
+  border-radius: 4rpx;
+  font-size: 20rpx;
+  color: #666;
+}
+
+.contact-side {
+  margin-left: 24rpx;
+  flex-shrink: 0;
+}
+
+.policy-badge {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  padding: 8rpx 16rpx;
+  background-color: #f8f8f8;
+  border-radius: 8rpx;
+}
+
+.policy-icon {
+  font-size: 24rpx;
+}
+
+.policy-count {
+  font-size: 24rpx;
+  color: #666;
+  font-weight: 500;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 120rpx 48rpx;
+}
+
+.empty-icon {
+  font-size: 96rpx;
+  margin-bottom: 24rpx;
+  opacity: 0.5;
+}
+
+.empty-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12rpx;
+}
+
+.empty-desc {
+  font-size: 26rpx;
+  color: #999;
+  margin-bottom: 32rpx;
+  text-align: center;
+}
+
+.empty-btn {
+  padding: 20rpx 48rpx;
+  background-color: #333;
+  color: #fff;
+  border-radius: 8rpx;
+  font-size: 28rpx;
+}
+
+.list-footer {
+  height: 120rpx;
+}
+
+/* 添加按钮 */
+.fab-wrapper {
+  position: fixed;
+  right: 32rpx;
+  bottom: 180rpx;
+  z-index: 100;
+}
+
+.fab {
+  width: 96rpx;
+  height: 96rpx;
+  background-color: #333;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.15);
+}
+
+.fab-icon {
+  font-size: 48rpx;
+  color: #fff;
+  font-weight: 300;
+}
+
+/* 加载状态 */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 120rpx 48rpx;
+}
+
+.loading-text {
+  font-size: 26rpx;
+  color: #999;
+  margin-top: 24rpx;
+}

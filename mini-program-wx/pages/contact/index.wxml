@@ -1,0 +1,38 @@
+<view class="container">
+  <view class="form-card">
+    <view class="form-title">{{isEdit ? '编辑客户' : '添加客户'}}</view>
+
+    <view class="form-item">
+      <text class="label">姓名 *</text>
+      <input type="text" value="{{form.remarkName}}" bindinput="onInput" data-field="remarkName" placeholder="请输入姓名" />
+    </view>
+
+    <view class="form-item">
+      <text class="label">昵称</text>
+      <input type="text" value="{{form.nickname}}" bindinput="onInput" data-field="nickname" placeholder="请输入昵称" />
+    </view>
+
+    <view class="form-item">
+      <text class="label">手机号</text>
+      <input type="number" value="{{form.phoneNumber}}" bindinput="onInput" data-field="phoneNumber" placeholder="请输入手机号" />
+    </view>
+
+    <view class="form-item">
+      <text class="label">微信号</text>
+      <input type="text" value="{{form.wxid}}" bindinput="onInput" data-field="wxid" placeholder="请输入微信号" />
+    </view>
+
+    <view class="form-item">
+      <text class="label">身份证号</text>
+      <input type="text" value="{{form.idCard}}" bindinput="onInput" data-field="idCard" placeholder="请输入身份证号" />
+    </view>
+
+    <view class="form-item">
+      <text class="label">备注</text>
+      <textarea value="{{form.remarkInfo}}" bindinput="onInput" data-field="remarkInfo" placeholder="请输入备注" />
+    </view>
+
+    <button class="save-btn" bindtap="save">保存</button>
+    <button wx:if="{{isEdit}}" class="delete-btn" bindtap="deleteContact">删除</button>
+  </view>
+</view>

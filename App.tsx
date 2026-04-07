@@ -9,8 +9,19 @@ import BatchTagModal from './components/BatchTagModal';
 import ConfirmModal from './components/ConfirmModal';
 import QuickFollowUpModal from './components/QuickFollowUpModal';
 import ManualPolicyModal from './components/ManualPolicyModal';
-import { Contact, NewContact, ProgressRecord, ExtractedTableData, Policy } from './types';
+import CategoryBoard from './components/CategoryBoard';
+import CategoryManager from './components/CategoryManager';
+import { Contact, NewContact, ProgressRecord, ExtractedTableData, Policy, Category } from './types';
 import { saveToCloud, loadFromCloud, isSupabaseConfigured, loadLegacyContactsTable, subscribeToDataChanges, broadcastDataChange } from './services/supabaseService';
+
+const CATEGORIES_STORAGE_KEY = 'wechat-categories';
+
+// 默认类目
+const DEFAULT_CATEGORIES: Category[] = [
+  { id: 'cat_default_1', name: '潜在客户', color: '#F59E0B', icon: 'UserPlus', order: 0, createdAt: Date.now(), updatedAt: Date.now() },
+  { id: 'cat_default_2', name: '重点跟进', color: '#EF4444', icon: 'Star', order: 1, createdAt: Date.now(), updatedAt: Date.now() },
+  { id: 'cat_default_3', name: '已成交', color: '#10B981', icon: 'CheckCircle', order: 2, createdAt: Date.now(), updatedAt: Date.now() },
+];
 
 const FOLLOW_UP_TAG = '跟进中';
 const CONTACTED_TAG = '沟通过';
@@ -66,6 +77,11 @@ const App: React.FC = () => {
   
   // 跟进状态筛选
   const [followUpFilter, setFollowUpFilter] = useState<'idle' | 'following' | 'contacted' | null>(null);
+
+  // 类目状态
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -279,6 +295,33 @@ const App: React.FC = () => {
     // console.log('⏸️ 实时订阅已禁用');
     return () => {};
   }, []);
+
+  // 4. 加载类目数据
+  useEffect(() => {
+    const loadCategories = () => {
+      const saved = localStorage.getItem(CATEGORIES_STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCategories(parsed);
+            return;
+          }
+        } catch (e) {
+          console.error('类目数据解析失败:', e);
+        }
+      }
+      setCategories(DEFAULT_CATEGORIES);
+    };
+    loadCategories();
+  }, []);
+
+  // 5. 保存类目数据
+  useEffect(() => {
+    if (categories.length > 0) {
+      localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
+    }
+  }, [categories]);
 
   // Derived State
   const allTags = Array.from(new Set(contacts.flatMap(c => c.tags))).sort();
@@ -812,7 +855,38 @@ const App: React.FC = () => {
           return c;
       }));
   };
-  
+
+  // 类目相关处理函数
+  const handleAddCategory = (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newCategory: Category = {
+      ...category,
+      id: generateId(),
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    setCategories(prev => [...prev, newCategory]);
+  };
+
+  const handleUpdateCategory = (id: string, updates: Partial<Category>) => {
+    setCategories(prev => prev.map(c =>
+      c.id === id ? { ...c, ...updates, updatedAt: Date.now() } : c
+    ));
+  };
+
+  const handleDeleteCategory = (id: string) => {
+    // 删除类目时，将该类目下的联系人移到"无类目"
+    setContacts(prev => prev.map(c =>
+      c.categoryId === id ? { ...c, categoryId: undefined } : c
+    ));
+    setCategories(prev => prev.filter(c => c.id !== id));
+  };
+
+  const handleMoveContactToCategory = (contactId: string, newCategoryId: string | null) => {
+    setContacts(prev => prev.map(c =>
+      c.id === contactId ? { ...c, categoryId: newCategoryId || undefined } : c
+    ));
+  };
+
   const renderContent = () => {
       switch (currentView) {
           case 'contacts':
@@ -841,28 +915,20 @@ const App: React.FC = () => {
               );
           case 'followups':
               return (
-                  <FollowUpDashboard 
+                  <CategoryBoard
                      contacts={contacts}
+                     categories={categories}
                      filterTags={selectedTags}
-                    followUpFilter={followUpFilter}
-                     onAddProgress={(id) => {
-                         setEditingRecord(null);
-                         setQuickFollowUpContactId(id);
-                         setIsQuickFollowUpOpen(true);
-                     }}
-                     onEditProgressRecord={(contactId, record) => {
-                         setQuickFollowUpContactId(contactId);
-                         setEditingRecord({ contactId, record });
-                         setIsQuickFollowUpOpen(true);
-                     }}
-                     onEditContact={(contact) => {
+                     followUpFilter={followUpFilter}
+                     categoryFilter={categoryFilter}
+                     onContactClick={(contact) => {
                          setEditingContact(contact);
                          setIsModalOpen(true);
                      }}
-                     onDeleteProgress={handleDeleteProgress}
-                     onToggleProgress={handleToggleProgress}
-                     onUpdateStatus={handleUpdateStatus}
-                     onSaveQuickFollowUp={handleQuickAddProgress}
+                     onStatusChange={handleUpdateStatus}
+                     onContactMove={handleMoveContactToCategory}
+                     onCategoryFilter={setCategoryFilter}
+                     onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
                   />
               );
           case 'policies':
@@ -1006,6 +1072,15 @@ const App: React.FC = () => {
         onClose={() => setIsManualPolicyOpen(false)}
         contacts={contacts}
         onSave={handleManualAddPolicy}
+      />
+
+      <CategoryManager
+        isOpen={isCategoryManagerOpen}
+        onClose={() => setIsCategoryManagerOpen(false)}
+        categories={categories}
+        onAdd={handleAddCategory}
+        onUpdate={handleUpdateCategory}
+        onDelete={handleDeleteCategory}
       />
     </div>
   );

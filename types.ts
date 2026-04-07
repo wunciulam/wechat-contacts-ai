@@ -21,6 +21,16 @@ export interface Policy {
   coverage?: string;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
+  order: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface Contact {
   id: string;
   wxid: string;
@@ -30,23 +40,24 @@ export interface Contact {
   tags: string[];
   avatarUrl?: string;
   addedAt: number;
-  
+
   phoneNumber?: string;
   idCard?: string;
   address?: string;
   bankAccount?: string;
   birthday?: string;
-  
+
   lastDate?: string;
   progressHistory?: ProgressRecord[];
   progress?: string;
-  
+
   dealProducts: string[];
   intentProducts: string[];
-  
+
   policies?: Policy[];
-  
+
   followUpStatus?: 'idle' | 'following' | 'contacted';
+  categoryId?: string;
 }
 
 export type NewContact = Omit<Contact, 'id' | 'addedAt'>;

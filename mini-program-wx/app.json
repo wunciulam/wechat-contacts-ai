@@ -1,0 +1,42 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/contact/index",
+    "pages/followup/index",
+    "pages/policy/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#fff",
+    "navigationBarTitleText": "保险跟单仔",
+    "navigationBarTextStyle": "black"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#333333",
+    "borderStyle": "black",
+    "backgroundColor": "#ffffff",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "客户",
+        "iconPath": "images/contact.png",
+        "selectedIconPath": "images/contact-active.png"
+      },
+      {
+        "pagePath": "pages/followup/index",
+        "text": "跟进",
+        "iconPath": "images/followup.png",
+        "selectedIconPath": "images/followup-active.png"
+      },
+      {
+        "pagePath": "pages/policy/index",
+        "text": "保单",
+        "iconPath": "images/policy.png",
+        "selectedIconPath": "images/policy-active.png"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}
