@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Category, Contact } from '../types';
 import ContactCard from './ContactCard';
 import * as LucideIcons from 'lucide-react';
-import { Settings } from 'lucide-react';
+import { Plus, Search, X, UserPlus } from 'lucide-react';
 
 interface CategoryColumnProps {
   category: Category | null;
@@ -13,7 +13,11 @@ interface CategoryColumnProps {
   isOver?: boolean;
   isFiltered?: boolean;
   onContactClick: (contact: Contact) => void;
-  onStatusChange: (contactId: string, status: 'idle' | 'following' | 'contacted') => void;
+  onStatusChange: (contactId: string, status: 'idle' | 'following') => void;
+  onRemoveFromFollowUp: (contactId: string) => void;
+  onAddToFollowUp?: (contactId: string, categoryId: string) => void;
+  onQuickCreateContact?: (name: string, categoryId: string) => void;
+  availableContacts?: Contact[];
   onFilterClick: () => void;
   isUncategorized?: boolean;
 }
@@ -26,9 +30,16 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
   isFiltered,
   onContactClick,
   onStatusChange,
+  onRemoveFromFollowUp,
+  onAddToFollowUp,
+  onQuickCreateContact,
+  availableContacts = [],
   onFilterClick,
   isUncategorized
 }) => {
+  const [isAdding, setIsAdding] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
   const droppableId = isUncategorized ? '__uncategorized__' : `category-${category?.id}`;
 
   const { setNodeRef, isOver: isDropOver } = useDroppable({
@@ -41,9 +52,30 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
     return Icon;
   };
 
-  const handleStatusChange = (contactId: string, status: 'idle' | 'following' | 'contacted') => {
+  const handleStatusChange = (contactId: string, status: 'idle' | 'following') => {
     onStatusChange(contactId, status);
   };
+
+  const handleAddContact = (contactId: string) => {
+    const targetCategoryId = isUncategorized ? '__uncategorized__' : category?.id || '__uncategorized__';
+    onAddToFollowUp?.(contactId, targetCategoryId);
+    setIsAdding(false);
+    setSearchQuery('');
+  };
+
+  const handleQuickCreate = () => {
+    if (searchQuery.trim()) {
+      const targetCategoryId = isUncategorized ? '__uncategorized__' : category?.id || '__uncategorized__';
+      onQuickCreateContact?.(searchQuery.trim(), targetCategoryId);
+      setSearchQuery('');
+      setIsAdding(false);
+    }
+  };
+
+  const filteredAvailableContacts = availableContacts.filter(c =>
+    !contacts.some(ac => ac.id === c.id) &&
+    (c.remarkName || c.nickname || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div
@@ -78,8 +110,72 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
               {count}
             </span>
           </div>
+          {/* 添加联系人按钮 */}
+          {onAddToFollowUp && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setIsAdding(!isAdding); }}
+              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all"
+              title="添加联系人"
+            >
+              <Plus size={16} />
+            </button>
+          )}
         </div>
       </div>
+
+      {/* 添加联系人面板 */}
+      {isAdding && (
+        <div className="p-2 border-b border-gray-100 bg-white">
+          <div className="flex gap-2 mb-2">
+            <div className="relative flex-1">
+              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="搜索联系人..."
+                className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-gray-400"
+                autoFocus
+              />
+            </div>
+            <button
+              onClick={() => { setIsAdding(false); setSearchQuery(''); }}
+              className="p-1 text-gray-400 hover:text-gray-600"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div className="max-h-40 overflow-y-auto space-y-1">
+            {filteredAvailableContacts.length === 0 ? (
+              searchQuery.trim() ? (
+                /* 搜索无结果时，直接创建 */
+                <button
+                  onClick={handleQuickCreate}
+                  className="w-full text-left px-2 py-2 text-xs hover:bg-gray-100 rounded transition-all flex items-center gap-2 text-gray-600"
+                >
+                  <UserPlus size={14} />
+                  <span>创建 "<span className="font-medium text-gray-900">{searchQuery.trim()}</span>"</span>
+                </button>
+              ) : (
+                <p className="text-xs text-gray-400 text-center py-2">无更多联系人</p>
+              )
+            ) : (
+              filteredAvailableContacts.slice(0, 10).map(contact => (
+                <button
+                  key={contact.id}
+                  onClick={() => handleAddContact(contact.id)}
+                  className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-100 rounded transition-all flex items-center gap-2"
+                >
+                  <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-[10px] font-bold">
+                    {contact.remarkName?.[0] || contact.nickname?.[0] || '?'}
+                  </div>
+                  <span className="truncate">{contact.remarkName || contact.nickname}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Drop Zone */}
       <div
@@ -104,6 +200,7 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
                 contact={contact}
                 onClick={() => onContactClick(contact)}
                 onStatusChange={handleStatusChange}
+                onRemoveFromFollowUp={onRemoveFromFollowUp}
               />
             ))
           )}

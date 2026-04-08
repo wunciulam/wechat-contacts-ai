@@ -56,9 +56,15 @@ export interface Contact {
 
   policies?: Policy[];
 
-  followUpStatus?: 'idle' | 'following' | 'contacted';
+  followUpStatus?: 'idle' | 'following';
   categoryId?: string;
 }
+
+// 跟进状态标签映射
+export const FOLLOW_UP_STATUS_LABELS: Record<NonNullable<Contact['followUpStatus']>, string> = {
+  idle: '暂未跟进',
+  following: '跟进中'
+};
 
 export type NewContact = Omit<Contact, 'id' | 'addedAt'>;
 
