@@ -25,14 +25,11 @@ interface CategoryBoardProps {
   contacts: Contact[];
   categories: Category[];
   filterTags: Set<string>;
-  followUpFilter: 'idle' | 'following' | null;
+  followUpFilter: 'idle' | 'following' | 'contacted' | null;
   categoryFilter: string | null;
   onContactClick: (contact: Contact) => void;
-  onStatusChange: (contactId: string, status: 'idle' | 'following') => void;
+  onStatusChange: (contactId: string, status: 'idle' | 'following' | 'contacted') => void;
   onContactMove: (contactId: string, newCategoryId: string | null) => void;
-  onRemoveFromFollowUp: (contactId: string) => void;
-  onAddToFollowUp: (contactId: string, categoryId: string) => void;
-  onQuickCreateContact: (name: string, categoryId: string) => void;
   onCategoryFilter: (categoryId: string | null) => void;
   onOpenCategoryManager: () => void;
 }
@@ -46,9 +43,6 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
   onContactClick,
   onStatusChange,
   onContactMove,
-  onRemoveFromFollowUp,
-  onAddToFollowUp,
-  onQuickCreateContact,
   onCategoryFilter,
   onOpenCategoryManager
 }) => {
@@ -66,20 +60,13 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
     })
   );
 
-  // 自动显示所有跟进中的联系人（不需要 categoryId）
   const filteredContacts = useMemo(() => {
     return contacts.filter(c => {
-      // 只显示跟进中的联系人
-      const isFollowing = c.followUpStatus === 'following';
+      const matchesFollowUp = !followUpFilter || c.followUpStatus === followUpFilter;
       const matchesTags = filterTags.size === 0 || c.tags.some(tag => filterTags.has(tag));
-      return isFollowing && matchesTags;
+      return matchesFollowUp && matchesTags;
     });
-  }, [contacts, filterTags]);
-
-  // 可添加到跟进工作台的联系人（尚未跟进）
-  const availableContacts = useMemo(() => {
-    return contacts.filter(c => c.followUpStatus !== 'following');
-  }, [contacts]);
+  }, [contacts, followUpFilter, filterTags]);
 
   const contactsByCategory = useMemo(() => {
     const groups: Record<string, Contact[]> = {};
@@ -183,10 +170,6 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
                 isFiltered={categoryFilter === category.id}
                 onContactClick={onContactClick}
                 onStatusChange={onStatusChange}
-                onRemoveFromFollowUp={onRemoveFromFollowUp}
-                onAddToFollowUp={onAddToFollowUp}
-                onQuickCreateContact={onQuickCreateContact}
-                availableContacts={availableContacts}
                 onFilterClick={() => onCategoryFilter(categoryFilter === category.id ? null : category.id)}
               />
             ))}
@@ -200,10 +183,6 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
               isFiltered={categoryFilter === null}
               onContactClick={onContactClick}
               onStatusChange={onStatusChange}
-              onRemoveFromFollowUp={onRemoveFromFollowUp}
-              onAddToFollowUp={onAddToFollowUp}
-              onQuickCreateContact={onQuickCreateContact}
-              availableContacts={availableContacts}
               onFilterClick={() => onCategoryFilter(null)}
               isUncategorized
             />
@@ -217,7 +196,6 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
               isOverlay
               onClick={() => {}}
               onStatusChange={() => {}}
-              onRemoveFromFollowUp={() => {}}
             />
           )}
         </DragOverlay>

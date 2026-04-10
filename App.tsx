@@ -24,6 +24,7 @@ const DEFAULT_CATEGORIES: Category[] = [
 ];
 
 const FOLLOW_UP_TAG = '跟进中';
+const CONTACTED_TAG = '沟通过';
 const CLOSED_CUSTOMER_TAG = '成交客户';
 
 // Helper function to categorize policies based on product name
@@ -295,25 +296,9 @@ const App: React.FC = () => {
     return () => {};
   }, []);
 
-  // 4. 加载类目数据 - 优先从云端加载
+  // 4. 加载类目数据
   useEffect(() => {
-    const loadCategories = async () => {
-      // 优先从云端加载
-      if (isSupabaseConfigured()) {
-        try {
-          const cloudData = await loadFromCloud('categories');
-          if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
-            console.log('从云端加载类目成功:', cloudData.length);
-            setCategories(cloudData);
-            localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(cloudData));
-            return;
-          }
-        } catch (e) {
-          console.error('从云端加载类目失败:', e);
-        }
-      }
-
-      // 云端没有，从本地存储加载
+    const loadCategories = () => {
       const saved = localStorage.getItem(CATEGORIES_STORAGE_KEY);
       if (saved) {
         try {
@@ -331,15 +316,10 @@ const App: React.FC = () => {
     loadCategories();
   }, []);
 
-  // 5. 保存类目数据 - 同时保存到云端
+  // 5. 保存类目数据
   useEffect(() => {
     if (categories.length > 0) {
       localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
-      if (isSupabaseConfigured()) {
-        saveToCloud('categories', categories).then(success => {
-          console.log('类目云端保存结果:', success ? '成功' : '失败');
-        });
-      }
     }
   }, [categories]);
 
@@ -856,7 +836,7 @@ const App: React.FC = () => {
       });
   };
 
-  const handleUpdateStatus = (contactId: string, newStatus: 'idle' | 'following') => {
+  const handleUpdateStatus = (contactId: string, newStatus: 'idle' | 'following' | 'contacted') => {
       setContacts(prev => prev.map(c => {
           if (c.id === contactId) {
               const updatedContact = { ...c, followUpStatus: newStatus };
@@ -866,7 +846,7 @@ const App: React.FC = () => {
       }));
   };
 
-  const handleBatchUpdateStatus = (ids: string[], newStatus: 'idle' | 'following') => {
+  const handleBatchUpdateStatus = (ids: string[], newStatus: 'idle' | 'following' | 'contacted') => {
       setContacts(prev => prev.map(c => {
           if (ids.includes(c.id)) {
               const updatedContact = { ...c, followUpStatus: newStatus };
@@ -874,50 +854,6 @@ const App: React.FC = () => {
           }
           return c;
       }));
-  };
-
-  // 从跟进工作台移除联系人，状态变为"暂未跟进"
-  const handleRemoveFromFollowUp = (contactId: string) => {
-      setContacts(prev => prev.map(c => {
-          if (c.id === contactId) {
-              return { ...c, followUpStatus: 'idle', categoryId: undefined };
-          }
-          return c;
-      }));
-  };
-
-  // 添加联系人到跟进工作台
-  const handleAddToFollowUp = (contactId: string, categoryId: string) => {
-      setContacts(prev => prev.map(c => {
-          if (c.id === contactId) {
-              return {
-                  ...c,
-                  followUpStatus: 'following',
-                  categoryId: categoryId === '__uncategorized__' ? undefined : categoryId
-              };
-          }
-          return c;
-      }));
-  };
-
-  // 快捷创建联系人并添加到跟进工作台
-  const handleQuickCreateContact = (name: string, categoryId: string) => {
-      const newContact: Contact = {
-          id: generateId(),
-          addedAt: Date.now(),
-          wxid: '',
-          nickname: name,
-          remarkName: name,
-          remarkInfo: '快速创建',
-          tags: [],
-          dealProducts: [],
-          intentProducts: [],
-          progressHistory: [],
-          followUpStatus: 'following',
-          categoryId: categoryId === '__uncategorized__' ? undefined : categoryId,
-          policies: []
-      };
-      setContacts(prev => [newContact, ...prev]);
   };
 
   // 类目相关处理函数
@@ -991,9 +927,6 @@ const App: React.FC = () => {
                      }}
                      onStatusChange={handleUpdateStatus}
                      onContactMove={handleMoveContactToCategory}
-                     onRemoveFromFollowUp={handleRemoveFromFollowUp}
-                     onAddToFollowUp={handleAddToFollowUp}
-                     onQuickCreateContact={handleQuickCreateContact}
                      onCategoryFilter={setCategoryFilter}
                      onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
                   />
