@@ -7,7 +7,13 @@ const configuredAppId = import.meta.env.VITE_APP_ID || '';
 
 const APP_ID_STORAGE_KEY = 'wechat_app_id';
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+console.log('🔧 Supabase 配置:', { 
+  supabaseUrl: supabaseUrl ? supabaseUrl.substring(0, 30) + '...' : '未配置',
+  supabaseKey: supabaseKey ? '已配置 (' + supabaseKey.length + ' 字符)' : '未配置',
+  configuredAppId: configuredAppId || '未配置'
+});
+
+export const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null as any;
 
 export const isSupabaseConfigured = () => {
   return !!(supabaseUrl && supabaseKey);

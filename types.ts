@@ -56,7 +56,7 @@ export interface Contact {
 
   policies?: Policy[];
 
-  followUpStatus?: 'idle' | 'following' | 'contacted';
+  followUpStatus?: 'idle' | 'following';
   categoryId?: string;
 }
 
