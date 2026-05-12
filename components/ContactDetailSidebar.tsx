@@ -10,7 +10,7 @@ interface ContactDetailSidebarProps {
   onDelete: (id: string) => void;
   onAddProgress: (contactId: string) => void;
   onDeleteProgress: (contactId: string, progressId: string) => void;
-  onUpdateStatus: (contactId: string, newStatus: 'idle' | 'following') => void;
+  onUpdateStatus: (contactId: string, newStatus: 'idle' | 'following' | 'contacted') => void;
   onAddToFollowing: (contactId: string) => void;
   onRemoveTag: (contactId: string, tag: string) => void;
   showAddToFollowing?: boolean;
@@ -158,12 +158,10 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
             </button>
             <button
               onClick={() => {
-                if (confirm(`确定要删除联系人「${contact.remarkName || contact.nickname}」吗？\n\n此操作不可撤销，该联系人的所有跟进记录和保单信息都会被删除。`)) {
-                  onDelete(contact.id);
-                  onClose();
-                }
+                onDelete(contact.id);
+                onClose();
               }}
-              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+              className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
               title="删除联系人"
             >
               <Trash2 size={18} />
@@ -188,10 +186,14 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
                   contact.followUpStatus === 'following' 
                     ? 'bg-gray-900 text-white' 
+                    : contact.followUpStatus === 'contacted'
+                    ? 'bg-gray-100 text-gray-700'
                     : 'bg-gray-50 text-gray-400'
                 }`}>
                   {contact.followUpStatus === 'following' ? (
                     <><Clock size={12} /> 跟进中</>
+                  ) : contact.followUpStatus === 'contacted' ? (
+                    <><CheckCircle2 size={12} /> 已沟通</>
                   ) : (
                     <><CircleDashed size={12} /> 暂未跟进</>
                   )}
@@ -208,6 +210,16 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                     }`}
                   >
                     跟进中
+                  </button>
+                  <button
+                    onClick={() => onUpdateStatus(contact.id, 'contacted')}
+                    className={`text-xs px-2 py-1 rounded transition-colors ${
+                      contact.followUpStatus === 'contacted'
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-400 hover:text-gray-900 hover:bg-gray-100'
+                    }`}
+                  >
+                    已沟通
                   </button>
                   <button
                     onClick={() => onUpdateStatus(contact.id, 'idle')}

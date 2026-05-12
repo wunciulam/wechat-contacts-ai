@@ -1,4 +1,3 @@
-
 export interface ProgressRecord {
   id: string;
   date: string;
@@ -19,16 +18,6 @@ export interface Policy {
   paymentYears?: string;
   insuranceType?: string;
   coverage?: string;
-}
-
-export interface Category {
-  id: string;
-  name: string;
-  color: string;
-  icon: string;
-  order: number;
-  createdAt: number;
-  updatedAt: number;
 }
 
 export interface Contact {
@@ -56,15 +45,8 @@ export interface Contact {
 
   policies?: Policy[];
 
-  followUpStatus?: 'idle' | 'following';
-  categoryId?: string;
+  followUpStatus?: 'idle' | 'following' | 'contacted';
 }
-
-// 跟进状态标签映射
-export const FOLLOW_UP_STATUS_LABELS: Record<NonNullable<Contact['followUpStatus']>, string> = {
-  idle: '暂未跟进',
-  following: '跟进中'
-};
 
 export type NewContact = Omit<Contact, 'id' | 'addedAt'>;
 
@@ -73,7 +55,7 @@ export interface ExtractedData {
   nickname?: string;
   remarkName?: string;
   remarkInfo?: string;
-  tags?: string[]; 
+  tags?: string[];
   lastDate?: string;
   progress?: string;
   dealProducts?: string[];

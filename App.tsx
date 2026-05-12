@@ -24,7 +24,6 @@ const DEFAULT_CATEGORIES: Category[] = [
 ];
 
 const FOLLOW_UP_TAG = '跟进中';
-const CONTACTED_TAG = '沟通过';
 const CLOSED_CUSTOMER_TAG = '成交客户';
 
 // Helper function to categorize policies based on product name
@@ -296,18 +295,17 @@ const App: React.FC = () => {
     return () => {};
   }, []);
 
-  // 4. 加载类目数据 - 从云端同步
+  // 4. 加载类目数据 - 优先从云端加载
   useEffect(() => {
     const loadCategories = async () => {
       // 优先从云端加载
       if (isSupabaseConfigured()) {
         try {
-          const cloudCategories = await loadFromCloud('categories');
-          if (cloudCategories && Array.isArray(cloudCategories) && cloudCategories.length > 0) {
-            console.log('从云端加载类目数据，数量:', cloudCategories.length);
-            setCategories(cloudCategories);
-            // 同步到本地
-            localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(cloudCategories));
+          const cloudData = await loadFromCloud('categories');
+          if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
+            console.log('从云端加载类目成功:', cloudData.length);
+            setCategories(cloudData);
+            localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(cloudData));
             return;
           }
         } catch (e) {
@@ -315,13 +313,12 @@ const App: React.FC = () => {
         }
       }
 
-      // 云端没有数据，从本地存储加载
+      // 云端没有，从本地存储加载
       const saved = localStorage.getItem(CATEGORIES_STORAGE_KEY);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            console.log('从本地存储加载类目数据，数量:', parsed.length);
             setCategories(parsed);
             return;
           }
@@ -329,24 +326,18 @@ const App: React.FC = () => {
           console.error('类目数据解析失败:', e);
         }
       }
-      
-      // 使用默认值
-      console.log('使用默认类目');
       setCategories(DEFAULT_CATEGORIES);
     };
     loadCategories();
   }, []);
 
-  // 5. 保存类目数据 - 同步到云端
+  // 5. 保存类目数据 - 同时保存到云端
   useEffect(() => {
     if (categories.length > 0) {
       localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
-      
-      // 同步到云端
       if (isSupabaseConfigured()) {
-        console.log('正在保存类目到云端，数量:', categories.length);
-        saveToCloud('categories', categories).catch(e => {
-          console.error('保存类目到云端失败:', e);
+        saveToCloud('categories', categories).then(success => {
+          console.log('类目云端保存结果:', success ? '成功' : '失败');
         });
       }
     }
@@ -865,7 +856,7 @@ const App: React.FC = () => {
       });
   };
 
-  const handleUpdateStatus = (contactId: string, newStatus: 'idle' | 'following' | 'contacted') => {
+  const handleUpdateStatus = (contactId: string, newStatus: 'idle' | 'following') => {
       setContacts(prev => prev.map(c => {
           if (c.id === contactId) {
               const updatedContact = { ...c, followUpStatus: newStatus };
@@ -875,7 +866,7 @@ const App: React.FC = () => {
       }));
   };
 
-  const handleBatchUpdateStatus = (ids: string[], newStatus: 'idle' | 'following' | 'contacted') => {
+  const handleBatchUpdateStatus = (ids: string[], newStatus: 'idle' | 'following') => {
       setContacts(prev => prev.map(c => {
           if (ids.includes(c.id)) {
               const updatedContact = { ...c, followUpStatus: newStatus };
@@ -883,6 +874,50 @@ const App: React.FC = () => {
           }
           return c;
       }));
+  };
+
+  // 从跟进工作台移除联系人，状态变为"暂未跟进"
+  const handleRemoveFromFollowUp = (contactId: string) => {
+      setContacts(prev => prev.map(c => {
+          if (c.id === contactId) {
+              return { ...c, followUpStatus: 'idle', categoryId: undefined };
+          }
+          return c;
+      }));
+  };
+
+  // 添加联系人到跟进工作台
+  const handleAddToFollowUp = (contactId: string, categoryId: string) => {
+      setContacts(prev => prev.map(c => {
+          if (c.id === contactId) {
+              return {
+                  ...c,
+                  followUpStatus: 'following',
+                  categoryId: categoryId === '__uncategorized__' ? undefined : categoryId
+              };
+          }
+          return c;
+      }));
+  };
+
+  // 快捷创建联系人并添加到跟进工作台
+  const handleQuickCreateContact = (name: string, categoryId: string) => {
+      const newContact: Contact = {
+          id: generateId(),
+          addedAt: Date.now(),
+          wxid: '',
+          nickname: name,
+          remarkName: name,
+          remarkInfo: '快速创建',
+          tags: [],
+          dealProducts: [],
+          intentProducts: [],
+          progressHistory: [],
+          followUpStatus: 'following',
+          categoryId: categoryId === '__uncategorized__' ? undefined : categoryId,
+          policies: []
+      };
+      setContacts(prev => [newContact, ...prev]);
   };
 
   // 类目相关处理函数
@@ -916,63 +951,6 @@ const App: React.FC = () => {
     ));
   };
 
-  const handleAddContactToCategory = (categoryId: string | null, contactName: string) => {
-    console.log('添加联系人:', contactName, '到类目:', categoryId);
-    console.log('当前联系人总数:', contacts.length);
-    
-    // 先搜索库中是否已存在同名联系人
-    const existingContact = contacts.find(
-      c => c.remarkName === contactName || c.nickname === contactName
-    );
-
-    console.log('查找结果:', existingContact ? '找到已有联系人' : '未找到，将创建新的');
-
-    if (existingContact) {
-      // 如果已存在，更新其状态为跟进中，并设置类目
-      console.log('更新已有联系人:', existingContact.id, existingContact.remarkName);
-      setContacts(prev => 
-        prev.map(c => 
-          c.id === existingContact.id 
-            ? { ...c, followUpStatus: 'following' as const, categoryId: categoryId || undefined }
-            : c
-        )
-      );
-    } else {
-      // 如果不存在，创建新联系人
-      console.log('创建新联系人:', contactName);
-      const newContact: Contact = {
-        id: generateId(),
-        wxid: '',
-        nickname: contactName,
-        remarkName: contactName,
-        remarkInfo: '',
-        tags: [],
-        addedAt: Date.now(),
-        dealProducts: [],
-        intentProducts: [],
-        policies: [],
-        followUpStatus: 'following',
-        categoryId: categoryId || undefined
-      };
-      setContacts(prev => [newContact, ...prev]);
-    }
-  };
-
-  const handleAddExistingContactToCategory = (categoryId: string | null, contactId: string) => {
-    console.log('添加已有联系人:', contactId, '到类目:', categoryId);
-    setContacts(prev =>
-      prev.map(c =>
-        c.id === contactId
-          ? { ...c, followUpStatus: 'following' as const, categoryId: categoryId || undefined }
-          : c
-      )
-    );
-  };
-
-  const handleReorderCategories = (newCategories: Category[]) => {
-    setCategories(newCategories);
-  };
-
   const renderContent = () => {
       switch (currentView) {
           case 'contacts':
@@ -1002,7 +980,7 @@ const App: React.FC = () => {
           case 'followups':
               return (
                   <CategoryBoard
-                     contacts={contacts.filter(c => c.followUpStatus === 'following')}
+                     contacts={contacts}
                      categories={categories}
                      filterTags={selectedTags}
                      followUpFilter={followUpFilter}
@@ -1011,13 +989,13 @@ const App: React.FC = () => {
                          setEditingContact(contact);
                          setIsModalOpen(true);
                      }}
+                     onStatusChange={handleUpdateStatus}
                      onContactMove={handleMoveContactToCategory}
+                     onRemoveFromFollowUp={handleRemoveFromFollowUp}
+                     onAddToFollowUp={handleAddToFollowUp}
+                     onQuickCreateContact={handleQuickCreateContact}
                      onCategoryFilter={setCategoryFilter}
                      onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
-                     onAddContact={handleAddContactToCategory}
-                     onAddExistingContact={handleAddExistingContactToCategory}
-                     allContacts={contacts}
-                     onReorderCategories={handleReorderCategories}
                   />
               );
           case 'policies':
@@ -1106,6 +1084,13 @@ const App: React.FC = () => {
             <span className="text-[9px] font-medium">工作台</span>
           </button>
           <button 
+            onClick={() => setCurrentView('policies')}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all ${currentView === 'policies' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`}
+          >
+            <FileText size={18} />
+            <span className="text-[9px] font-medium">保单</span>
+          </button>
+          <button 
             onClick={() => setIsMobileSidebarOpen(true)}
             className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all text-gray-400"
           >
@@ -1122,7 +1107,6 @@ const App: React.FC = () => {
         onTableSave={handleTableDataSave}
         initialData={editingContact}
         allTags={allTags}
-        onDelete={handleDeleteContact}
       />
       
       <BatchTagModal

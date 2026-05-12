@@ -1,0 +1,61 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "客户管理",
+        "navigationStyle": "default"
+      }
+    },
+    {
+      "path": "pages/followup/index",
+      "style": {
+        "navigationBarTitleText": "跟进记录"
+      }
+    },
+    {
+      "path": "pages/policy/index",
+      "style": {
+        "navigationBarTitleText": "保单管理"
+      }
+    },
+    {
+      "path": "pages/contact-detail/index",
+      "style": {
+        "navigationBarTitleText": "客户详情"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "保险跟单仔",
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "backgroundColor": "#F8F8F8"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#333333",
+    "borderStyle": "black",
+    "backgroundColor": "#FFFFFF",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "客户",
+        "iconPath": "static/icons/contact.png",
+        "selectedIconPath": "static/icons/contact-active.png"
+      },
+      {
+        "pagePath": "pages/followup/index",
+        "text": "跟进",
+        "iconPath": "static/icons/followup.png",
+        "selectedIconPath": "static/icons/followup-active.png"
+      },
+      {
+        "pagePath": "pages/policy/index",
+        "text": "保单",
+        "iconPath": "static/icons/policy.png",
+        "selectedIconPath": "static/icons/policy-active.png"
+      }
+    ]
+  }
+}

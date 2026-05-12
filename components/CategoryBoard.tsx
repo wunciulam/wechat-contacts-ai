@@ -15,121 +15,26 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  horizontalListSortingStrategy,
-  useSortable,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { Category, Contact } from '../types';
 import CategoryColumn from './CategoryColumn';
 import ContactCard from './ContactCard';
-import { Settings, GripHorizontal } from 'lucide-react';
-
-interface SortableCategoryColumnProps {
-  category: Category;
-  contacts: Contact[];
-  count: number;
-  isOver: boolean;
-  isFiltered: boolean;
-  onContactClick: (contact: Contact) => void;
-  onFilterClick: () => void;
-  onAddContact?: (categoryId: string | null, contactName: string) => void;
-  onAddExistingContact?: (categoryId: string | null, contactId: string) => void;
-  allContacts?: Contact[];
-  showFollowUpInfo: boolean;
-}
-
-const SortableCategoryColumn: React.FC<SortableCategoryColumnProps> = ({
-  category,
-  ...props
-}) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-  } = useSortable({ id: `category-${category.id}` });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style} className="flex flex-col group">
-      <div
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing px-3 pt-2 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        <GripHorizontal size={16} className="text-gray-400 hover:text-gray-600" />
-      </div>
-      <CategoryColumn
-        category={category}
-        {...props}
-      />
-    </div>
-  );
-};
-
-interface SortableUncategorizedColumnProps {
-  contacts: Contact[];
-  count: number;
-  isOver: boolean;
-  isFiltered: boolean;
-  onContactClick: (contact: Contact) => void;
-  onFilterClick: () => void;
-  onAddContact?: (categoryId: string | null, contactName: string) => void;
-  onAddExistingContact?: (categoryId: string | null, contactId: string) => void;
-  allContacts?: Contact[];
-}
-
-const SortableUncategorizedColumn: React.FC<SortableUncategorizedColumnProps> = (props) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-  } = useSortable({ id: '__uncategorized__sort__' });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style} className="flex flex-col group">
-      <div
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing px-3 pt-2 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        <GripHorizontal size={16} className="text-gray-400 hover:text-gray-600" />
-      </div>
-      <CategoryColumn
-        category={null}
-        isUncategorized
-        {...props}
-      />
-    </div>
-  );
-};
+import { Settings } from 'lucide-react';
 
 interface CategoryBoardProps {
   contacts: Contact[];
   categories: Category[];
   filterTags: Set<string>;
-  followUpFilter: 'idle' | 'following' | 'contacted' | null;
+  followUpFilter: 'idle' | 'following' | null;
   categoryFilter: string | null;
   onContactClick: (contact: Contact) => void;
+  onStatusChange: (contactId: string, status: 'idle' | 'following') => void;
   onContactMove: (contactId: string, newCategoryId: string | null) => void;
+  onRemoveFromFollowUp: (contactId: string) => void;
+  onAddToFollowUp: (contactId: string, categoryId: string) => void;
+  onQuickCreateContact: (name: string, categoryId: string) => void;
   onCategoryFilter: (categoryId: string | null) => void;
   onOpenCategoryManager: () => void;
-  onAddContact?: (categoryId: string | null, contactName: string) => void;
-  onAddExistingContact?: (categoryId: string | null, contactId: string) => void;
-  allContacts?: Contact[];
-  onReorderCategories?: (categories: Category[]) => void;
 }
 
 const CategoryBoard: React.FC<CategoryBoardProps> = ({
@@ -139,13 +44,13 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
   followUpFilter,
   categoryFilter,
   onContactClick,
+  onStatusChange,
   onContactMove,
+  onRemoveFromFollowUp,
+  onAddToFollowUp,
+  onQuickCreateContact,
   onCategoryFilter,
-  onOpenCategoryManager,
-  onAddContact,
-  onAddExistingContact,
-  allContacts = [],
-  onReorderCategories
+  onOpenCategoryManager
 }) => {
   const [activeContact, setActiveContact] = useState<Contact | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -161,13 +66,20 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
     })
   );
 
+  // 自动显示所有跟进中的联系人（不需要 categoryId）
   const filteredContacts = useMemo(() => {
     return contacts.filter(c => {
-      const matchesFollowUp = !followUpFilter || c.followUpStatus === followUpFilter;
+      // 只显示跟进中的联系人
+      const isFollowing = c.followUpStatus === 'following';
       const matchesTags = filterTags.size === 0 || c.tags.some(tag => filterTags.has(tag));
-      return matchesFollowUp && matchesTags;
+      return isFollowing && matchesTags;
     });
-  }, [contacts, followUpFilter, filterTags]);
+  }, [contacts, filterTags]);
+
+  // 可添加到跟进工作台的联系人（尚未跟进）
+  const availableContacts = useMemo(() => {
+    return contacts.filter(c => c.followUpStatus !== 'following');
+  }, [contacts]);
 
   const contactsByCategory = useMemo(() => {
     const groups: Record<string, Contact[]> = {};
@@ -194,13 +106,9 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
-    const activeId = active.id as string;
-    
-    if (!activeId.startsWith('category-')) {
-      const contact = filteredContacts.find(c => c.id === activeId);
-      if (contact) {
-        setActiveContact(contact);
-      }
+    const contact = filteredContacts.find(c => c.id === active.id);
+    if (contact) {
+      setActiveContact(contact);
     }
   };
 
@@ -216,38 +124,9 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
 
     if (!over) return;
 
-    const activeId = active.id as string;
+    const contactId = active.id as string;
     const overId = over.id as string;
 
-    const isActiveColumn = activeId.startsWith('category-') || activeId === '__uncategorized__sort__';
-    const isOverColumn = overId.startsWith('category-') || overId === '__uncategorized__sort__';
-
-    if (isActiveColumn && isOverColumn) {
-      // Build the full column order: categories + uncategorized
-      const columnIds = [...categories.map(c => `category-${c.id}`), '__uncategorized__sort__'];
-      const oldIndex = columnIds.indexOf(activeId);
-      const newIndex = columnIds.indexOf(overId);
-
-      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-        const newColumnIds = [...columnIds];
-        const [moved] = newColumnIds.splice(oldIndex, 1);
-        newColumnIds.splice(newIndex, 0, moved);
-
-        // Extract the new category order (excluding uncategorized)
-        const newCategories = newColumnIds
-          .filter(id => id !== '__uncategorized__sort__')
-          .map((id, index) => {
-            const catId = id.replace('category-', '');
-            const cat = categories.find(c => c.id === catId)!;
-            return { ...cat, order: index };
-          });
-
-        onReorderCategories?.(newCategories);
-      }
-      return;
-    }
-
-    const contactId = activeId;
     let newCategoryId: string | null = null;
 
     if (overId === '__uncategorized__') {
@@ -293,42 +172,42 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
         onDragEnd={handleDragEnd}
       >
         <div className="flex-1 overflow-x-auto p-4 md:p-6">
-          <SortableContext
-            items={[...categories.map(c => `category-${c.id}`), '__uncategorized__sort__']}
-            strategy={horizontalListSortingStrategy}
-          >
-            <div className="flex gap-4 h-full min-w-max">
-              {categories.map(category => (
-                <SortableCategoryColumn
-                  key={category.id}
-                  category={category}
-                  contacts={contactsByCategory[category.id] || []}
-                  count={counts[category.id]}
-                  isOver={overId === `category-${category.id}`}
-                  isFiltered={categoryFilter === category.id}
-                  onContactClick={onContactClick}
-                  onFilterClick={() => onCategoryFilter(categoryFilter === category.id ? null : category.id)}
-                  onAddContact={onAddContact}
-                  onAddExistingContact={onAddExistingContact}
-                  allContacts={allContacts}
-                  showFollowUpInfo
-                />
-              ))}
-
-              <SortableUncategorizedColumn
-                key="__uncategorized__"
-                contacts={contactsByCategory['__uncategorized__'] || []}
-                count={counts['__uncategorized__']}
-                isOver={overId === '__uncategorized__'}
-                isFiltered={categoryFilter === null}
+          <div className="flex gap-4 h-full min-w-max">
+            {categories.map(category => (
+              <CategoryColumn
+                key={category.id}
+                category={category}
+                contacts={contactsByCategory[category.id] || []}
+                count={counts[category.id]}
+                isOver={overId === `category-${category.id}`}
+                isFiltered={categoryFilter === category.id}
                 onContactClick={onContactClick}
-                onFilterClick={() => onCategoryFilter(null)}
-                onAddContact={onAddContact}
-                onAddExistingContact={onAddExistingContact}
-                allContacts={allContacts}
+                onStatusChange={onStatusChange}
+                onRemoveFromFollowUp={onRemoveFromFollowUp}
+                onAddToFollowUp={onAddToFollowUp}
+                onQuickCreateContact={onQuickCreateContact}
+                availableContacts={availableContacts}
+                onFilterClick={() => onCategoryFilter(categoryFilter === category.id ? null : category.id)}
               />
-            </div>
-          </SortableContext>
+            ))}
+
+            <CategoryColumn
+              key="__uncategorized__"
+              category={null}
+              contacts={contactsByCategory['__uncategorized__'] || []}
+              count={counts['__uncategorized__']}
+              isOver={overId === '__uncategorized__'}
+              isFiltered={categoryFilter === null}
+              onContactClick={onContactClick}
+              onStatusChange={onStatusChange}
+              onRemoveFromFollowUp={onRemoveFromFollowUp}
+              onAddToFollowUp={onAddToFollowUp}
+              onQuickCreateContact={onQuickCreateContact}
+              availableContacts={availableContacts}
+              onFilterClick={() => onCategoryFilter(null)}
+              isUncategorized
+            />
+          </div>
         </div>
 
         <DragOverlay>
@@ -337,6 +216,8 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
               contact={activeContact}
               isOverlay
               onClick={() => {}}
+              onStatusChange={() => {}}
+              onRemoveFromFollowUp={() => {}}
             />
           )}
         </DragOverlay>

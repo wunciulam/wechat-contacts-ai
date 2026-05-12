@@ -11,10 +11,9 @@ interface ImportModalProps {
   onTableSave?: (data: ExtractedTableData) => void;
   initialData?: Contact | null;
   allTags?: string[];
-  onDelete?: (id: string) => void;
 }
 
-const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTableSave, initialData, allTags = [], onDelete }) => {
+const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTableSave, initialData, allTags = [] }) => {
   const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'table'>('ai');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -798,24 +797,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
 
          {/* 底部操作区 - 仅在手动录入时显示 */}
          {(activeTab === 'manual' || initialData) && (
-           <div className="px-5 py-4 border-t border-gray-100 bg-white flex justify-between shrink-0">
-             <div>
-               {initialData && onDelete && (
-                 <button
-                   onClick={() => {
-                     onDelete(initialData.id);
-                     onClose();
-                   }}
-                   className="btn text-xs py-2 text-red-600 border border-red-200 hover:bg-red-50 hover:border-red-300 transition-colors"
-                 >
-                   删除
-                 </button>
-               )}
-             </div>
-             <div className="flex gap-2">
-               <button onClick={onClose} className="btn btn-secondary text-xs py-2">取消</button>
-               <button onClick={handleManualSave} className="btn btn-primary text-xs py-2">保存</button>
-             </div>
+           <div className="px-5 py-4 border-t border-gray-100 bg-white flex justify-end gap-2 shrink-0">
+             <button onClick={onClose} className="btn btn-secondary text-xs py-2">取消</button>
+             <button onClick={handleManualSave} className="btn btn-primary text-xs py-2">保存</button>
            </div>
          )}
        </div>

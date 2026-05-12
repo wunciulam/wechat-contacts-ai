@@ -1,11 +1,10 @@
-
 import { createClient } from '@supabase/supabase-js';
+import { Contact } from '../types';
+import storage from './storage';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const configuredAppId = import.meta.env.VITE_APP_ID || '';
-
-const APP_ID_STORAGE_KEY = 'wechat_app_id';
+// 从环境变量或硬编码获取配置
+const supabaseUrl = 'https://ulgqiixqaxxgodyowrep.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsZ3FpaXhxYXh4Z29keW93cmVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3MTEwNDcsImV4cCI6MjA4NzI4NzA0N30.ZgxdR2MwwzBSzhXCkk0JPJdnijKr-qouxOG0aQ1S8Xg';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -13,48 +12,19 @@ export const isSupabaseConfigured = () => {
   return !!(supabaseUrl && supabaseKey);
 };
 
-const generateAppId = () => `app_${Math.random().toString(36).slice(2, 17)}`;
-
-const getStoredAppId = (): string | null => {
-  try {
-    return localStorage.getItem(APP_ID_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-};
-
-const setStoredAppId = (appId: string) => {
-  try {
-    localStorage.setItem(APP_ID_STORAGE_KEY, appId);
-  } catch {
-    // ignore
-  }
-};
-
-/**
- * 注意：
- * - localStorage/IndexedDB 都是“按域名+端口”隔离的；换端口/域名会像“数据没了”
- * - 云端 app_data 又按 app_id 分区；如果 app_id 丢失（清缓存/换浏览器/换设备），也会读不到旧数据
- *
- * 解决：
- * - 配置 VITE_APP_ID（推荐）让不同设备/域名访问同一份云端数据
- * - 或者在第一次读取时自动探测已有 app_id（仅在你自己的 Supabase 项目里使用）
- */
 const resolveAppIdForWrite = (): string => {
-  if (configuredAppId) return configuredAppId;
-  const stored = getStoredAppId();
+  const stored = storage.getAppId();
   if (stored) return stored;
-  const fresh = generateAppId();
-  setStoredAppId(fresh);
+  const fresh = storage.generateAppId();
+  storage.setAppId(fresh);
   return fresh;
 };
 
 const resolveAppIdForRead = async (dataType: string): Promise<string> => {
-  if (configuredAppId) return configuredAppId;
-  const stored = getStoredAppId();
+  const stored = storage.getAppId();
   if (stored) return stored;
 
-  // 尝试从云端找回旧 app_id（比如清理了本地存储/换了域名/换了端口）
+  // 尝试从云端找回旧 app_id
   try {
     const { data, error } = await supabase
       .from('app_data')
@@ -65,15 +35,15 @@ const resolveAppIdForRead = async (dataType: string): Promise<string> => {
       .maybeSingle();
 
     if (!error && data?.app_id) {
-      setStoredAppId(data.app_id);
+      storage.setAppId(data.app_id);
       return data.app_id;
     }
   } catch {
-    // ignore and create a new one
+    // ignore
   }
 
-  const fresh = generateAppId();
-  setStoredAppId(fresh);
+  const fresh = storage.generateAppId();
+  storage.setAppId(fresh);
   return fresh;
 };
 
@@ -86,7 +56,7 @@ export const saveToCloud = async (dataType: string, data: any): Promise<boolean>
   try {
     const appId = resolveAppIdForWrite();
     console.log('💾 正在保存到云端，appId:', appId, 'dataType:', dataType);
-    
+
     // 先检查是否存在
     const { data: existing } = await supabase
       .from('app_data')
@@ -94,14 +64,14 @@ export const saveToCloud = async (dataType: string, data: any): Promise<boolean>
       .eq('app_id', appId)
       .eq('data_type', dataType)
       .maybeSingle();
-    
+
     let error;
-    
+
     if (existing) {
-      // 更新现有记录 - 这会触发 realtime
+      // 更新现有记录
       const result = await supabase
         .from('app_data')
-        .update({ 
+        .update({
           data: data,
           updated_at: new Date().toISOString()
         })
@@ -111,10 +81,10 @@ export const saveToCloud = async (dataType: string, data: any): Promise<boolean>
       error = result.error;
       console.log('📝 更新记录，影响行数:', result.data?.length || 0);
     } else {
-      // 插入新记录 - 这会触发 realtime
+      // 插入新记录
       const result = await supabase
         .from('app_data')
-        .insert({ 
+        .insert({
           app_id: appId,
           data_type: dataType,
           data: data,
@@ -124,12 +94,12 @@ export const saveToCloud = async (dataType: string, data: any): Promise<boolean>
       error = result.error;
       console.log('📝 插入新记录，ID:', result.data?.[0]?.id);
     }
-    
+
     if (error) {
       console.error('❌ 云端保存失败:', error);
       return false;
     }
-    
+
     console.log('✅ 云端保存成功');
     return true;
   } catch (e) {
@@ -152,7 +122,7 @@ export const loadFromCloud = async (dataType: string): Promise<any | null> => {
       .eq('app_id', appId)
       .eq('data_type', dataType)
       .single();
-    
+
     if (error) {
       if (error.code === 'PGRST116') {
         return null;
@@ -167,10 +137,7 @@ export const loadFromCloud = async (dataType: string): Promise<any | null> => {
   }
 };
 
-/**
- * 旧版兼容：早期版本可能把联系人直接存进 contacts 表。
- * 当 app_data 没有 contacts 数据时，可用它来恢复/迁移。
- */
+// 旧版兼容
 export const loadLegacyContactsTable = async (): Promise<any[]> => {
   if (!isSupabaseConfigured()) return [];
   try {
@@ -198,7 +165,7 @@ export const getLastSyncTime = async (): Promise<string | null> => {
       .eq('app_id', appId)
       .eq('data_type', 'contacts')
       .single();
-    
+
     if (error || !data) return null;
     return data.updated_at;
   } catch {
@@ -214,10 +181,7 @@ const channels: Map<string, any> = new Map();
 const callbacks: Set<DataChangeCallback> = new Set();
 let isSubscribed = false;
 
-/**
- * 订阅实时数据变化
- * 当云端数据变化时，自动通知所有订阅者
- */
+// 订阅实时数据变化
 export const subscribeToDataChanges = async (callback: DataChangeCallback): Promise<() => void> => {
   if (!isSupabaseConfigured()) {
     console.log('Supabase 未配置，无法订阅实时变化');
@@ -226,14 +190,12 @@ export const subscribeToDataChanges = async (callback: DataChangeCallback): Prom
 
   callbacks.add(callback);
 
-  // 如果还没有订阅，创建订阅
   if (!isSubscribed) {
     isSubscribed = true;
-    
-    // 异步获取 appId
+
     const appId = await resolveAppIdForRead('contacts');
     console.log('使用 appId 订阅实时变化:', appId);
-    
+
     const channel = supabase
       .channel(`data-changes-${appId}`)
       .on(
@@ -249,7 +211,6 @@ export const subscribeToDataChanges = async (callback: DataChangeCallback): Prom
           const { new: newRow, eventType } = payload;
           if (newRow?.data_type && newRow?.data) {
             console.log('  └─ 数据类型:', newRow.data_type, '事件类型:', eventType);
-            // 通知所有回调
             callbacks.forEach(cb => cb(newRow.data_type, newRow.data));
           }
         }
@@ -258,7 +219,7 @@ export const subscribeToDataChanges = async (callback: DataChangeCallback): Prom
         if (status === 'SUBSCRIBED') {
           console.log('✅ 已订阅实时数据变化');
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ 订阅通道出错，尝试重新连接...');
+          console.error('❌ 订阅通道出错');
           isSubscribed = false;
           channels.clear();
         } else {
@@ -269,11 +230,9 @@ export const subscribeToDataChanges = async (callback: DataChangeCallback): Prom
     channels.set('main', channel);
   }
 
-  // 返回取消订阅函数
   return () => {
     callbacks.delete(callback);
     if (callbacks.size === 0) {
-      // 没有订阅者了，取消订阅
       channels.forEach((channel, key) => {
         supabase.removeChannel(channel);
         channels.delete(key);
@@ -283,13 +242,22 @@ export const subscribeToDataChanges = async (callback: DataChangeCallback): Prom
   };
 };
 
-/**
- * 手动触发数据刷新（用于写入数据后通知其他标签页）
- */
+// 手动触发数据刷新
 export const broadcastDataChange = (dataType: string, data: any) => {
-  // 通知本地的所有回调
   callbacks.forEach(cb => cb(dataType, data));
-  
-  // 如果有 Supabase Realtime，它会自动广播给其他标签页
-  // 这里不需要额外操作
+};
+
+// 本地数据操作
+export const CONTACTS_STORAGE_KEY = 'wechat-contacts';
+export const CONTACTS_BACKUP_KEY = 'wechat-contacts-backup';
+
+export const loadContactsFromStorage = (): Contact[] => {
+  const data = storage.get<Contact[]>(CONTACTS_STORAGE_KEY);
+  return data || [];
+};
+
+export const saveContactsToStorage = (contacts: Contact[]): boolean => {
+  const result = storage.set(CONTACTS_STORAGE_KEY, contacts);
+  storage.set(CONTACTS_BACKUP_KEY, contacts);
+  return result;
 };
