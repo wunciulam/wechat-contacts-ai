@@ -937,6 +937,15 @@ const App: React.FC = () => {
     ));
   };
 
+  const handleReorderCategories = (reorderedCategories: Category[]) => {
+    const now = Date.now();
+    setCategories(reorderedCategories.map((category, index) => ({
+      ...category,
+      order: index,
+      updatedAt: now
+    })));
+  };
+
   const handleDeleteCategory = (id: string) => {
     // 删除类目时，将该类目下的联系人移到"无类目"
     setContacts(prev => prev.map(c =>
@@ -995,6 +1004,7 @@ const App: React.FC = () => {
                      onAddToFollowUp={handleAddToFollowUp}
                      onQuickCreateContact={handleQuickCreateContact}
                      onCategoryFilter={setCategoryFilter}
+                     onCategoryReorder={handleReorderCategories}
                      onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
                   />
               );
@@ -1148,6 +1158,7 @@ const App: React.FC = () => {
         onAdd={handleAddCategory}
         onUpdate={handleUpdateCategory}
         onDelete={handleDeleteCategory}
+        onReorder={handleReorderCategories}
       />
     </div>
   );

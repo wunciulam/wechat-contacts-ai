@@ -1,6 +1,23 @@
 import React, { useState } from 'react';
+import {
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Category } from '../types';
-import { Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Check, GripVertical, Plus, Edit2, Trash2, X } from 'lucide-react';
 
 interface CategoryManagerProps {
   isOpen?: boolean;
@@ -8,6 +25,7 @@ interface CategoryManagerProps {
   onAdd: (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onUpdate: (id: string, updates: Partial<Category>) => void;
   onDelete: (id: string) => void;
+  onReorder: (categories: Category[]) => void;
   onClose: () => void;
 }
 
@@ -23,19 +41,165 @@ const PRESET_ICONS = [
   'Briefcase', 'Gift'
 ];
 
+interface CategoryRowProps {
+  category: Category;
+  isEditing: boolean;
+  editName: string;
+  editColor: string;
+  onEditNameChange: (value: string) => void;
+  onEditColorChange: (value: string) => void;
+  onStartEdit: () => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+  onDelete: () => void;
+}
+
+const CategoryRow: React.FC<CategoryRowProps> = ({
+  category,
+  isEditing,
+  editName,
+  editColor,
+  onEditNameChange,
+  onEditColorChange,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onDelete
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: category.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all group ${
+        isDragging ? 'opacity-50 shadow-lg' : ''
+      }`}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        className="p-1 text-gray-300 hover:text-gray-600 rounded cursor-grab active:cursor-grabbing"
+        title="拖拽排序类目"
+      >
+        <GripVertical size={16} />
+      </button>
+      <div
+        className="w-8 h-8 rounded-md flex items-center justify-center text-white text-sm font-bold shrink-0"
+        style={{ backgroundColor: isEditing ? editColor : category.color }}
+      >
+        {(isEditing ? editName : category.name).trim()[0] || category.name[0]}
+      </div>
+      <div className="flex-1 min-w-0">
+        {isEditing ? (
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={editName}
+              onChange={e => onEditNameChange(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') onSaveEdit();
+                if (e.key === 'Escape') onCancelEdit();
+              }}
+              className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              autoFocus
+            />
+            <div className="flex flex-wrap gap-1.5">
+              {PRESET_COLORS.map(color => (
+                <button
+                  key={color}
+                  onClick={() => onEditColorChange(color)}
+                  className={`w-5 h-5 rounded transition-all ${editColor === color ? 'ring-2 ring-offset-1 ring-gray-900' : ''}`}
+                  style={{ backgroundColor: color }}
+                  title={color}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <span className="text-sm font-medium text-gray-900">{category.name}</span>
+        )}
+      </div>
+      <div className={`flex items-center gap-1 transition-opacity ${isEditing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+        {isEditing ? (
+          <>
+            <button
+              onClick={onSaveEdit}
+              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-all"
+              title="保存"
+            >
+              <Check size={14} />
+            </button>
+            <button
+              onClick={onCancelEdit}
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-md transition-all"
+              title="取消"
+            >
+              <X size={14} />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={onStartEdit}
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-md transition-all"
+              title="编辑"
+            >
+              <Edit2 size={14} />
+            </button>
+            <button
+              onClick={onDelete}
+              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
+              title="删除"
+            >
+              <Trash2 size={14} />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const CategoryManager: React.FC<CategoryManagerProps> = ({
   isOpen,
   categories,
   onAdd,
   onUpdate,
   onDelete,
+  onReorder,
   onClose
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState(PRESET_COLORS[0]);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState(PRESET_COLORS[0]);
   const [newCategoryIcon, setNewCategoryIcon] = useState(PRESET_ICONS[0]);
   const [isAdding, setIsAdding] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   if (!isOpen) return null;
 
@@ -51,10 +215,36 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
     setIsAdding(false);
   };
 
-  const handleUpdate = (id: string) => {
-    if (editingId && editingId !== id) {
-      setEditingId(null);
-    }
+  const startEditing = (category: Category) => {
+    setEditingId(category.id);
+    setEditName(category.name);
+    setEditColor(category.color);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditName('');
+    setEditColor(PRESET_COLORS[0]);
+  };
+
+  const saveEditing = () => {
+    if (!editingId || !editName.trim()) return;
+    onUpdate(editingId, {
+      name: editName.trim(),
+      color: editColor
+    });
+    cancelEditing();
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = categories.findIndex(category => category.id === active.id);
+    const newIndex = categories.findIndex(category => category.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    onReorder(arrayMove(categories, oldIndex, newIndex));
   };
 
   return (
@@ -73,36 +263,32 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {categories.map(category => (
-            <div
-              key={category.id}
-              className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all group"
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={categories.map(category => category.id)}
+              strategy={verticalListSortingStrategy}
             >
-              <div
-                className="w-8 h-8 rounded-md flex items-center justify-center text-white text-sm font-bold shrink-0"
-                style={{ backgroundColor: category.color }}
-              >
-                {category.name[0]}
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="text-sm font-medium text-gray-900">{category.name}</span>
-              </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={() => setEditingId(category.id)}
-                  className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-md transition-all"
-                >
-                  <Edit2 size={14} />
-                </button>
-                <button
-                  onClick={() => onDelete(category.id)}
-                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
+              {categories.map(category => (
+                <CategoryRow
+                  key={category.id}
+                  category={category}
+                  isEditing={editingId === category.id}
+                  editName={editName}
+                  editColor={editColor}
+                  onEditNameChange={setEditName}
+                  onEditColorChange={setEditColor}
+                  onStartEdit={() => startEditing(category)}
+                  onSaveEdit={saveEditing}
+                  onCancelEdit={cancelEditing}
+                  onDelete={() => onDelete(category.id)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
 
           {/* Add New */}
           {isAdding ? (
