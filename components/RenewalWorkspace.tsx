@@ -1,3 +1,6 @@
+import PolicyDashboard from "./PolicyDashboard";
+import { PageHeader } from "./PageHeader";
+import PolicyDetail from "./PolicyDetail";
 import { saveImport } from "../services/renewalStorage";
 import React, { useEffect, useState } from "react";
 import { Contact } from "../types";
@@ -14,18 +17,30 @@ import {
   dueItems,
   today,
   key,
+  nextPayment,
+  projectContacts,
 } from "../services/renewal";
-const btn =
-  "px-3 py-2 border border-gray-200 rounded-md hover:bg-gray-50 text-sm";
+const btn = "btn btn-secondary text-sm";
 export default function RenewalWorkspace({
   contacts,
   onContacts,
   customerId,
+  initialPolicyId,
+  ...dashboardProps
 }: {
   contacts: Contact[];
   onContacts: (c: Contact[]) => void;
   customerId?: string;
+  initialPolicyId?: string;
+  filterTags?: Set<string>;
+  followUpFilter?: any;
+  onEditContact?: (c: Contact) => void;
+  onAddPolicy?: () => void;
+  onBatchDeleteContacts?: (ids: string[]) => void;
+  onDeletePolicy?: (contactId: string, policyId: string) => void;
 }) {
+  const [remindersOpen, setRemindersOpen] = useState(Boolean(customerId));
+  const fileRef = React.useRef<HTMLInputElement>(null);
   const [mailReady, setMailReady] = useState(false);
   useEffect(() => {
     fetch("/api/renewal-email")
@@ -45,16 +60,46 @@ export default function RenewalWorkspace({
     [settings, setSettings] = useState(emptyData.settings),
     [links, setLinks] = useState<Record<string, string>>({});
   useEffect(() => {
-    supabase.from("app_data").select("data").eq("app_id", import.meta.env.VITE_APP_ID).eq("data_type", "renewal_v1").maybeSingle()
-      .then(({data: row, error}) => { if(error) throw error; setData(row?.data || { ...emptyData, policies: migrate(contacts) }); })
+    Promise.resolve(
+      supabase
+        .from("app_data")
+        .select("data")
+        .eq("app_id", import.meta.env.VITE_APP_ID)
+        .eq("data_type", "renewal_v1")
+        .maybeSingle(),
+    )
+      .then(({ data: row, error }) => {
+        if (error) throw error;
+        setData(
+          row?.data
+            ? {
+                ...row.data,
+                policies: mergePolicies(row.data.policies, migrate(contacts)),
+              }
+            : { ...emptyData, policies: migrate(contacts) },
+        );
+      })
       .catch((e) => setError(String(e)));
   }, []);
-  async function persist(next: RenewalData) {
+  useEffect(() => {
+    setData(current => current ? { ...current, policies: mergePolicies(current.policies, migrate(contacts)) } : current);
+  }, [contacts]);
+  useEffect(() => {
+    if (data && initialPolicyId) {
+      const p = data.policies.find((x) => x.id === initialPolicyId);
+      if (p) {
+        setSelected(p);
+        setModal("detail");
+      }
+    }
+  }, [Boolean(data), initialPolicyId]);
+  async function persist(next: RenewalData, baseContacts = contacts) {
     setBusy(true);
     setError("");
     try {
-      if (!(await saveToCloud("renewal_v1", next)))
-        throw new Error("云端保存失败，请重试；当前改动尚未保存");
+      const projected = projectContacts(baseContacts, next.policies);
+      await saveImport(next, projected);
+      onContacts(projected);
       setData(next);
       return true;
     } catch (e) {
@@ -86,7 +131,7 @@ export default function RenewalWorkspace({
   }
   const identity = (p: ManagedPolicy, role: "applicant" | "insured") =>
     role === "applicant"
-      ? `${p.applicant}|${p.phone || ""}|${p.document || ""}`
+      ? `${p.applicant}|${p.phone ? "phone:" + p.phone.slice(-4) : p.document ? "id:" + p.document.slice(-4) : "unknown"}`
       : `insured:${p.insured}`;
   function resolve(
     p: ManagedPolicy,
@@ -97,7 +142,19 @@ export default function RenewalWorkspace({
     if (role === "insured" && name === p.applicant)
       return resolve(p, "applicant", cs);
     const choice = links[identity(p, role)];
+    if (choice?.startsWith("batch:")) {
+      const target = rows[Number(choice.slice(6))];
+      const targetId = resolve(target, "applicant", cs);
+      return targetId === "new"
+        ? "new:" + identity(target, "applicant")
+        : targetId;
+    }
     if (choice) return choice;
+    const known = data?.policies.find((x) => key(x) === key(p));
+    const knownId =
+      role === "applicant" ? known?.applicantId : known?.insuredId;
+    if (knownId && known?.[role] === name && cs.some((c) => c.id === knownId))
+      return knownId;
     const found = candidates(
       name,
       role === "applicant" ? p.phone : undefined,
@@ -106,7 +163,14 @@ export default function RenewalWorkspace({
     );
     const strong = found.filter((x) => x.strong);
     if (strong.length === 1) return strong[0].contact.id;
-    if (!found.length) return "new";
+    if (!found.length) {
+      if (
+        role === "insured" &&
+        rows.some((x) => x.applicant === name && !inactive(x.status))
+      )
+        return "";
+      return "new";
+    }
     return "";
   }
   const pending = rows
@@ -126,11 +190,15 @@ export default function RenewalWorkspace({
       if (inactive(p.status)) return next;
       for (const role of ["applicant", "insured"] as const) {
         if (!p[role]) continue;
-        const identityKey =
+        let identityKey =
           role === "insured" && p.insured === p.applicant
             ? identity(p, "applicant")
             : identity(p, role);
         let id = created.get(identityKey) || resolve(p, role, contacts);
+        if (id.startsWith("new:")) {
+          identityKey = id.slice(4);
+          id = created.get(identityKey) || "new";
+        }
         if (id === "new") {
           id = created.get(identityKey) || crypto.randomUUID();
           if (!created.has(identityKey)) {
@@ -202,7 +270,10 @@ export default function RenewalWorkspace({
           : {
               ...x,
               ...(kind === "renewal" ? { renewed: !x.renewed } : {}),
-              payments: x.payments.map((q) =>
+              payments: (x.payments.some((q) => q.date === dt) || !dt
+                ? x.payments
+                : [...x.payments, { ...nextPayment(x)!, date: dt }]
+              ).map((q) =>
                 q.date !== dt
                   ? q
                   : kind === "contact"
@@ -226,7 +297,9 @@ export default function RenewalWorkspace({
     };
     if (await persist(next)) {
       setSelected(next.policies.find((x) => x.id === p.id) || null);
+      return true;
     }
+    return false;
   }
   if (!data)
     return <div className="p-6">{error || "正在读取保单与续费数据…"}</div>;
@@ -247,176 +320,242 @@ export default function RenewalWorkspace({
     setModal("detail");
   };
   return (
-    <div className="h-full overflow-auto bg-white">
-      <div className="p-6 border-b border-gray-100 flex justify-between gap-3 flex-wrap">
-        <h2 className="text-xl font-bold">
-          {customerId ? "关联保单" : "续费待办"}
-        </h2>
-        <div className="flex gap-2">
-          <label className={btn}>
-            上传明亚表格
-            <input
-              disabled={busy}
-              className="hidden"
-              type="file"
-              multiple
-              accept=".xlsx,.xls"
-              onChange={(e) => upload(e.target.files)}
-            />
-          </label>
-          <button
-            className={btn}
-            onClick={() => {
-              setSettings(data.settings);
-              setModal("settings");
-            }}
-          >
-            提醒设置
-          </button>
-        </div>
-      </div>
-      <div className="p-6 space-y-4">
-        {error && (
-          <div role="alert" className="p-3 bg-red-50 text-red-700">
-            {error}
-          </div>
-        )}
-        <div className="flex gap-2 flex-wrap">
-          {[
-            ["all", "全部待办"],
-            ["payment", "本期应缴"],
-            ["renewal", "到期续保"],
-            ["policies", "全部保单"],
-            ["history", "导入记录"],
-          ].map(([v, l]) => (
-            <button
-              key={v}
-              className={btn + " " + (filter === v ? "bg-gray-100" : "")}
-              onClick={() => setFilter(v)}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
-        <p className="text-sm text-gray-500">
-          提前30天提醒 · 每份保单仅展示最新一期未缴费记录 · 已逾期事项持续显示
-        </p>
-        <input
-          className="border rounded p-2 w-full"
-          placeholder="搜索投保人、被保人、产品或保单号"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+    <div className="h-full overflow-auto bg-white text-sm">
+      <input
+        ref={fileRef}
+        className="hidden"
+        type="file"
+        multiple
+        accept=".xlsx,.xls"
+        onChange={(e) => upload(e.target.files)}
+      />
+      {error && !modal && <p role="alert" className="p-4 text-red-600">{error}</p>}
+      {!remindersOpen && !customerId ? (
+        <PolicyDashboard
+          {...dashboardProps}
+          contacts={projectContacts(contacts, data.policies, true)}
+          filterTags={dashboardProps.filterTags || new Set()}
+          followUpFilter={dashboardProps.followUpFilter || null}
+          onEditContact={dashboardProps.onEditContact || (() => {})}
+          onAddPolicy={dashboardProps.onAddPolicy || (() => {})}
+          reminderCount={
+            new Set(dueItems(data.policies).map((t) => t.policy.id)).size
+          }
+          onReminders={() => {
+            setFilter("all");
+            setRemindersOpen(true);
+          }}
+          onImport={() => fileRef.current?.click()}
+          onDeletePolicy={async (_contactId, policyId) => {
+            if (!confirm("确定删除这份保单及其缴费记录吗？所有关联客户中的这份保单将同步移除。")) return;
+            await persist({ ...data, policies: data.policies.filter(p => p.id !== policyId) },
+              contacts.map(c => ({ ...c, policies: c.policies?.filter(p => p.id !== policyId) })));
+          }}
+          onBatchDeleteContacts={async (ids) => {
+            const removed = new Set(ids);
+            await persist({ ...data, policies: data.policies.filter(p => !removed.has(p.applicantId || "")).map(p => removed.has(p.insuredId || "") ? { ...p, insuredId: undefined } : p) }, contacts.filter(c => !removed.has(c.id)));
+          }}
+          onPolicyDetail={(p) =>
+            open(
+              data.policies.find((x) => key(x) === key(p)) || {
+                ...p,
+                applicantId: contacts.find((c) =>
+                  c.policies?.some((x) => x.id === p.id),
+                )?.id,
+                payments: [],
+              },
+            )
+          }
         />
-        {filter === "history" ? (
-          data.imports.map((h, i) => (
-            <div key={i} className="border rounded p-4">
-              <p>
-                {new Date(h.at).toLocaleString()} · {h.count} 条原始记录
-              </p>
-              <small>{h.files.join("、")}</small>
-            </div>
-          ))
-        ) : filter === "policies" || customerId ? (
-          <div className="space-y-2">
-            {all
-              .filter((p) =>
-                `${p.applicant}${p.insured}${p.productName}${p.policyNumber}`.includes(
-                  search,
-                ),
-              )
-              .map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => open(p)}
-                  className="w-full text-left p-4 border rounded"
-                >
-                  <b>{p.productName}</b>　{p.status}
-                  <p className="text-sm text-gray-500">
-                    {p.policyNumber} · 投保人 {p.applicant} / 被保人 {p.insured}
-                  </p>
-                  {!p.expiryDate && !inactive(p.status) && (
-                    <small>未设置到期日 · 点击补充续保日期</small>
+      ) : (
+        <>
+          <div className="border-b border-gray-100">
+            <PageHeader
+              title={customerId ? "关联保单" : "续期提醒"}
+              actionButton={
+                <div className="flex gap-2 flex-wrap">
+                  {!customerId && (
+                    <button
+                      className={btn}
+                      onClick={() => setRemindersOpen(false)}
+                    >
+                      返回保单管理
+                    </button>
                   )}
+                  <button
+                    className={btn}
+                    onClick={() => {
+                      setSettings(data.settings);
+                      setModal("settings");
+                    }}
+                  >
+                    通知设置
+                  </button>
+                </div>
+              }
+            />
+          </div>
+          <div className="p-6 space-y-4">
+            {error && (
+              <div role="alert" className="p-3 bg-red-50 text-red-700">
+                {error}
+              </div>
+            )}
+            <div className="flex gap-2 flex-wrap">
+              {[
+                ["all", "全部待办"],
+                ["payment", "本期应缴"],
+                ["renewal", "到期续保"],
+                ["policies", "全部保单"],
+                ["history", "导入记录"],
+              ].map(([v, l]) => (
+                <button
+                  key={v}
+                  className={btn + " " + (filter === v ? "bg-gray-100" : "")}
+                  onClick={() => setFilter(v)}
+                >
+                  {l}
                 </button>
               ))}
-          </div>
-        ) : (
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  {["客户 / 保单", "类型", "日期 / 金额", "操作"].map((x) => (
-                    <th key={x} className="text-left p-3 border-b">
-                      {x}
-                    </th>
+            </div>
+            <p className="text-sm text-gray-500">
+              提前30天提醒 · 每份保单仅展示最新一期未缴费记录 ·
+              已逾期事项持续显示
+            </p>
+            <input
+              className="input"
+              placeholder="搜索投保人、被保人、产品或保单号"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {filter === "history" ? (
+              data.imports.map((h, i) => (
+                <div key={i} className="border rounded p-4">
+                  <p>
+                    {new Date(h.at).toLocaleString()} · {h.count} 条原始记录
+                  </p>
+                  <small>{h.files.join("、")}</small>
+                </div>
+              ))
+            ) : filter === "policies" || customerId ? (
+              <div className="space-y-2">
+                {all
+                  .filter((p) =>
+                    `${p.applicant}${p.insured}${p.productName}${p.policyNumber}`.includes(
+                      search,
+                    ),
+                  )
+                  .map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => open(p)}
+                      className="w-full text-left p-4 border rounded"
+                    >
+                      <b>{p.productName}</b>　{p.status}
+                      <p className="text-sm text-gray-500">
+                        {p.policyNumber} · 投保人 {p.applicant} / 被保人{" "}
+                        {p.insured}
+                      </p>
+                      {!p.expiryDate && !inactive(p.status) && (
+                        <small>未设置到期日 · 点击补充续保日期</small>
+                      )}
+                    </button>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tasks.map((t) => (
-                  <tr key={t.policy.id + t.type} className="border-b">
-                    <td className="p-3">
-                      <button
-                        onClick={() => open(t.policy)}
-                        className="text-left"
-                      >
-                        <b>
-                          {t.policy.applicant} / {t.policy.insured}
-                        </b>
-                        <p>{t.policy.productName}</p>
-                        <small>{t.policy.policyNumber}</small>
-                      </button>
-                    </td>
-                    <td>{t.type === "payment" ? "本期应缴" : "到期续保"}</td>
-                    <td className={t.date < today() ? "text-red-600" : ""}>
-                      {t.date}
-                      <p>{t.amount && `¥ ${t.amount}`}</p>
-                    </td>
-                    <td>
-                      <div className="flex gap-2">
-                        {t.type === "payment" && (
+              </div>
+            ) : (
+              <div className="overflow-auto rounded-lg border border-gray-200">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr>
+                      {["客户 / 保单", "类型", "日期 / 金额", "操作"].map(
+                        (x) => (
+                          <th key={x} className="text-left p-3 border-b">
+                            {x}
+                          </th>
+                        ),
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tasks.map((t) => (
+                      <tr key={t.policy.id + t.type} className="border-b">
+                        <td className="p-3">
                           <button
-                            disabled={busy}
-                            className={btn}
-                            onClick={() => mark(t.policy, "contact", t.date)}
+                            onClick={() => open(t.policy)}
+                            className="text-left"
                           >
-                            {t.policy.payments.find((q) => q.date === t.date)
-                              ?.contactedAt
-                              ? "已联系"
-                              : "标记已联系"}
+                            <b>
+                              {t.policy.applicant} / {t.policy.insured}
+                            </b>
+                            <p>{t.policy.productName}</p>
+                            <small>{t.policy.policyNumber}</small>
                           </button>
-                        )}
-                        <button
-                          disabled={busy}
-                          className={btn}
-                          onClick={() => {
-                            setSelected(t.policy);
-                            setModal(
-                              t.type === "payment"
-                                ? "paid:" + t.date
-                                : "renewed",
-                            );
-                          }}
-                        >
-                          确认{t.type === "payment" ? "已缴费" : "已续保"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!tasks.length && (
-              <p className="p-10 text-center text-gray-400">
-                暂无符合条件的待办。可在“全部保单”补充到期日期，或上传应缴明细。
-              </p>
+                        </td>
+                        <td className="p-3">
+                          {t.type === "payment" ? "本期应缴" : "到期续保"}
+                        </td>
+                        <td className={t.date < today() ? "text-red-600" : ""}>
+                          {t.date}
+                          {t.estimated && (
+                            <span className="ml-1 text-gray-400">预计</span>
+                          )}
+                          <p>{t.amount && `¥ ${t.amount}`}</p>
+                        </td>
+                        <td>
+                          <div className="flex gap-2">
+                            {t.type === "payment" && (
+                              <button
+                                disabled={busy}
+                                className={btn}
+                                onClick={() =>
+                                  mark(t.policy, "contact", t.date)
+                                }
+                              >
+                                {t.policy.payments.find(
+                                  (q) => q.date === t.date,
+                                )?.contactedAt
+                                  ? "已联系"
+                                  : "标记已联系"}
+                              </button>
+                            )}
+                            <button
+                              disabled={busy}
+                              className={btn}
+                              onClick={() => {
+                                setSelected(t.policy);
+                                setModal(
+                                  t.type === "payment"
+                                    ? "paid:" + t.date
+                                    : "renewed",
+                                );
+                              }}
+                            >
+                              确认{t.type === "payment" ? "已缴费" : "已续保"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!tasks.length && (
+                  <p className="p-10 text-center text-gray-400">
+                    暂无符合条件的待办。可在“全部保单”补充到期日期，或上传应缴明细。
+                  </p>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
+        </>
+      )}
       {modal && (
         <div className="fixed inset-0 bg-black/30 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-auto p-6">
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-auto p-5 md:p-6 shadow-lg">
+            {error && (
+              <p role="alert" className="text-red-600 mb-3">
+                {error}
+              </p>
+            )}
             <div className="flex justify-end">
               <button className={btn} onClick={() => setModal("")}>
                 关闭
@@ -446,7 +585,7 @@ export default function RenewalWorkspace({
                       </small>
                     </p>
                     <select
-                      className="border p-2"
+                      className="input mt-2"
                       value={links[id] || ""}
                       onChange={(e) =>
                         setLinks({ ...links, [id]: e.target.value })
@@ -461,6 +600,27 @@ export default function RenewalWorkspace({
                           </option>
                         ),
                       )}
+                      {role === "insured" &&
+                        rows
+                          .map((r, i) => ({ r, i }))
+                          .filter(
+                            ({ r }) =>
+                              r.applicant === p.insured && !inactive(r.status),
+                          )
+                          .filter(
+                            (x, i, a) =>
+                              a.findIndex(
+                                (y) =>
+                                  identity(y.r, "applicant") ===
+                                  identity(x.r, "applicant"),
+                              ) === i,
+                          )
+                          .map(({ r, i }) => (
+                            <option key={"batch:" + i} value={"batch:" + i}>
+                              本次导入的投保人：{r.applicant} · 手机尾号{" "}
+                              {r.phone?.slice(-4) || "无"}
+                            </option>
+                          ))}
                       <option value="new">确认为不同客户，新增资料</option>
                     </select>
                   </div>
@@ -487,7 +647,7 @@ export default function RenewalWorkspace({
                   收件邮箱
                   <input
                     type="email"
-                    className="border rounded p-2 ml-3"
+                    className="input mt-2"
                     value={settings.email}
                     onChange={(e) =>
                       setSettings({ ...settings, email: e.target.value })
@@ -498,7 +658,7 @@ export default function RenewalWorkspace({
                   北京时间
                   <input
                     type="time"
-                    className="border rounded p-2 ml-3"
+                    className="input mt-2"
                     value={settings.time}
                     onChange={(e) =>
                       setSettings({ ...settings, time: e.target.value })
@@ -565,80 +725,29 @@ export default function RenewalWorkspace({
               </>
             )}
             {modal === "detail" && selected && (
-              <>
-                <h3 className="font-bold text-lg">{selected.productName}</h3>
-                <p>
-                  {selected.policyNumber} · {selected.status}
-                </p>
-                <p className="my-3">
-                  投保人 {selected.applicant}　被保人 {selected.insured}
-                </p>
-                <label>
-                  到期日期（按保单确认）
-                  <input
-                    className="border rounded p-2"
-                    type="date"
-                    value={selected.expiryDate || ""}
-                    onChange={(e) =>
-                      setSelected({
-                        ...selected,
-                        expiryDate: e.target.value,
-                        renewed: false,
-                      })
-                    }
-                  />
-                </label>
-                <button
-                  disabled={busy}
-                  className={btn + " ml-2"}
-                  onClick={() =>
-                    persist({
-                      ...data,
-                      policies: data.policies.map((p) =>
-                        p.id === selected.id ? selected : p,
-                      ),
-                    })
+              <PolicyDetail
+                policy={selected}
+                contacts={contacts}
+                busy={busy}
+                onSave={async (p) => {
+                  if (data.policies.some(x => x.id !== p.id && key(x) === key(p))) {
+                    setError("该公司与保单号已存在，请通过导入合并更新。");
+                    return false;
                   }
-                >
-                  保存到期日
-                </button>
-                <h4 className="font-bold mt-6">缴费历史</h4>
-                {selected.payments.map((q) => (
-                  <div className="p-3 border-b" key={q.date}>
-                    {q.date} · ¥{q.amount} · {q.status}　
-                    <button
-                      disabled={busy}
-                      className={btn}
-                      onClick={() => mark(selected, "payment", q.date)}
-                    >
-                      {q.status === "已缴费" ? "改为未缴费" : "标记已缴费"}
-                    </button>
-                    {q.history?.length > 0 && (
-                      <details>
-                        <summary>状态变更记录</summary>
-                        {q.history.map((h, i) => (
-                          <p key={i}>
-                            {h.at} · {h.source} · {h.from} → {h.to}
-                          </p>
-                        ))}
-                      </details>
-                    )}
-                  </div>
-                ))}
-                {!selected.payments.length && (
-                  <p className="my-4 text-gray-500">
-                    尚无应缴明细，上传后自动关联。
-                  </p>
-                )}
-                {selected.renewed && (
-                  <button
-                    className={btn}
-                    onClick={() => mark(selected, "renewal")}
-                  >
-                    撤销已续保标记
-                  </button>
-                )}
-              </>
+                  const next = {
+                    ...data,
+                    policies: data.policies.some((x) => x.id === p.id)
+                      ? data.policies.map((x) => (x.id === p.id ? p : x))
+                      : [...data.policies, p],
+                  };
+                  if (await persist(next)) {
+                    setSelected(p);
+                    return true;
+                  }
+                  return false;
+                }}
+                onMark={(date) => mark(selected, "payment", date)}
+              />
             )}
             {(modal.startsWith("paid:") || modal === "renewed") && selected && (
               <>
@@ -653,12 +762,12 @@ export default function RenewalWorkspace({
                   disabled={busy}
                   className={btn}
                   onClick={async () => {
-                    await mark(
+                    const saved = await mark(
                       selected,
                       modal === "renewed" ? "renewal" : "payment",
                       modal.split(":")[1],
                     );
-                    setModal("");
+                    if (saved) setModal("");
                   }}
                 >
                   确认标记

@@ -25,7 +25,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   className = ''
 }) => {
   return (
-    <div className={`p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${className}`}>
+    <div className={`p-5 flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-4 ${className}`}>
       <div className="flex items-center gap-3">
         {onSelectAll && (
           <button 
@@ -51,7 +51,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 w-full sm:w-auto ml-auto">
+      <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto ml-auto">
         {actionButton}
         {searchBox}
       </div>

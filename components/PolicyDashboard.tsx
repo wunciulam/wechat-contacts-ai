@@ -1,3 +1,4 @@
+import {ManagedPolicy, dueItems, nextPayment, today} from '../services/renewal';
 
 import React, { useState, useMemo } from 'react';
 import { Contact, Policy } from '../types';
@@ -6,6 +7,10 @@ import { PageHeader } from './PageHeader';
 
 interface PolicyDashboardProps {
   contacts: Contact[];
+  onPolicyDetail?: (policy: Policy) => void;
+  onReminders?: () => void;
+  onImport?: () => void;
+  reminderCount?: number;
   filterTags: Set<string>;
   followUpFilter: 'idle' | 'following' | 'contacted' | null;
   onEditContact: (contact: Contact) => void;
@@ -14,7 +19,7 @@ interface PolicyDashboardProps {
   onDeletePolicy?: (contactId: string, policyId: string) => void;
 }
 
-const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags, followUpFilter, onEditContact, onAddPolicy, onBatchDeleteContacts, onDeletePolicy }) => {
+const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags, followUpFilter, onEditContact, onAddPolicy, onBatchDeleteContacts, onDeletePolicy, onPolicyDetail, onReminders, onImport, reminderCount = 0 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedContactIds, setExpandedContactIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -110,7 +115,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
           allSelected={allSelected}
           onSelectAll={handleSelectAll}
           actionButton={
-            <button onClick={onAddPolicy} className="btn btn-primary text-sm"><Plus size={16} /><span>录入保单</span></button>
+            <div className="flex gap-2 flex-wrap"><button onClick={onImport} className="btn btn-secondary text-sm">导入明亚表格</button><button onClick={onReminders} className="btn btn-secondary text-sm">续期提醒（{reminderCount}）</button><button onClick={onAddPolicy} className="btn btn-primary text-sm"><Plus size={16} /><span>录入保单</span></button></div>
           }
           searchBox={
             <div className="relative w-full sm:w-72">
@@ -134,6 +139,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
           filteredContactsWithPolicies.map(contact => {
             const { count, totalPremium } = getTotals(contact.policies || []);
             const isExpanded = expandedContactIds.has(contact.id);
+            const contactReminders = new Set(dueItems((contact.policies || []).map(p => ({...p,payments:(p as ManagedPolicy).payments || []}))).map(t=>t.policy.id)).size;
             const isSelected = selectedIds.has(contact.id);
             return (
               <div key={contact.id} className={`bg-white rounded-lg border transition-all duration-150 overflow-hidden hover:border-gray-200 ${isSelected ? 'border-gray-400' : 'border-gray-100'}`}>
@@ -144,6 +150,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                     </button>
                     <div>
                       <div className="flex items-center gap-2"><h3 className="text-lg font-medium text-gray-900">{contact.remarkName || contact.nickname}</h3><span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-mono">{contact.phoneNumber || '无手机号'}</span></div>
+                      {contactReminders > 0 && <button onClick={e=>{e.stopPropagation();onReminders?.();}} className="text-xs text-amber-700 mt-2">{contactReminders} 份保单需缴费 / 续保</button>}
                       <div className="flex flex-wrap items-center gap-2 mt-2">
                         {contact.tags.map(tag => <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">{tag}</span>)}
                         <button onClick={(e) => { e.stopPropagation(); onEditContact(contact); }} className="text-[10px] text-gray-500 hover:bg-gray-100 px-2 py-0.5 rounded-md transition-colors flex items-center gap-1 font-medium"><Edit2 size={10} /> 修改标签</button>
@@ -159,13 +166,13 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                 {isExpanded && (
                   <div className="border-t border-gray-100 bg-gray-50 p-4 animate-in slide-in-from-top-2">
                     <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto no-scrollbar">
-                      <table className="w-full text-left text-sm min-w-[800px]">
+                      <table className="w-full text-left text-sm min-w-[1400px]">
                         <thead className="bg-gray-50 text-gray-500 font-medium text-[10px] uppercase tracking-wider border-b border-gray-200">
                           <tr className="divide-x divide-gray-100">
                             <th className="px-4 py-3">险种名称</th>
                             <th className="px-4 py-3">保单号</th>
                             <th className="px-4 py-3 text-right">保费</th>
-                            <th className="px-4 py-3">缴费年限</th>
+                            <th className="px-4 py-3">缴费方式 / 期间</th><th className="px-4 py-3">下次缴费 / 应缴金额</th><th className="px-4 py-3">提醒</th>
                             <th className="px-4 py-3">投保人/被保人</th>
                             <th className="px-4 py-3">生效日期</th>
                             <th className="px-4 py-3">状态</th>
@@ -173,12 +180,12 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {contact.policies?.map(policy => (
+                          {contact.policies?.map(policy => { const managed={...policy,payments:(policy as ManagedPolicy).payments||[]}; const next=nextPayment(managed);const reminders=dueItems([managed]);return (
                             <tr key={policy.id} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-4 py-3 font-medium text-gray-700">{policy.productName}</td>
+                              <td className="px-4 py-3 font-medium text-gray-700"><button className="text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)}>{policy.productName}</button></td>
                               <td className="px-4 py-3 font-mono text-gray-500 text-xs">{policy.policyNumber}</td>
                               <td className="px-4 py-3 text-right font-mono font-medium text-gray-900">¥ {policy.premium}</td>
-                              <td className="px-4 py-3 text-gray-500 text-xs">{policy.paymentYears || '-'}</td>
+                              <td className="px-4 py-3 text-gray-500 text-xs">{policy.paymentFrequency || '待补充'} / {policy.paymentYears || '待补充'}</td><td className="px-4 py-3 text-xs">{next ? <>{next.date}{next.estimated && <span className="ml-1 text-gray-400">预计</span>}<p className="mt-1">¥ {next.amount}</p></> : '暂无待缴 / 待补充'}</td><td className="px-4 py-3 text-xs">{reminders.map(r=><div key={r.type} className={r.date<today()?'text-red-600':'text-amber-700'}>{r.date<today()?'已逾期':'30天内'}{r.type==='payment'?'缴费':'续保'}</div>)}</td>
                               <td className="px-4 py-3 text-gray-600">{policy.applicant} / {policy.insured}</td>
                               <td className="px-4 py-3 text-gray-500 text-xs">{policy.effectiveDate}</td>
                               <td className="px-4 py-3">
@@ -187,7 +194,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-right">
-                                <button 
+                                <button className="btn btn-ghost btn-sm" onClick={()=>onPolicyDetail?.(policy)}>详情</button><button 
                                   onClick={(e) => { 
                                     e.stopPropagation(); 
                                     if (onDeletePolicy) onDeletePolicy(contact.id, policy.id); 
@@ -199,7 +206,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                                 </button>
                               </td>
                             </tr>
-                          ))}
+                          );})}
                         </tbody>
                       </table>
                     </div>

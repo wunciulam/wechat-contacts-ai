@@ -65,7 +65,7 @@ export default async function handler(req: any, res: any) {
     `待处理 ${tasks.length} 项`,
     ...tasks.map(
       (t) =>
-        `${t.type === "payment" ? "本期应缴" : "到期续保"} | ${t.policy.applicant} / ${t.policy.insured} | ${t.policy.productName} | 保单尾号 ${t.policy.policyNumber.slice(-6)} | ${t.date}${t.amount ? " | ¥" + t.amount : ""}`,
+        `${t.type === "payment" ? "本期应缴" : "到期续保"} | ${t.policy.applicant} / ${t.policy.insured} | ${t.policy.productName} | 保单尾号 ${t.policy.policyNumber.slice(-6)} | ${t.date}${t.estimated ? "（预计）" : ""}${t.amount ? " | ¥" + t.amount : ""}`,
     ),
     "打开系统：https://insurance-rose-seven.vercel.app/",
   ].join("\n\n");

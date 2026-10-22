@@ -247,7 +247,7 @@ export const subscribeToDataChanges = async (callback: DataChangeCallback): Prom
         (payload) => {
           console.log('📡 收到实时数据变化:', payload);
           const { new: newRow, eventType } = payload;
-          if (newRow?.data_type && newRow?.data) {
+          if (newRow && "data_type" in newRow && "data" in newRow && newRow.data_type && newRow.data) {
             console.log('  └─ 数据类型:', newRow.data_type, '事件类型:', eventType);
             // 通知所有回调
             callbacks.forEach(cb => cb(newRow.data_type, newRow.data));

@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 interface ImportModalProps {
   isOpen: boolean;
   onLinkedPolicies?: () => void;
+  onPolicyDetail?: (p: Policy) => void;
   onClose: () => void;
   onSave: (contacts: NewContact[]) => void;
   onTableSave?: (data: ExtractedTableData) => void;
@@ -14,7 +15,7 @@ interface ImportModalProps {
   allTags?: string[];
 }
 
-const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTableSave, initialData, allTags = [], onLinkedPolicies }) => {
+const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTableSave, initialData, allTags = [], onLinkedPolicies, onPolicyDetail }) => {
   const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'table'>('ai');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -581,7 +582,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
                                 </>
                               ) : (
                                 <>
-                                  <td className="px-3 py-2 font-medium text-gray-800">{policy.productName}</td>
+                                  <td className="px-3 py-2 font-medium text-gray-800"><button type="button" className="text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)}>{policy.productName}</button></td>
                                   <td className="px-3 py-2 text-gray-600">{policy.company || '-'}</td>
                                   <td className="px-3 py-2 text-gray-600">{policy.premium ? `¥${policy.premium}` : '-'}</td>
                                   <td className="px-3 py-2">
@@ -593,8 +594,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
                                   </td>
                                   <td className="px-3 py-2 text-gray-500">{policy.effectiveDate || '-'}</td>
                                   <td className="px-3 py-2 text-right">
-                                    <button onClick={() => handleEditPolicy(policy.id)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded"><Edit2 size={12} /></button>
-                                    <button onClick={() => handleDeletePolicy(policy.id)} className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1 rounded ml-1"><Trash2 size={12} /></button>
+                                    <button onClick={() => onPolicyDetail && initialData ? onPolicyDetail(policy) : handleEditPolicy(policy.id)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded"><Edit2 size={12} /></button>
+                                    {!(onPolicyDetail && initialData) && <button onClick={() => handleDeletePolicy(policy.id)} className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1 rounded ml-1"><Trash2 size={12} /></button>}
                                   </td>
                                 </>
                               )}

@@ -5,6 +5,7 @@ export interface Payment {
   amount: string;
   status: string;
   confirmedAt?: string;
+  estimated?: boolean;
   contactedAt?: string;
   history?: { at: string; from: string; to: string; source: string }[];
 }
@@ -32,7 +33,9 @@ export const emptyData: RenewalData = {
 };
 export const inactive = (s: string) => /撤单|退保|拒保|终止|失效/.test(s || "");
 export const key = (p: Partial<ManagedPolicy>) =>
-  `${p.company?.trim()}|${p.policyNumber?.trim()}`;
+  p.policyNumber?.trim()
+    ? `${p.company?.trim()}|${p.policyNumber.trim()}`
+    : `manual:${p.id}`;
 const text = (v: unknown) => String(v ?? "").trim();
 export function date(v: unknown) {
   if (typeof v === "number") {
@@ -92,6 +95,9 @@ export function parseWorkbook(
         phone: text(get("手机号", "投保人手机")),
         document: text(get("投保人证件号码", "投保人证件号")),
         paymentYears: text(get("缴费期间", "缴费年限")),
+        paymentFrequency: text(get("缴费方式")),
+        coveragePeriod: text(get("保障期间", "保险期间", "保障期限")),
+        expiryDate: date(get("保障到期日", "保险止期")),
         payments: due
           ? [
               {
@@ -172,8 +178,12 @@ export function mergePolicies(old: ManagedPolicy[], incoming: ManagedPolicy[]) {
       ...prev,
       ...nonempty,
       id: prev.id,
-      ...(p.payments.length && prev.source && !prev.payments.length
-        ? { status: prev.status }
+      ...(p.payments.length
+        ? {
+            status: prev.status || p.status,
+            premium: prev.premium || p.premium,
+            effectiveDate: prev.effectiveDate || p.effectiveDate,
+          }
         : {}),
       payments: [...payments.values()].sort((a, b) =>
         a.date.localeCompare(b.date),
@@ -183,7 +193,9 @@ export function mergePolicies(old: ManagedPolicy[], incoming: ManagedPolicy[]) {
   return [...map.values()];
 }
 export function latestPayment(p: ManagedPolicy) {
-  const latest = [...p.payments].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const latest = [...p.payments].sort((a, b) =>
+    b.date.localeCompare(a.date),
+  )[0];
   return latest?.status === "未缴费" ? latest : undefined;
 }
 export function today() {
@@ -198,12 +210,13 @@ export function dueItems(policies: ManagedPolicy[], now = today()) {
   return policies
     .filter((p) => !inactive(p.status))
     .flatMap((p) => {
-      const pay = latestPayment(p);
+      const pay = nextPayment(p);
       const items: {
         policy: ManagedPolicy;
         type: "payment" | "renewal";
         date: string;
         amount: string;
+        estimated?: boolean;
       }[] = [];
       if (pay && pay.date <= limit)
         items.push({
@@ -211,6 +224,7 @@ export function dueItems(policies: ManagedPolicy[], now = today()) {
           type: "payment",
           date: pay.date,
           amount: pay.amount,
+          estimated: pay.estimated,
         });
       if (p.expiryDate && !p.renewed && p.expiryDate <= limit)
         items.push({
@@ -227,9 +241,88 @@ export function migrate(contacts: Contact[]) {
   const all: ManagedPolicy[] = [];
   for (const c of contacts)
     for (const p of c.policies || [])
-      all.push({ ...p, applicantId: c.id, payments: [] });
-  return mergePolicies(
-    [],
-    all.filter((p) => p.policyNumber),
-  );
+      all.push({
+        ...p,
+        applicantId: c.id,
+        payments: (p as ManagedPolicy).payments || [],
+      });
+  return mergePolicies([], all);
+}
+
+// Calculate on the original anniversary to avoid month-end/leap-year drift.
+export function addMonths(anchor: string, months: number): string {
+  const [y, m, d] = anchor.split("-").map(Number);
+  const target = new Date(Date.UTC(y, m - 1 + months, 1));
+  const last = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  target.setUTCDate(Math.min(d, last));
+  return target.toISOString().slice(0, 10);
+}
+export function nextPayment(p: ManagedPolicy): Payment | undefined {
+  if (inactive(p.status)) return;
+  const latest = [...(p.payments || [])].sort((a, b) =>
+    b.date.localeCompare(a.date),
+  )[0];
+  if (latest?.status === "未缴费") return latest;
+  if (latest && latest.status !== "已缴费") return;
+  const frequency = p.paymentFrequency || "";
+  if (/趸|一次/.test(frequency) || /趸/.test(p.paymentYears || "")) return;
+  const months = /半年/.test(frequency)
+    ? 6
+    : /季/.test(frequency)
+      ? 3
+      : /月/.test(frequency)
+        ? 1
+        : /年/.test(frequency)
+          ? 12
+          : 0;
+  const years = /^(\d+)年$/.exec(p.paymentYears || "");
+  if (!months || !date(p.effectiveDate) || (!p.paymentEndDate && !years))
+    return;
+  const end =
+    p.paymentEndDate || addMonths(p.effectiveDate, Number(years![1]) * 12);
+  let candidate = p.effectiveDate;
+  if (latest) {
+    let n = Math.max(
+      1,
+      (Number(latest.date.slice(0, 4)) - Number(p.effectiveDate.slice(0, 4))) *
+        12 +
+        Number(latest.date.slice(5, 7)) -
+        Number(p.effectiveDate.slice(5, 7)),
+    );
+    n = Math.floor(n / months);
+    candidate = addMonths(p.effectiveDate, n * months);
+    while (candidate <= latest.date) {
+      n++;
+      candidate = addMonths(p.effectiveDate, n * months);
+    }
+  }
+  if (candidate >= end) return;
+  return {
+    date: candidate,
+    amount: latest?.amount || p.premium,
+    status: "未缴费",
+    estimated: true,
+  };
+}
+export function projectContacts(
+  contacts: Contact[],
+  policies: ManagedPolicy[],
+  bothRoles = false,
+): Contact[] {
+  return contacts.map((c) => {
+    const associated = policies.filter(
+      (p) => p.applicantId === c.id || (bothRoles && p.insuredId === c.id),
+    );
+    const known = new Set(policies.map(key));
+    const knownIds = new Set(policies.map(p => p.id));
+    return {
+      ...c,
+      policies: [
+        ...(c.policies || []).filter((p) => !known.has(key(p)) && !knownIds.has(p.id)),
+        ...associated,
+      ],
+    };
+  });
 }

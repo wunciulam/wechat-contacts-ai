@@ -17,6 +17,10 @@ export interface Policy {
   applicant: string;
   insured: string;
   paymentYears?: string;
+  paymentFrequency?: string;
+  paymentEndDate?: string;
+  coveragePeriod?: string;
+  expiryDate?: string;
   insuranceType?: string;
   coverage?: string;
 }

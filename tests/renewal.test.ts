@@ -81,4 +81,81 @@ test("name alone never auto-merges; contradictory identifiers rejected", () => {
   assert.equal(candidates("甲", "138****5678", "***5678", [c])[0].strong, true);
 });
 
-test("paid latest installment does not resurrect old unpaid history",()=>{assert.equal(latestPayment({...p,payments:[{date:"2025-11-01",amount:"20",status:"未缴费"},{date:"2026-11-01",amount:"20",status:"已缴费"}]}),undefined);});
+test("paid latest installment does not resurrect old unpaid history", () => {
+  assert.equal(
+    latestPayment({
+      ...p,
+      payments: [
+        { date: "2025-11-01", amount: "20", status: "未缴费" },
+        { date: "2026-11-01", amount: "20", status: "已缴费" },
+      ],
+    }),
+    undefined,
+  );
+});
+
+import {
+  nextPayment,
+  addMonths,
+  projectContacts,
+} from "../services/renewal.ts";
+test("annual next payment is estimated and stops at payment term", () => {
+  const a = {
+    ...p,
+    effectiveDate: "2024-02-29",
+    paymentFrequency: "期交-年",
+    paymentYears: "3年",
+    payments: [{ date: "2025-02-28", amount: "100", status: "已缴费" }],
+  };
+  assert.equal(nextPayment(a)?.date, "2026-02-28");
+  assert.equal(nextPayment(a)?.estimated, true);
+  assert.equal(
+    nextPayment({
+      ...a,
+      payments: [{ date: "2026-02-28", amount: "100", status: "已缴费" }],
+    }),
+    undefined,
+  );
+});
+test("month end uses original anchor; explicit due dates win", () => {
+  assert.equal(addMonths("2026-01-31", 1), "2026-02-28");
+  assert.equal(addMonths("2026-01-31", 2), "2026-03-31");
+  const a = {
+    ...p,
+    effectiveDate: "2026-01-31",
+    paymentFrequency: "期交-月",
+    paymentYears: "1年",
+    payments: [{ date: "2026-02-28", amount: "10", status: "已缴费" }],
+  };
+  assert.equal(nextPayment(a)?.date, "2026-03-31");
+  assert.equal(
+    nextPayment({
+      ...a,
+      payments: [{ date: "2026-03-20", amount: "12", status: "未缴费" }],
+    })?.date,
+    "2026-03-20",
+  );
+});
+test("single payment and incomplete term do not invent next date", () => {
+  assert.equal(nextPayment({ ...p, paymentFrequency: "趸交" }), undefined);
+  assert.equal(
+    nextPayment({
+      ...p,
+      paymentFrequency: "期交-年",
+      effectiveDate: "2024-01-01",
+    }),
+    undefined,
+  );
+});
+test("both customer roles project same policy identity", () => {
+  const cs: any = [
+    { id: "a", policies: [] },
+    { id: "b", policies: [] },
+  ];
+  const projected = projectContacts(
+    cs,
+    [{ ...p, applicantId: "a", insuredId: "b" }],
+    true,
+  );
+  assert.equal(projected[0].policies?.[0], projected[1].policies?.[0]);
+});

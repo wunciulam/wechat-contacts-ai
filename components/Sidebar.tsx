@@ -15,8 +15,8 @@ interface SidebarProps {
   totalContacts: number;
   followUpCount: number;
   policyCount: number;
-  currentView: 'contacts' | 'followups' | 'policies' | 'renewals';
-  onChangeView: (view: 'contacts' | 'followups' | 'policies' | 'renewals') => void;
+  currentView: 'contacts' | 'followups' | 'policies';
+  onChangeView: (view: 'contacts' | 'followups' | 'policies') => void;
   followUpFilter?: 'idle' | 'following' | 'contacted' | null;
   onFollowUpFilter?: (filter: 'idle' | 'following' | 'contacted' | null) => void;
   isMobileOpen?: boolean;
@@ -128,7 +128,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             {[
               { id: 'contacts', label: '全部联系人', short: '全部', icon: Users, count: totalContacts },
               { id: 'followups', label: '跟进工作台', short: '跟进', icon: ClipboardList, count: followUpCount },
-              { id: 'renewals', label: '续费待办', short: '续费', icon: Clock, count: undefined },
+              
               { id: 'policies', label: '保单管理', short: '保单', icon: FileText, count: policyCount }
             ].map(item => (
               <button
