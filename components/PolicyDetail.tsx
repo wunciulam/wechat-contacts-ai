@@ -38,7 +38,7 @@ export default function PolicyDetail({
   ];
   return (
     <>
-      <h3 className="text-lg font-semibold">保单详情</h3>
+      
       <p className="text-xs text-gray-400 mt-1 mb-5">
         缴费期限与保障期限分别记录；空缺信息可按保单补充。
       </p>
