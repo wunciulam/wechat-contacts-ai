@@ -80,3 +80,5 @@ test("name alone never auto-merges; contradictory identifiers rejected", () => {
   );
   assert.equal(candidates("甲", "138****5678", "***5678", [c])[0].strong, true);
 });
+
+test("paid latest installment does not resurrect old unpaid history",()=>{assert.equal(latestPayment({...p,payments:[{date:"2025-11-01",amount:"20",status:"未缴费"},{date:"2026-11-01",amount:"20",status:"已缴费"}]}),undefined);});

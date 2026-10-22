@@ -183,9 +183,8 @@ export function mergePolicies(old: ManagedPolicy[], incoming: ManagedPolicy[]) {
   return [...map.values()];
 }
 export function latestPayment(p: ManagedPolicy) {
-  return p.payments
-    .filter((x) => x.status === "未缴费")
-    .sort((a, b) => b.date.localeCompare(a.date))[0];
+  const latest = [...p.payments].sort((a, b) => b.date.localeCompare(a.date))[0];
+  return latest?.status === "未缴费" ? latest : undefined;
 }
 export function today() {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" }).format(
