@@ -32,9 +32,13 @@ export const emptyData: RenewalData = {
   imports: [],
 };
 export const inactive = (s: string) => /撤单|退保|拒保|终止|失效/.test(s || "");
+export const normalizedPolicyNumber = (value: unknown) => {
+  const clean = String(value ?? "").trim().replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+  return clean.replace(/^0+(?=[0-9A-Z])/, "");
+};
 export const key = (p: Partial<ManagedPolicy>) =>
-  p.policyNumber?.trim()
-    ? `${p.company?.trim()}|${p.policyNumber.trim()}`
+  normalizedPolicyNumber(p.policyNumber)
+    ? `${p.company?.trim()}|${normalizedPolicyNumber(p.policyNumber)}`
     : `manual:${p.id}`;
 const text = (v: unknown) => String(v ?? "").trim();
 export function date(v: unknown) {

@@ -159,3 +159,10 @@ test("both customer roles project same policy identity", () => {
   );
   assert.equal(projected[0].policies?.[0], projected[1].policies?.[0]);
 });
+
+test("policy numbers with leading zero merge into the existing record", () => {
+  const [merged] = mergePolicies([{...p, policyNumber:"2211805182135", id:"old"}], [{...p, policyNumber:"002211805182135", id:"export", paymentFrequency:"期交-年", payments:[{date:"2026-11-01", amount:"100", status:"未缴费"}]}]);
+  assert.equal(merged.id,"old");
+  assert.equal(merged.payments.length,1);
+  assert.equal(merged.paymentFrequency,"期交-年");
+});
