@@ -18,6 +18,7 @@ import {
   today,
   key,
   nextPayment,
+  remainingInstallments,
   projectContacts,
 } from "../services/renewal";
 const btn = "btn btn-secondary text-sm";
@@ -322,7 +323,7 @@ export default function RenewalWorkspace({
   );
   const daysLeft = (date: string) => Math.round((Date.parse(date + "T00:00:00Z") - Date.parse(today() + "T00:00:00Z")) / 86400000);
   const daysLabel = (date: string) => { const n = daysLeft(date); return n < 0 ? `逾期 ${-n} 天` : n === 0 ? "今天缴费" : `剩余 ${n} 天`; };
-  const paidTotal = (p: ManagedPolicy) => p.payments.filter(q => q.status === "已缴费").reduce((n,q) => n + (Number(String(q.amount).replace(/,/g,"")) || 0), 0).toLocaleString("zh-CN", {minimumFractionDigits:2,maximumFractionDigits:2});
+  const remainingLabel = (p: ManagedPolicy) => { const n = remainingInstallments(p); return n === undefined ? "待补充" : `${n} 期`; };
   const open = (p: ManagedPolicy) => {
     setSelected(p);
     setModal("detail");
@@ -425,7 +426,7 @@ export default function RenewalWorkspace({
               ))}
             </div>
             <p className="text-sm text-gray-500">
-              每份保单展示下一次缴费；7天内及逾期天数标红。已缴金额仅统计已记录的缴费明细。
+              每份保单展示下一次缴费；7天内及逾期天数标红。剩余期数包含当前待缴这一期。
             </p>
             <input
               className="input"
@@ -466,7 +467,7 @@ export default function RenewalWorkspace({
                         <div className="min-w-28"><span className="block text-xs text-gray-400">投保人</span><strong>{p.applicant || "待补充"}</strong></div>
                         <div className="min-w-28"><span className="block text-xs text-gray-400">被保人</span><strong>{p.insured || "待补充"}</strong></div>
                         <div className="flex-1 min-w-56"><span className="block text-xs text-gray-400">保单</span><strong>{p.productName}</strong><span className="ml-2 text-xs text-gray-500">{p.policyNumber}</span></div>
-                        <div className="min-w-36"><span className="block text-xs text-gray-400">下次缴费</span><strong>{nextPayment(p)?.date || "待补充"}</strong>{nextPayment(p)?.estimated && <span className="ml-1 text-xs text-gray-500">预计</span>}{nextPayment(p) && <p className={daysLeft(nextPayment(p)!.date) <= 7 ? "text-red-600 font-medium" : "text-gray-500"}>{daysLabel(nextPayment(p)!.date)}</p>}</div><div><span className="block text-xs text-gray-400">本期应缴</span>¥ {nextPayment(p)?.amount || "—"}<span className="block text-xs text-gray-400 mt-1">已缴（已记录）</span>¥ {paidTotal(p)}</div>
+                        <div className="min-w-36"><span className="block text-xs text-gray-400">下次缴费</span><strong>{nextPayment(p)?.date || "待补充"}</strong>{nextPayment(p)?.estimated && <span className="ml-1 text-xs text-gray-500">预计</span>}{nextPayment(p) && <p className={daysLeft(nextPayment(p)!.date) <= 7 ? "text-red-600 font-medium" : "text-gray-500"}>{daysLabel(nextPayment(p)!.date)}</p>}</div><div className="flex flex-nowrap items-start gap-6 shrink-0"><div><span className="block text-xs text-gray-400">本期应缴</span>¥ {nextPayment(p)?.amount || "—"}</div><div><span className="block text-xs text-gray-400">剩余期数</span>{remainingLabel(p)}</div></div>
                       </div>
                     </button>
                   ))}
@@ -476,7 +477,7 @@ export default function RenewalWorkspace({
                 <table className="w-full text-sm">
                   <thead>
                     <tr>
-                      {["客户 / 保单", "已缴（已记录）", "下次缴费 / 本期应缴", "操作"].map(
+                      {["客户 / 保单", "剩余期数", "下次缴费 / 本期应缴", "操作"].map(
                         (x) => (
                           <th key={x} className="text-left p-3 border-b">
                             {x}
@@ -501,7 +502,7 @@ export default function RenewalWorkspace({
                           </button>
                         </td>
                         <td className="p-3">
-                          ¥ {paidTotal(t.policy)}
+                          {remainingLabel(t.policy)}
                         </td>
                         <td className={t.date < today() ? "text-red-600" : ""}>
                           {t.date}

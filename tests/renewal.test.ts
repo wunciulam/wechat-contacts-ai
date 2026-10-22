@@ -166,3 +166,12 @@ test("policy numbers with leading zero merge into the existing record", () => {
   assert.equal(merged.payments.length,1);
   assert.equal(merged.paymentFrequency,"期交-年");
 });
+
+import { remainingInstallments } from '../services/renewal.ts';
+test('remaining installments include current due and stop at payment end', () => {
+  const a = {...p, effectiveDate:'2024-02-29', paymentFrequency:'期交-年', paymentYears:'3年', payments:[{date:'2025-02-28',amount:'100',status:'未缴费'}]};
+  assert.equal(remainingInstallments(a),2);
+  assert.equal(remainingInstallments({...a,payments:[{date:'2025-02-28',amount:'100',status:'已缴费'}]}),1);
+  assert.equal(remainingInstallments({...a,payments:[{date:'2026-02-28',amount:'100',status:'已缴费'}]}),0);
+  assert.equal(remainingInstallments({...a,paymentYears:''}),undefined);
+});

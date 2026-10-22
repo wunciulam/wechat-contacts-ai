@@ -330,3 +330,26 @@ export function projectContacts(
     };
   });
 }
+
+// Remaining contractual installments, including the next unpaid installment.
+export function remainingInstallments(p: ManagedPolicy): number | undefined {
+  const frequency = p.paymentFrequency || '';
+  const months = /半年/.test(frequency) ? 6 : /季/.test(frequency) ? 3 : /月/.test(frequency) ? 1 : /年/.test(frequency) ? 12 : 0;
+  const years = /^(\d+)年$/.exec(p.paymentYears || '');
+  if (!months || !date(p.effectiveDate) || (!date(p.paymentEndDate) && !years)) return;
+  const end = date(p.paymentEndDate) || addMonths(p.effectiveDate, Number(years![1]) * 12);
+  const next = nextPayment(p);
+  if (!next) {
+    const last = [...p.payments].sort((a,b)=>b.date.localeCompare(a.date))[0];
+    return last?.status === '已缴费' && addMonths(last.date, months) >= end ? 0 : undefined;
+  }
+  let count = 1;
+  let index = Math.floor(((Number(next.date.slice(0,4))-Number(p.effectiveDate.slice(0,4)))*12 + Number(next.date.slice(5,7))-Number(p.effectiveDate.slice(5,7))) / months) + 1;
+  if (next.date >= end) return undefined;
+  for (let i = Math.max(1,index); i < 2400; i++) {
+    const candidate = addMonths(p.effectiveDate, i * months);
+    if (candidate >= end) return count;
+    if (candidate > next.date) count++;
+  }
+  return undefined;
+}
