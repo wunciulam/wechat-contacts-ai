@@ -3,10 +3,11 @@ import { X, Upload, Check, AlertCircle, Plus, FileSpreadsheet, ShoppingBag, Tras
 import { extractContactsFromMedia, extractTableFromMedia } from '../services/geminiService';
 import { NewContact, Contact, ProgressRecord, ExtractedTableData, Policy, ExcelCustomerRow, ExcelPolicyRow } from '../types';
 import * as XLSX from 'xlsx';
+import { key as policyKey } from '../services/renewal';
 
 interface ImportModalProps {
   isOpen: boolean;
-  onLinkedPolicies?: () => void;
+  relatedPolicies?: Policy[];
   onPolicyDetail?: (p: Policy) => void;
   onClose: () => void;
   onSave: (contacts: NewContact[]) => void;
@@ -15,7 +16,8 @@ interface ImportModalProps {
   allTags?: string[];
 }
 
-const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTableSave, initialData, allTags = [], onLinkedPolicies, onPolicyDetail }) => {
+const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail }) => {
+  const displayedPolicies = () => Array.from(new Map([...(formData.policies || []), ...relatedPolicies].map(p => [policyKey(p), p])).values());
   const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'table'>('ai');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -361,7 +363,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
       <div className="bg-white shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh] rounded-2xl border border-slate-200">
         <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
-          <h2 className="text-base font-semibold text-slate-800">{initialData ? '编辑联系人资料' : '添加联系人'}</h2>{initialData && onLinkedPolicies && <button type="button" className="text-sm border rounded px-3 py-2" onClick={onLinkedPolicies}>全部关联保单 · 投保 / 被保</button>}
+          <h2 className="text-base font-semibold text-slate-800">{initialData ? '编辑联系人资料' : '添加联系人'}</h2>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all cursor-pointer">
             <X size={20} />
           </button>
@@ -545,7 +547,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
                   )}
 
                   {/* 保单列表 */}
-                  {(formData.policies || []).length > 0 ? (
+                  {displayedPolicies().length > 0 ? (
                     <div className="border border-gray-200 rounded-lg overflow-hidden">
                       <table className="w-full text-xs">
                         <thead className="bg-gray-50 border-b border-gray-200">
@@ -559,7 +561,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {(formData.policies || []).map(policy => (
+                          {displayedPolicies().map(policy => (
                             <tr key={policy.id} className="hover:bg-gray-50">
                               {editingPolicyId === policy.id ? (
                                 <>

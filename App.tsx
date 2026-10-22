@@ -1,3 +1,4 @@
+import { migrate, projectContacts } from './services/renewal';
 import RenewalWorkspace from './components/RenewalWorkspace';
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
@@ -1117,7 +1118,7 @@ const App: React.FC = () => {
 
       {policyContactId && <div className="fixed inset-0 bg-black/30 z-[90] p-8 flex justify-center"><div className="bg-white rounded-xl w-full max-w-5xl overflow-hidden"><button className="p-3 border rounded m-2" onClick={() => {setPolicyContactId(null);setDetailPolicyId(undefined);}}>返回客户资料</button><div className="h-[85%]"><RenewalWorkspace contacts={contacts} onContacts={setContacts} customerId={policyContactId} initialPolicyId={detailPolicyId} /></div></div></div>}
       <ImportModal 
-        onLinkedPolicies={() => { if(editingContact) {setDetailPolicyId(undefined);setPolicyContactId(editingContact.id);} }}
+        relatedPolicies={editingContact ? projectContacts(contacts, migrate(contacts), true).find(c => c.id === editingContact.id)?.policies : []}
         onPolicyDetail={p=>{if(editingContact){setDetailPolicyId(p.id);setPolicyContactId(editingContact.id);}}}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
