@@ -27,12 +27,14 @@ export default function RenewalWorkspace({
   onContacts,
   customerId,
   initialPolicyId,
+  onCloseDetail,
   ...dashboardProps
 }: {
   contacts: Contact[];
   onContacts: (c: Contact[]) => void;
   customerId?: string;
   initialPolicyId?: string;
+  onCloseDetail?: () => void;
   filterTags?: Set<string>;
   followUpFilter?: any;
   onEditContact?: (c: Contact) => void;
@@ -305,6 +307,22 @@ export default function RenewalWorkspace({
       return true;
     }
     return false;
+  }
+  if (onCloseDetail) {
+    const policy = selected || data?.policies.find(p => p.id === initialPolicyId);
+    return <div className="fixed inset-0 bg-black/30 z-[100] flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-lg overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0"><h3 className="text-lg font-semibold">保单详情</h3><button className={btn} onClick={onCloseDetail}>关闭</button></div>
+        <div className="overflow-auto p-5 md:p-6">
+          {error && <p role="alert" className="text-red-600 mb-3">{error}</p>}
+          {!data ? <p>正在读取保单…</p> : !policy ? <p>未找到这份保单，请关闭后重新打开。</p> : <PolicyDetail policy={policy} contacts={contacts} busy={busy} onMark={date => mark(policy, "payment", date)} onSave={async p => {
+            if (data.policies.some(x => x.id !== p.id && key(x) === key(p))) { setError("该保单号已存在，请核对。"); return false; }
+            const next = {...data, policies: data.policies.map(x => x.id === p.id ? p : x)};
+            if (await persist(next)) {setSelected(p); return true;} return false;
+          }} />}
+        </div>
+      </div>
+    </div>;
   }
   if (!data)
     return <div className="p-6">{error || "正在读取保单与续费数据…"}</div>;
