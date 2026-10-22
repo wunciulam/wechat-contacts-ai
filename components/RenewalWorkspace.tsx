@@ -53,6 +53,7 @@ export default function RenewalWorkspace({
     [busy, setBusy] = useState(false),
     [modal, setModal] = useState(""),
     [rows, setRows] = useState<ManagedPolicy[]>([]),
+    [preview, setPreview] = useState(false),
     [files, setFiles] = useState<string[]>([]),
     [selected, setSelected] = useState<ManagedPolicy | null>(null),
     [filter, setFilter] = useState("all"),
@@ -120,9 +121,12 @@ export default function RenewalWorkspace({
         ),
       );
       setRows(input.flat());
+      setPreview(true);
       setFiles(Array.from(list).map((f) => f.name));
       setLinks({});
       setModal("import");
+      setFilter("policies");
+      setRemindersOpen(true);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -303,11 +307,12 @@ export default function RenewalWorkspace({
   }
   if (!data)
     return <div className="p-6">{error || "正在读取保单与续费数据…"}</div>;
+  const shownPolicies = preview && rows.length ? mergePolicies(data.policies, rows) : data.policies;
   const all = customerId
-    ? data.policies.filter(
+    ? shownPolicies.filter(
         (p) => p.applicantId === customerId || p.insuredId === customerId,
       )
-    : data.policies;
+    : shownPolicies;
   const tasks = dueItems(all).filter(
     (x) =>
       (filter === "all" || filter === x.type) &&
@@ -428,6 +433,12 @@ export default function RenewalWorkspace({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+            {preview && rows.length > 0 && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+                <span>本地表格预览：已读取 {rows.length} 条，尚未保存到线上。可在“全部保单”核对缴费字段。</span>
+                <button className={btn} onClick={() => { setPreview(false); setRows([]); }}>退出预览</button>
+              </div>
+            )}
             {filter === "history" ? (
               data.imports.map((h, i) => (
                 <div key={i} className="border rounded p-4">
@@ -451,14 +462,12 @@ export default function RenewalWorkspace({
                       onClick={() => open(p)}
                       className="w-full text-left p-4 border rounded"
                     >
-                      <b>{p.productName}</b>　{p.status}
-                      <p className="text-sm text-gray-500">
-                        {p.policyNumber} · 投保人 {p.applicant} / 被保人{" "}
-                        {p.insured}
-                      </p>
-                      {!p.expiryDate && !inactive(p.status) && (
-                        <small>未设置到期日 · 点击补充续保日期</small>
-                      )}
+                      <div className="flex flex-wrap items-center gap-4">
+                        <div className="min-w-28"><span className="block text-xs text-gray-400">投保人</span><strong>{p.applicant || "待补充"}</strong></div>
+                        <div className="min-w-28"><span className="block text-xs text-gray-400">被保人</span><strong>{p.insured || "待补充"}</strong></div>
+                        <div className="flex-1 min-w-56"><span className="block text-xs text-gray-400">保单</span><strong>{p.productName}</strong><span className="ml-2 text-xs text-gray-500">{p.policyNumber}</span></div>
+                        <div className="min-w-36"><span className="block text-xs text-gray-400">下次缴费</span><strong>{nextPayment(p)?.date || "待补充"}</strong>{nextPayment(p)?.estimated && <span className="ml-1 text-xs text-gray-500">预计</span>}</div>
+                      </div>
                     </button>
                   ))}
               </div>
