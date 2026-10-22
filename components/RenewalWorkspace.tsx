@@ -1,7 +1,7 @@
 import { saveImport } from "../services/renewalStorage";
 import React, { useEffect, useState } from "react";
 import { Contact } from "../types";
-import { loadFromCloud, saveToCloud } from "../services/supabaseService";
+import { supabase, saveToCloud } from "../services/supabaseService";
 import {
   RenewalData,
   ManagedPolicy,
@@ -45,8 +45,8 @@ export default function RenewalWorkspace({
     [settings, setSettings] = useState(emptyData.settings),
     [links, setLinks] = useState<Record<string, string>>({});
   useEffect(() => {
-    loadFromCloud("renewal_v1")
-      .then((d) => setData(d || { ...emptyData, policies: migrate(contacts) }))
+    supabase.from("app_data").select("data").eq("app_id", import.meta.env.VITE_APP_ID).eq("data_type", "renewal_v1").maybeSingle()
+      .then(({data: row, error}) => { if(error) throw error; setData(row?.data || { ...emptyData, policies: migrate(contacts) }); })
       .catch((e) => setError(String(e)));
   }, []);
   async function persist(next: RenewalData) {
