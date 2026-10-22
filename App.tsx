@@ -1,3 +1,4 @@
+import RenewalWorkspace from './components/RenewalWorkspace';
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import { Menu, Users, ClipboardList, FileText, Cloud, CloudOff } from 'lucide-react';
@@ -71,7 +72,8 @@ const App: React.FC = () => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [isLoaded, setIsLoaded] = useState(false);
-  const [currentView, setCurrentView] = useState<'contacts' | 'followups' | 'policies'>('contacts');
+  const [currentView, setCurrentView] = useState<'contacts' | 'followups' | 'policies' | 'renewals'>('contacts');
+  const [policyContactId, setPolicyContactId] = useState<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
   // 跟进状态筛选
@@ -962,6 +964,7 @@ const App: React.FC = () => {
 
   const renderContent = () => {
       switch (currentView) {
+          case 'renewals': return <RenewalWorkspace contacts={contacts} onContacts={setContacts} />;
           case 'contacts':
               return (
                   <ContactList 
@@ -1110,7 +1113,9 @@ const App: React.FC = () => {
         </div>
       </div>
 
+      {policyContactId && <div className="fixed inset-0 bg-black/30 z-[90] p-8 flex justify-center"><div className="bg-white rounded-xl w-full max-w-5xl overflow-hidden"><button className="p-3 border rounded m-2" onClick={() => setPolicyContactId(null)}>返回客户资料</button><div className="h-[85%]"><RenewalWorkspace contacts={contacts} onContacts={setContacts} customerId={policyContactId} /></div></div></div>}
       <ImportModal 
+        onLinkedPolicies={() => { if(editingContact) setPolicyContactId(editingContact.id); }}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveContact}

@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 
 interface ImportModalProps {
   isOpen: boolean;
+  onLinkedPolicies?: () => void;
   onClose: () => void;
   onSave: (contacts: NewContact[]) => void;
   onTableSave?: (data: ExtractedTableData) => void;
@@ -13,7 +14,7 @@ interface ImportModalProps {
   allTags?: string[];
 }
 
-const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTableSave, initialData, allTags = [] }) => {
+const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTableSave, initialData, allTags = [], onLinkedPolicies }) => {
   const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'table'>('ai');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -359,7 +360,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
       <div className="bg-white shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh] rounded-2xl border border-slate-200">
         <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
-          <h2 className="text-base font-semibold text-slate-800">{initialData ? '编辑联系人资料' : '添加联系人'}</h2>
+          <h2 className="text-base font-semibold text-slate-800">{initialData ? '编辑联系人资料' : '添加联系人'}</h2>{initialData && onLinkedPolicies && <button type="button" className="text-sm border rounded px-3 py-2" onClick={onLinkedPolicies}>全部关联保单 · 投保 / 被保</button>}
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all cursor-pointer">
             <X size={20} />
           </button>
