@@ -167,7 +167,7 @@ function SampleCard({ kind }: { kind: 'normal' | 'long' | 'empty' | 'error' }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <h3 className="min-w-0 break-words text-sm font-semibold leading-5 text-gray-900">{data.name}</h3>
-          <span className="shrink-0 text-xs text-gray-500">{data.status}</span>
+          {data.status === '跟进中' && <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-gray-500"><span className="acceptance-status-dot" aria-hidden="true" />跟进中</span>}
         </div>
         <div className="mt-2 flex flex-wrap gap-1">
           {data.tags.length ? data.tags.map(tag => <AcceptanceTag tone={sampleTagTones[tag] || 'neutral'} key={tag}>{tag}</AcceptanceTag>) : <span className="text-xs text-gray-400">暂无标签</span>}
@@ -275,7 +275,7 @@ export function ComponentAcceptancePage() {
     <header className="border-b border-gray-100 bg-white"><div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6"><div><div className="text-sm font-semibold">保险跟单仔</div><div className="text-xs text-gray-500">组件验收样板 · 本地示例数据</div></div><a className="text-xs text-gray-500 hover:underline" href="/">返回当前网站</a></div></header>
     <main className="mx-auto max-w-[1240px] px-4 pb-16 sm:px-6">
       <div className="-mx-4 border-b border-gray-100 sm:-mx-6"><PageHeader title="组件验收样板" subtitle="待确认：这不是已定稿的全站规范" actionButton={<button className="btn btn-primary text-sm" onClick={() => openModal()}><Plus size={16} />打开弹窗</button>} searchBox={<div className="relative w-full sm:w-56"><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input className="input acceptance-search-input" value={query} onChange={event => setQuery(event.target.value)} placeholder="演示搜索输入框" aria-label="演示搜索输入框" /></div>} /></div>
-      <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs leading-5 text-gray-600">此页独立运行，不导入线上数据。左侧概念取自当前客户管理界面；有争议的样式在下方明确标为“建议修正”。请先检查样板，确认后再更新 design.md 和全站组件。</div>
+      <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs leading-5 text-gray-600"><strong className="font-semibold text-gray-900">怎么反馈：</strong>直接选中不满意的组件并留言，像这次一样说明你想要的效果即可；不用逐项回复验收说明。等你明确说“样板确认”后，才会定稿 design.md 并修改业务页面。本页只用示例数据，不写入线上数据库。</div>
       <nav className="mt-5 flex flex-wrap gap-2 text-xs" aria-label="组件分区">{[['palette','辅助色'],['typography','字号'],['spacing','间距'],['numbers','数字'],['title','页面标题'],['buttons','按钮'],['inputs','输入框'],['tabs','Tab'],['tags','标签'],['cards','客户卡片'],['table','保单表格'],['modal','弹窗']].map(([id,label]) => <a className="btn btn-secondary btn-sm" key={id} href={`#${id}`}>{label}</a>)}</nav>
 
       <Section id="palette" title="完整色板 · 六个色系" source="原站黑白灰底色与联系人状态标签" suggestion="中性灰沿用原站；五个辅助色各有 50–900 十档。状态文字、边框和标签都从同一色系取值，不混用额外的鲜红色。"><PaletteDemo /></Section>

@@ -19,6 +19,14 @@
   color: var(--acceptance-rose-700);
 }
 
+.acceptance-page .acceptance-status-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 9999px;
+  background: var(--acceptance-blue-500);
+}
+
 .acceptance-tag {
   display: inline-flex;
   align-items: center;
