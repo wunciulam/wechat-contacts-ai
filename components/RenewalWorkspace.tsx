@@ -585,14 +585,13 @@ export default function RenewalWorkspace({
               </p>
             )}
             <div className="sticky -top-5 md:-top-6 z-10 bg-white flex items-center justify-between py-3 border-b border-gray-100 mb-4">
-              <h3 className="text-lg font-semibold">{modal === "detail" ? "保单详情" : ""}</h3>
+              <h3 className="text-lg font-semibold">{modal === "detail" ? "保单详情" : modal === "import" ? "导入预览" : ""}</h3>
               <button className={btn} onClick={() => setModal("")}>
                 关闭
               </button>
             </div>
             {modal === "import" && (
               <>
-                <h3 className="font-bold text-lg">导入预览</h3>
                 <p className="my-3">
                   原始记录 {rows.length} · 合并后保单{" "}
                   {mergePolicies([], rows).length} · 撤单/退保等记录{" "}
