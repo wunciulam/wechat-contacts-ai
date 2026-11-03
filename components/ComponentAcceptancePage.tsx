@@ -20,7 +20,7 @@ const colorScales: Record<TagTone, { name: string; use: string; shades: Record<S
   violet: { name: '亮紫', use: '意向 / 分类', shades: { '50':'#f5f3ff','100':'#ede9fe','200':'#ddd6fe','300':'#c4b5fd','400':'#a78bfa','500':'#8b5cf6','600':'#7c3aed','700':'#6d28d9','800':'#5b21b6','900':'#4c1d95' } },
   rose: { name: '珊瑚红', use: '七天内 / 待核对 / 表单错误', shades: { '50':'#fff1f2','100':'#ffe4e6','200':'#fecdd3','300':'#fda4af','400':'#fb7185','500':'#f43f5e','600':'#e11d48','700':'#be123c','800':'#9f1239','900':'#881337' } },
 };
-const paletteVariables = Object.fromEntries((Object.entries(colorScales) as [TagTone, typeof colorScales[TagTone]][]).flatMap(([tone, scale]) => shadeOrder.map(shade => [`--acceptance-${tone}-${shade}`, scale.shades[shade]]))) as React.CSSProperties;
+export const paletteVariables = Object.fromEntries((Object.entries(colorScales) as [TagTone, typeof colorScales[TagTone]][]).flatMap(([tone, scale]) => shadeOrder.map(shade => [`--acceptance-${tone}-${shade}`, scale.shades[shade]]))) as React.CSSProperties;
 const amountFormatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const formatAmount = (amount: number | null) => amount === null ? '待补充' : `¥ ${amountFormatter.format(amount)}`;
 
@@ -272,7 +272,7 @@ export function ComponentAcceptancePage() {
   const [errorValue, setErrorValue] = useState('示例错误值');
   const openModal = (policy: DemoPolicy | null = null) => { setSelectedPolicy(policy); setModalOpen(true); };
   return <div className="acceptance-page min-h-screen bg-white text-gray-900" style={paletteVariables}>
-    <header className="border-b border-gray-100 bg-white"><div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6"><div><div className="text-sm font-semibold">保险跟单仔</div><div className="text-xs text-gray-500">组件验收样板 · 本地示例数据</div></div><a className="text-xs text-gray-500 hover:underline" href="/">返回当前网站</a></div></header>
+    <header className="border-b border-gray-100 bg-white"><div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6"><div><div className="text-sm font-semibold">保险跟单仔</div><div className="text-xs text-gray-500">组件验收样板 · 本地示例数据</div></div><div className="flex gap-4"><a className="text-xs text-gray-500 hover:underline" href="/module-acceptance.html">其他模块验收</a><a className="text-xs text-gray-500 hover:underline" href="/">返回当前网站</a></div></div></header>
     <main className="mx-auto max-w-[1240px] px-4 pb-16 sm:px-6">
       <div className="-mx-4 border-b border-gray-100 sm:-mx-6"><PageHeader title="组件验收样板" subtitle="待确认：这不是已定稿的全站规范" actionButton={<button className="btn btn-primary text-sm" onClick={() => openModal()}><Plus size={16} />打开弹窗</button>} searchBox={<div className="relative w-full sm:w-56"><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input className="input acceptance-search-input" value={query} onChange={event => setQuery(event.target.value)} placeholder="演示搜索输入框" aria-label="演示搜索输入框" /></div>} /></div>
       <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs leading-5 text-gray-600"><strong className="font-semibold text-gray-900">怎么反馈：</strong>直接选中不满意的组件并留言，像这次一样说明你想要的效果即可；不用逐项回复验收说明。等你明确说“样板确认”后，才会定稿 design.md 并修改业务页面。本页只用示例数据，不写入线上数据库。</div>

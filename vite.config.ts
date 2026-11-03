@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => {
           input: {
             main: path.resolve(__dirname, 'index.html'),
             acceptance: path.resolve(__dirname, 'ui-acceptance.html'),
+            modules: path.resolve(__dirname, 'module-acceptance.html'),
           },
         },
       },
