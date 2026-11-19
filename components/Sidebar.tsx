@@ -79,11 +79,11 @@ const Sidebar: React.FC<SidebarProps> = ({
         group/sidebar
         ${isCollapsed ? 'w-16' : 'w-64'}
         bg-white h-full border-r border-gray-100 flex flex-col z-50
-        fixed md:relative inset-y-0 left-0 transition-all duration-200 ease-in-out
+        fixed md:relative inset-y-0 left-0 transition-transform duration-200 ease-in-out
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         <div className="md:hidden absolute top-4 right-4 z-50">
-          <button onClick={onCloseMobile} className="p-2 text-gray-400 hover:text-gray-900 transition-colors rounded-md hover:bg-gray-100">
+          <button onClick={onCloseMobile} className="p-2 text-gray-500 hover:text-gray-900 transition-colors rounded-md hover:bg-gray-100">
             <X size={22} />
           </button>
         </div>
@@ -91,7 +91,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <button
           ref={collapseBtnRef}
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="hidden md:flex absolute -right-3 top-12 w-6 h-6 bg-white border border-gray-200 rounded-full items-center justify-center text-gray-400 hover:text-gray-900 hover:border-gray-300 shadow-sm z-50 transition-all opacity-0 group-hover/sidebar:opacity-100 cursor-pointer"
+          className="hidden md:flex absolute -right-3 top-12 w-6 h-6 bg-white border border-gray-200 rounded-full items-center justify-center text-gray-500 hover:text-gray-900 hover:border-gray-300 shadow-sm z-50 transition-colors opacity-0 group-hover/sidebar:opacity-100 cursor-pointer"
         >
           {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
         </button>
@@ -116,7 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <div className="mb-6">
             <button
               onClick={() => { onAddNew(); onCloseMobile?.(); }}
-              className={`bg-gray-900 hover:bg-gray-800 text-white ${isCollapsed ? 'w-10 h-10 rounded-lg mx-auto' : 'w-full py-2.5 px-4 rounded-lg'} flex items-center justify-center gap-2 font-medium transition-all cursor-pointer`}
+              className={`bg-gray-900 hover:bg-gray-800 text-white ${isCollapsed ? 'w-10 h-10 rounded-lg mx-auto' : 'w-full py-2.5 px-4 rounded-lg'} flex items-center justify-center gap-2 font-medium transition-colors cursor-pointer`}
             >
               <PlusCircle size={17} />
               {!isCollapsed && <span>添加 / 导入</span>}
@@ -124,7 +124,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <div className="space-y-1 mb-6 hidden md:block">
-            {!isCollapsed && <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">工作台</p>}
+            {!isCollapsed && <p className="px-3 text-xs font-semibold text-gray-500  mb-2">工作台</p>}
             {[
               { id: 'contacts', label: '全部联系人', short: '全部', icon: Users, count: totalContacts },
               { id: 'followups', label: '跟进工作台', short: '跟进', icon: ClipboardList, count: followUpCount },
@@ -134,16 +134,16 @@ const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => { onChangeView(item.id as any); if(item.id === 'contacts') onSelectTag(null); onCloseMobile?.(); }}
-                className={`w-full flex items-center ${isCollapsed ? 'justify-center py-2.5' : 'justify-between py-2 px-3'} text-sm font-medium rounded-md transition-all duration-150 cursor-pointer
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center py-2.5' : 'justify-between py-2 px-3'} text-sm font-medium rounded-md transition-colors duration-150 cursor-pointer
                   ${isViewActive(item.id as any) && (item.id !== 'contacts' || selectedTags.size === 0)
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
                 title={isCollapsed ? item.label : ''}
               >
                 <div className={`flex ${isCollapsed ? 'flex-col' : 'flex-row'} items-center gap-2`}>
-                  <item.icon size={16} className={isViewActive(item.id as any) && (item.id !== 'contacts' || selectedTags.size === 0) ? "text-gray-900" : "text-gray-400"} />
+                  <item.icon size={16} className={isViewActive(item.id as any) && (item.id !== 'contacts' || selectedTags.size === 0) ? "text-gray-900" : "text-gray-500"} />
                   {!isCollapsed && <span>{item.label}</span>}
-                  {isCollapsed && <span className="text-[10px] font-medium mt-0.5">{item.short}</span>}
+                  {isCollapsed && <span className="text-xs font-medium mt-0.5">{item.short}</span>}
                 </div>
                 {!isCollapsed && item.count !== undefined && (
                   <span className={`py-0.5 px-2 rounded-full text-xs font-medium
@@ -162,14 +162,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                   <button onClick={() => onToggleAllTags(selectedTags.size !== tags.length)} className="text-gray-300 hover:text-gray-900 transition-colors cursor-pointer">
                     {selectedTags.size === tags.length ? <CheckSquare size={15} className="text-gray-900" /> : <Square size={15} />}
                   </button>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">标签筛选</p>
+                  <p className="text-xs font-semibold text-gray-500 ">标签筛选</p>
                 </div>
                 {selectedTags.size > 0 && (
                   <div className="flex items-center gap-1.5 animate-fade-in">
                     <span className="text-xs font-medium text-gray-900 bg-gray-100 px-2 py-0.5 rounded-full">已选 {selectedTags.size}</span>
                     <button
                       onClick={(e) => { e.stopPropagation(); onBatchDeleteTags(Array.from(selectedTags)); }}
-                      className="p-1 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+                      className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
                       title="批量删除选中标签"
                     >
                       <Trash2 size={13} />
@@ -178,20 +178,20 @@ const Sidebar: React.FC<SidebarProps> = ({
                 )}
               </div>
               {tags.map(tag => (
-                <div key={tag} onClick={() => onSelectTag(tag)} className={`group w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-all cursor-pointer
+                <div key={tag} onClick={() => onSelectTag(tag)} className={`group w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer
                   ${selectedTags.has(tag) ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}>
                   <div className="flex items-center gap-2 truncate">
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all shrink-0
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0
                       ${selectedTags.has(tag) ? 'bg-gray-900 border-gray-900' : 'bg-white border-gray-300'}`}>
                       {selectedTags.has(tag) && <Check size={11} className="text-white" strokeWidth={3} />}
                     </div>
                     <span className="truncate">{tag}</span>
                   </div>
                   <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.stopPropagation(); setEditingTag(tag); setEditValue(tag); }} className="p-1 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer">
+                    <button onClick={(e) => { e.stopPropagation(); setEditingTag(tag); setEditValue(tag); }} className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer">
                       <Edit2 size={12} />
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); onDeleteTag(tag); }} className="p-1 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer">
+                    <button onClick={(e) => { e.stopPropagation(); onDeleteTag(tag); }} className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer">
                       <Trash2 size={12} />
                     </button>
                   </div>

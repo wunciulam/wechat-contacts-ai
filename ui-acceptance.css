@@ -51,8 +51,13 @@
   scrollbar-width: thin;
 }
 
+.acceptance-tab {
+  border: 1px solid transparent;
+}
+
 .acceptance-tab[aria-selected="true"] {
-  background: var(--acceptance-neutral-100);
+  border-color: var(--acceptance-neutral-900);
+  background: transparent;
   color: var(--acceptance-neutral-900);
 }
 

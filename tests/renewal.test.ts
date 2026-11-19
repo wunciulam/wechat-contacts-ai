@@ -175,3 +175,21 @@ test('remaining installments include current due and stop at payment end', () =>
   assert.equal(remainingInstallments({...a,payments:[{date:'2026-02-28',amount:'100',status:'已缴费'}]}),0);
   assert.equal(remainingInstallments({...a,paymentYears:''}),undefined);
 });
+
+
+test("conflicting paid due date requires reconciliation instead of guessing its installment", () => {
+  const policy = { ...p, effectiveDate: "2024-06-01", paymentFrequency: "期交-年", paymentYears: "10年", payments: [
+    { date: "2025-06-01", amount: "2400", status: "已缴费" },
+    { date: "2026-05-31", amount: "2400", status: "已缴费" },
+  ] };
+  assert.equal(nextPayment(policy), undefined);
+});
+
+
+test("actual confirmation date never moves the contractual next date", () => {
+  const policy = { ...p, effectiveDate: "2024-06-01", paymentFrequency: "期交-年", paymentYears: "10年", payments: [
+    { date: "2026-06-01", confirmedAt: "2026-05-20", amount: "2400", status: "已缴费" },
+  ] };
+  assert.equal(nextPayment(policy)?.date, "2027-06-01");
+  assert.equal(nextPayment({ ...policy, payments: [{ ...policy.payments[0], confirmedAt: "2026-07-10" }] })?.date, "2027-06-01");
+});

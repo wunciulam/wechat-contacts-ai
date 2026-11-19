@@ -154,14 +154,24 @@ function NumberDemo() {
   </div>;
 }
 
-function SampleCard({ kind }: { kind: 'normal' | 'long' | 'empty' | 'error' }) {
+function SampleCard({ kind }: { kind: 'normal' | 'long' | 'empty' }) {
   const data = {
     normal: { name: '林女士', note: '已沟通续缴时间，下周电话确认。', tags: ['成交客户', '医疗险'], status: '跟进中' },
     long: { name: '周先生（姓名过长时仍保持卡片宽度和操作位置）', note: '客户希望同时了解父母医疗、家庭意外保障和孩子的教育储备，备注内容较长，用来核对多行文本。', tags: ['成交客户', '家庭保障', '长期护理'], status: '跟进中' },
     empty: { name: '陈女士', note: '', tags: [], status: '暂未跟进' },
-    error: { name: '待核对客户', note: '手机号或身份信息缺失，请先核对后再关联保单。', tags: ['资料待核对'], status: '需核对' },
   }[kind];
-  return <article className="card flex min-h-44 flex-col p-4" aria-label={`${data.name}客户卡片`}>
+  return <AcceptanceCustomerCard data={data} onOpen={() => alert(data.name + ' · ' + (data.note || '暂无跟进记录'))} />;
+}
+
+export function AcceptanceCustomerCard({ data, error, selection, onOpen }: {
+  data: { name: string; note: string; tags: string[]; status: string };
+  error?: boolean;
+  selection?: React.ReactNode;
+  onOpen: () => void;
+}) {
+  return <article className="card relative flex min-h-44 flex-col p-4" aria-label={`${data.name}客户卡片`}>
+    {selection && <div className="absolute left-4 top-4">{selection}</div>}
+    <div className={selection ? "ml-7 flex flex-1 flex-col" : "flex flex-1 flex-col"}>
     <div className="flex min-w-0 items-start gap-3">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-100 text-sm font-semibold text-gray-600">{data.name[0]}</div>
       <div className="min-w-0 flex-1">
@@ -174,8 +184,9 @@ function SampleCard({ kind }: { kind: 'normal' | 'long' | 'empty' | 'error' }) {
         </div>
       </div>
     </div>
-    <p className={`mt-4 min-h-10 break-words rounded-md p-2 text-xs leading-5 ${kind === 'error' ? 'acceptance-error-note' : 'bg-gray-50 text-gray-600'}`}>{data.note || '暂无跟进记录'}</p>
-    <button type="button" className="mt-3 inline-flex items-center gap-1 self-start text-xs font-medium text-gray-700 hover:underline" onClick={() => alert('验收样板：此处不连接真实客户资料。')}>查看示例 <ChevronRight size={13} /></button>
+    <p className={`mt-4 min-h-10 break-words rounded-md p-2 text-xs leading-5 ${error ? 'acceptance-error-note' : 'bg-gray-50 text-gray-600'}`}>{data.note || '暂无跟进记录'}</p>
+    <button type="button" className="mt-3 inline-flex items-center gap-1 self-start text-xs font-medium text-gray-700 hover:underline" onClick={onOpen}>查看资料 <ChevronRight size={13} /></button>
+    </div>
   </article>;
 }
 
@@ -290,7 +301,7 @@ export function ComponentAcceptancePage() {
       <Section id="tags" title="标签" source="全部联系人卡片的浅灰标签" suggestion="普通、长文案和错误使用同一填充形状；辅助色仅区分种类，待核对和临期仍写清具体含义。"><div className="grid gap-4 sm:grid-cols-4"><div><StateLabel>正常</StateLabel><AcceptanceTag tone="green">成交客户</AcceptanceTag></div><div className="min-w-0"><StateLabel>长内容</StateLabel><AcceptanceTag tone="violet">需要补充投保人与被保人关系说明</AcceptanceTag></div><div><StateLabel>空值</StateLabel><span className="text-xs text-gray-400">暂无标签</span></div><div><StateLabel>错误</StateLabel><AcceptanceTag tone="rose">资料待核对</AcceptanceTag></div></div></Section>
       <Section id="cards" title="客户卡片" source="全部联系人网格卡片 + 当前工作台的 ContactCard" suggestion="上方并排展示现行工作台结构与候选样式，明确二者不同；候选把过小的 9–10px 内容提升到 12px，并允许长备注换行。确认前不替换运行页面。">
         <div className="mb-5 grid gap-3 sm:grid-cols-2"><div><StateLabel>现行跟进工作台结构 · 静态参考</StateLabel><CurrentWorkbenchCard /></div><div><StateLabel>候选客户卡片 · 待确认</StateLabel><SampleCard kind="normal" /></div></div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{(['normal','long','empty','error'] as const).map(kind => <div key={kind} className="min-w-0"><StateLabel>{({normal:'正常',long:'长内容',empty:'空值',error:'资料待核对'} as const)[kind]}</StateLabel><SampleCard kind={kind} /></div>)}</div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{(['normal','long','empty'] as const).map(kind => <div key={kind} className="min-w-0"><StateLabel>{({normal:'正常',long:'长内容',empty:'空值'} as const)[kind]}</StateLabel><SampleCard kind={kind} /></div>)}</div>
       </Section>
       <Section id="table" title="保单表格" source="保单管理展开后的真实 table" suggestion="保留浅灰表头与轻分割；减少逐字竖排，缺失值写“待补充”，手机只在表格内部横向滚动。"><PolicyTable onDetail={openModal} /></Section>
       <Section id="modal" title="弹窗" source="新增联系人弹窗的遮罩、标题行、双栏表单" suggestion="标题和关闭保持同一行；只滚动正文，底部操作固定。可测试必填错误、长内容滚动、保存和关闭。"><div className="flex flex-wrap gap-2"><button className="btn btn-primary text-sm" onClick={() => openModal()}>打开空值弹窗</button><button className="btn btn-secondary text-sm" onClick={() => openModal(samplePolicies[1])}>打开长保单示例</button></div></Section>

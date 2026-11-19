@@ -1,3 +1,7 @@
+import { createPortal } from 'react-dom';
+import { DialogFooterContext } from './WorkspaceDialog';
+import PolicyPaymentSummary, { formatMoney } from './PolicyPaymentSummary';
+import { Edit2, Save } from 'lucide-react';
 import type { Contact } from "../types";
 import React, { useState } from "react";
 import { ManagedPolicy, nextPayment } from "../services/renewal";
@@ -7,26 +11,31 @@ export default function PolicyDetail({
   busy,
   onSave,
   onMark,
+  onDirtyChange,
 }: {
   policy: ManagedPolicy;
   contacts: Contact[];
   busy: boolean;
   onSave: (p: ManagedPolicy) => Promise<boolean>;
   onMark: (date: string) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
+  const footer = React.useContext(DialogFooterContext);
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(policy),
     [saved, setSaved] = useState(false);
   React.useEffect(() => setDraft(policy), [policy]);
-  const next = nextPayment(draft);
+  React.useEffect(() => { onDirtyChange?.(editing && JSON.stringify(draft) !== JSON.stringify(policy)); }, [draft, policy, editing, onDirtyChange]);
   const fields: [keyof ManagedPolicy, string, string?][] = [
     ["productName", "产品名称"],
+    ["applicant", "投保人"],
+    ["insured", "被保人"],
     ["company", "保险公司"],
     ["policyNumber", "保单号"],
     ["applicationNumber", "投保单号"],
     ["status", "保单状态"],
     ["premium", "保费"],
-    ["applicant", "投保人"],
-    ["insured", "被保人"],
+
     ["effectiveDate", "生效日期", "date"],
     ["paymentFrequency", "缴费方式"],
     ["paymentYears", "缴费期间"],
@@ -38,10 +47,22 @@ export default function PolicyDetail({
   ];
   return (
     <>
-      
-      <p className="text-xs text-gray-400 mt-1 mb-5">
-        缴费期限与保障期限分别记录；空缺信息可按保单补充。
-      </p>
+
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div><h3 className="text-sm font-semibold">{policy.productName || '保单信息'}</h3><p className="mt-1 text-xs text-gray-500">{policy.policyNumber}</p></div>
+        {!editing && <button className="btn btn-secondary text-sm" onClick={() => setEditing(true)}><Edit2 size={16}/>编辑资料</button>}
+      </div>
+      <section className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <h4 className="mb-2 text-xs font-medium text-gray-500">下一次缴费</h4>
+        <PolicyPaymentSummary policy={policy}/>
+      </section>
+      {!editing && <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+        {fields.filter(([key]) => !['productName','policyNumber'].includes(key)).map(([key,label]) => <div key={key}>
+          <dt className="text-xs text-gray-500">{label}</dt>
+          <dd className="mt-1 break-words text-sm">{key === 'premium' ? formatMoney(policy[key]) : String(policy[key] ?? '') || '待补充'}</dd>
+        </div>)}
+      </dl>}
+      {editing && <>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
         {fields.map(([k, label, type]) => (
           <label key={k} className="text-xs text-gray-600">
@@ -83,7 +104,7 @@ export default function PolicyDetail({
                 ].includes(k) && Boolean(policy[k])}
                 className="input mt-1.5 read-only:bg-gray-50"
                 type={type || "text"}
-                value={String(draft[k] || "")}
+                value={k === 'premium' && draft[k] === policy[k] && String(draft[k] ?? '').trim() !== '' && Number.isFinite(Number(draft[k])) ? Number(draft[k]).toFixed(2) : String(draft[k] ?? "")}
                 placeholder={
                   k === "paymentYears"
                     ? "例如：20年"
@@ -104,41 +125,31 @@ export default function PolicyDetail({
           </label>
         ))}
       </div>
-      <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
-        <h4 className="text-sm font-semibold">下一次缴费</h4>
-        {next ? (
-          <p className="mt-2">
-            {next.date}　¥ {next.amount}　
-            {next.estimated ? "预计（按缴费周期推算）" : "来自应缴明细"}
-          </p>
-        ) : (
-          <p className="text-gray-500 mt-2">
-            暂无待缴记录；如仍在缴费期间，请补齐缴费方式和缴费期限。
-          </p>
-        )}
-      </div>
-      <div className="flex justify-end gap-3 mt-5 items-center">
+      {footer && createPortal(<div className="flex justify-end gap-3 border-t border-gray-100 bg-white px-5 py-4 items-center">
         <span className="text-xs text-gray-500">{saved ? "已保存" : ""}</span>
+        <button className="btn btn-secondary text-sm" disabled={busy} onClick={() => { setDraft(policy); setEditing(false); }}>取消</button>
         <button
           disabled={busy}
           className="btn btn-primary text-sm"
           onClick={async () => {
-            if (await onSave(draft)) setSaved(true);
+            if (await onSave(draft)) { setSaved(true); setEditing(false); }
           }}
         >
-          保存保单信息
+          <Save size={16}/> {busy ? "正在保存…" : "保存保单信息"}
         </button>
-      </div>
+      </div>, footer)}
+      </>}
+      {saved && !editing && <p role="status" className="mt-3 text-sm text-gray-600">保单资料已保存</p>}
       <details className="mt-6 border-t border-gray-100 pt-4" open>
         <summary className="font-medium cursor-pointer">
           缴费历史（{policy.payments.length}期）
         </summary>
         <div className="overflow-auto mt-3">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[520px] text-sm">
             <thead className="bg-gray-50 text-xs text-gray-500">
               <tr>
                 <th className="p-3 text-left">应缴日期</th>
-                <th className="p-3 text-left">金额</th>
+                <th className="p-3 text-right">金额</th>
                 <th className="p-3 text-left">缴费状态</th>
                 <th className="p-3 text-right">操作</th>
               </tr>
@@ -149,8 +160,8 @@ export default function PolicyDetail({
                 .map((q) => (
                   <React.Fragment key={q.date}>
                     <tr className="border-b border-gray-100">
-                      <td className="p-3">{q.date}</td>
-                      <td className="p-3">¥ {q.amount}</td>
+                      <td className="p-3 whitespace-nowrap">{q.date}</td>
+                      <td className="p-3 whitespace-nowrap text-right tabular-nums">{formatMoney(q.amount)}</td>
                       <td className="p-3">{q.status}</td>
                       <td className="p-3 text-right">
                         <button

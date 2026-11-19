@@ -1,3 +1,4 @@
+import CustomerTags from './CustomerTags';
 import React, { useState } from 'react';
 import { Contact } from '../types';
 import { Search, Tag, User, Edit2, Trash2, CheckSquare, Square, ShoppingBag, X, LayoutGrid, List, ChevronRight, Target, ChevronDown, ChevronUp, Copy, Check, Briefcase, Clock, CheckCircle2 } from 'lucide-react';
@@ -132,13 +133,13 @@ export const ContactList: React.FC<ContactListProps> = ({
               <div className="hidden sm:flex bg-gray-100 rounded-md p-0.5">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-1 rounded transition-all duration-150 ${viewMode === 'grid' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                  className={`p-1 rounded transition-colors duration-150 ${viewMode === 'grid' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
                 >
                   <LayoutGrid size={13} />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-1 rounded transition-all duration-150 ${viewMode === 'list' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                  className={`p-1 rounded transition-colors duration-150 ${viewMode === 'list' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
                 >
                   <List size={13} />
                 </button>
@@ -146,25 +147,25 @@ export const ContactList: React.FC<ContactListProps> = ({
               <div className="hidden md:flex items-center gap-1 bg-gray-100 rounded-md p-0.5">
                 <button
                   onClick={() => handleFollowUpFilterChange(null)}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${localFollowUpFilter === null && followUpFilter === null ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${localFollowUpFilter === null && followUpFilter === null ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   全部
                 </button>
                 <button
                   onClick={() => handleFollowUpFilterChange('following')}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${localFollowUpFilter === 'following' || followUpFilter === 'following' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${localFollowUpFilter === 'following' || followUpFilter === 'following' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   跟进中
                 </button>
                 <button
                   onClick={() => handleFollowUpFilterChange('contacted')}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${localFollowUpFilter === 'contacted' || followUpFilter === 'contacted' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${localFollowUpFilter === 'contacted' || followUpFilter === 'contacted' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   已沟通
                 </button>
                 <button
                   onClick={() => handleFollowUpFilterChange('idle')}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${localFollowUpFilter === 'idle' || followUpFilter === 'idle' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${localFollowUpFilter === 'idle' || followUpFilter === 'idle' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   暂未跟进
                 </button>
@@ -179,7 +180,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                 placeholder="搜索联系人..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-white focus:bg-white focus:outline-none transition-all text-xs"
+                className="w-full pl-8 pr-3 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-white focus:bg-white focus:outline-none transition-colors text-xs"
               />
             </div>
           }
@@ -198,7 +199,7 @@ export const ContactList: React.FC<ContactListProps> = ({
             {(searchTerm || filterTags.size > 0) && (
               <button
                 onClick={handleClearFilters}
-                className="mt-3 px-3 py-1.5 border border-gray-200 text-gray-500 text-xs font-medium rounded-md hover:bg-gray-50 transition-all cursor-pointer"
+                className="mt-3 px-3 py-1.5 border border-gray-200 text-gray-500 text-xs font-medium rounded-md hover:bg-gray-50 transition-colors cursor-pointer"
               >
                 清除筛选
               </button>
@@ -219,7 +220,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                   return (
                     <div
                       key={contact.id}
-                      className={`group bg-white border rounded-lg transition-all duration-150 flex flex-col cursor-pointer relative
+                      className={`group bg-white border rounded-lg transition-colors duration-150 flex flex-col cursor-pointer relative
                         ${isSelected
                           ? 'border-gray-400'
                           : 'border-gray-100 hover:border-gray-200'}`}
@@ -228,14 +229,14 @@ export const ContactList: React.FC<ContactListProps> = ({
                       <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
                         <button
                           onClick={(e) => { e.stopPropagation(); onDelete(contact.id); }}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all cursor-pointer opacity-0 group-hover:opacity-100"
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
                           title="删除"
                         >
                           <Trash2 size={12} />
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); onToggleSelect(contact.id); }}
-                          className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
+                          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
                             isSelected
                               ? 'bg-gray-900 border-gray-900 text-white'
                               : 'bg-white border-gray-300 text-transparent hover:border-gray-400'
@@ -244,7 +245,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                           <Check size={12} strokeWidth={3} />
                         </button>
                       </div>
-                      <div className="p-2.5 flex items-start gap-3">
+                      <div className="p-4 flex items-start gap-3 pr-14">
                         <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 font-semibold text-sm shrink-0">
                           {contact.remarkName ? contact.remarkName[0] : (contact.nickname ? contact.nickname[0] : '?')}
                         </div>
@@ -258,7 +259,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                               className="mt-1 flex items-center gap-1 cursor-pointer w-fit"
                               onClick={(e) => handleCopyWxid(e, contact.wxid)}
                             >
-                              <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1 py-0.5 rounded">
+                              <span className="text-xs font-mono text-gray-500 bg-gray-100 px-1 py-0.5 rounded">
                                 {contact.wxid}
                               </span>
                               {copiedWxid === contact.wxid ? (
@@ -269,30 +270,23 @@ export const ContactList: React.FC<ContactListProps> = ({
                             </div>
                           )}
 
+                          <CustomerTags tags={contact.tags}/>
                           <div className="flex flex-wrap gap-1 mt-1.5">
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium ${
-                              contact.followUpStatus === 'following' ? 'bg-blue-100 text-blue-700' :
-                              contact.followUpStatus === 'contacted' ? 'bg-green-100 text-green-700' :
-                              'bg-gray-100 text-gray-600'
-                            }`}>
-                              {contact.followUpStatus === 'following' ? '跟进中' :
-                               contact.followUpStatus === 'contacted' ? '已沟通' :
-                               '暂未跟进'}
-                            </span>
+                            {contact.followUpStatus === 'following' && <span className="follow-status"><span/>跟进中</span>}
                           </div>
                         </div>
                       </div>
 
-                      <div className="px-2.5 pb-2">
+                      <div className="px-4 pb-4">
                         <div className="bg-gray-50 rounded-md p-2 flex flex-col gap-1">
                           <div className="flex items-start gap-1.5">
                             <div className="p-0.5 rounded bg-gray-200 text-gray-600 mt-0.5 shrink-0">
                               <Briefcase size={9} strokeWidth={2.5} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <span className="text-[9px] font-medium text-gray-500">进展</span>
-                              <p className="text-[10px] text-gray-600 line-clamp-1 leading-relaxed mt-0.5">
-                                {latestProgress ? latestProgress.content : <span className="text-gray-400 italic">暂无</span>}
+                              <span className="text-xs font-medium text-gray-500">进展</span>
+                              <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed mt-0.5">
+                                {latestProgress ? latestProgress.content : <span className="text-gray-400">暂无</span>}
                               </p>
                             </div>
                           </div>
@@ -306,7 +300,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                                   </div>
                                   <div className="flex flex-wrap gap-1">
                                     {contact.dealProducts.map(p => (
-                                      <span key={p} className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded">
+                                      <span key={p} className="text-xs font-medium px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded">
                                         {p}
                                       </span>
                                     ))}
@@ -321,7 +315,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                                   </div>
                                   <div className="flex flex-wrap gap-1">
                                     {contact.intentProducts.map(p => (
-                                      <span key={p} className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded">
+                                      <span key={p} className="text-xs font-medium px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded">
                                         {p}
                                       </span>
                                     ))}
@@ -336,13 +330,13 @@ export const ContactList: React.FC<ContactListProps> = ({
                       <div className="px-4 py-3 mt-auto border-t border-gray-50">
                         {contact.remarkInfo ? (
                           <div className="relative">
-                            <p className={`text-sm text-gray-500 italic pl-2 border-l border-gray-200 ${isRemarkExpanded ? '' : 'line-clamp-2'}`}>
+                            <p className={`text-sm text-gray-500 pl-2 border-l border-gray-200 ${isRemarkExpanded ? '' : 'line-clamp-2'}`}>
                               {contact.remarkInfo}
                             </p>
                             {hasLongRemark && (
                               <button
                                 onClick={(e) => toggleRemarkExpand(contact.id, e)}
-                                className="mt-1.5 flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-gray-900 transition-colors cursor-pointer"
+                                className="mt-1.5 flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors cursor-pointer"
                               >
                                 {isRemarkExpanded ? (
                                   <>收起 <ChevronUp size={10} /></>
@@ -364,7 +358,7 @@ export const ContactList: React.FC<ContactListProps> = ({
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 text-gray-500 text-xs font-semibold uppercase tracking-wider border-b border-gray-200">
+                    <tr className="bg-gray-50 text-gray-500 text-xs font-semibold  border-b border-gray-200">
                       <th className="px-4 py-3 w-10 text-center">#</th>
                       <th className="px-4 py-3">联系人</th>
                       <th className="px-4 py-3 hidden md:table-cell">微信号</th>
@@ -390,7 +384,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                           <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => onToggleSelect(contact.id)}
-                              className={`p-1.5 rounded-md transition-all ${isSelected ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-300 hover:text-gray-900 hover:border-gray-400'}`}
+                              className={`p-1.5 rounded-md transition-colors ${isSelected ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-300 hover:text-gray-900 hover:border-gray-400'}`}
                             >
                               {isSelected ? <CheckSquare size={17} /> : <Square size={17} />}
                             </button>
@@ -434,7 +428,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                                 {latestProgress.date && <div className="text-xs text-gray-400 mt-0.5">{latestProgress.date}</div>}
                               </div>
                             ) : (
-                              <span className="text-gray-400 text-xs italic">无记录</span>
+                              <span className="text-gray-400 text-xs">无记录</span>
                             )}
                           </td>
                           <td className="px-4 py-3 hidden lg:table-cell text-gray-600">
@@ -442,14 +436,14 @@ export const ContactList: React.FC<ContactListProps> = ({
                               {contact.dealProducts?.length > 0 && (
                                 <div className="flex flex-wrap gap-1">
                                   {contact.dealProducts.slice(0, 2).map(p => (
-                                    <span key={p} className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100 truncate max-w-[80px]">{p}</span>
+                                    <span key={p} className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100 truncate max-w-[80px]">{p}</span>
                                   ))}
                                 </div>
                               )}
                               {contact.intentProducts?.length > 0 && (
                                 <div className="flex flex-wrap gap-1">
                                   {contact.intentProducts.slice(0, 2).map(p => (
-                                    <span key={p} className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 truncate max-w-[80px]">{p}</span>
+                                    <span key={p} className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 truncate max-w-[80px]">{p}</span>
                                   ))}
                                 </div>
                               )}
@@ -458,15 +452,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                           </td>
                           <td className="px-4 py-3 hidden sm:table-cell">
                             <div className="flex flex-wrap gap-1">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                contact.followUpStatus === 'following' ? 'bg-blue-100 text-blue-700' :
-                                contact.followUpStatus === 'contacted' ? 'bg-green-100 text-green-700' :
-                                'bg-gray-100 text-gray-600'
-                              }`}>
-                                {contact.followUpStatus === 'following' ? '跟进中' :
-                                 contact.followUpStatus === 'contacted' ? '已沟通' :
-                                 '暂未跟进'}
-                              </span>
+                              {contact.followUpStatus === 'following' && <span className="follow-status"><span/>跟进中</span>}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-right">
@@ -492,7 +478,7 @@ export const ContactList: React.FC<ContactListProps> = ({
 
       {isSelectionMode && (
         <div className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 bg-white border border-gray-200 shadow-lg rounded-lg px-3 py-2 flex items-center gap-2 z-50 max-w-[90vw] sm:max-w-none">
-          <div className="px-2 py-1 bg-gray-900 rounded text-[10px] font-medium text-white whitespace-nowrap">
+          <div className="px-2 py-1 text-xs font-medium text-blue-700 whitespace-nowrap">
             {selectedIds.size} 已选
           </div>
 
@@ -500,14 +486,14 @@ export const ContactList: React.FC<ContactListProps> = ({
 
           <button
             onClick={onBatchAddTag}
-            className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
           >
             <Tag size={10} />
             <span>加标签</span>
           </button>
           <button
             onClick={onBatchRemoveTag}
-            className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
           >
             <Tag size={10} />
             <span>减标签</span>
@@ -518,7 +504,7 @@ export const ContactList: React.FC<ContactListProps> = ({
           <div className="relative">
             <button
               onClick={() => setShowBatchStatusMenu(!showBatchStatusMenu)}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
             >
               <Clock size={10} />
               <span>跟进状态</span>
@@ -551,7 +537,7 @@ export const ContactList: React.FC<ContactListProps> = ({
 
           <button
             onClick={onBatchDelete}
-            className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
           >
             <Trash2 size={10} />
             <span>删除</span>
@@ -559,7 +545,7 @@ export const ContactList: React.FC<ContactListProps> = ({
 
           <button
             onClick={onDeselectAll}
-            className="ml-auto w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-400 transition-all cursor-pointer"
+            className="ml-auto w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-400 transition-colors cursor-pointer"
           >
             <X size={12} />
           </button>

@@ -297,10 +297,11 @@ export function nextPayment(p: ManagedPolicy): Payment | undefined {
     );
     n = Math.floor(n / months);
     candidate = addMonths(p.effectiveDate, n * months);
-    while (candidate <= latest.date) {
-      n++;
-      candidate = addMonths(p.effectiveDate, n * months);
-    }
+    // Payment.date is the imported installment DUE date, never the actual
+    // payment/confirmation timestamp. A conflicting due date needs reconciliation;
+    // do not silently assign it to another contractual installment.
+    if (candidate !== latest.date) return;
+    candidate = addMonths(p.effectiveDate, (n + 1) * months);
   }
   if (candidate >= end) return;
   return {

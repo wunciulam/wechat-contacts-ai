@@ -70,6 +70,7 @@ const applyAutoTags = (contact: Contact): Contact => {
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const App: React.FC = () => {
+  const [policyImportFiles, setPolicyImportFiles] = useState<FileList | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [isLoaded, setIsLoaded] = useState(false);
@@ -1016,6 +1017,8 @@ const App: React.FC = () => {
           case 'policies':
               return (
                   <RenewalWorkspace 
+                     importFiles={policyImportFiles}
+                     onImportConsumed={() => setPolicyImportFiles(null)}
                      onContacts={setContacts}
                      contacts={contacts}
                      filterTags={selectedTags}
@@ -1118,6 +1121,7 @@ const App: React.FC = () => {
 
       {policyContactId && detailPolicyId && <RenewalWorkspace contacts={contacts} onContacts={setContacts} customerId={policyContactId} initialPolicyId={detailPolicyId} onCloseDetail={() => { setPolicyContactId(null); setDetailPolicyId(undefined); }} />}
       <ImportModal 
+        onPolicyImport={files => { setPolicyImportFiles(files); setIsModalOpen(false); setCurrentView('policies'); }}
         relatedPolicies={editingContact ? projectContacts(contacts, migrate(contacts), true).find(c => c.id === editingContact.id)?.policies : []}
         onPolicyDetail={p=>{if(editingContact){setDetailPolicyId(p.id);setPolicyContactId(editingContact.id);}}}
         isOpen={isModalOpen}

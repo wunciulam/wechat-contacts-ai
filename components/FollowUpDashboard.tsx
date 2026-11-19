@@ -141,20 +141,20 @@ const FollowUpDashboard: React.FC<FollowUpDashboardProps> = ({
                           {contact.remarkName || contact.nickname}
                           <ArrowRight size={14} className="opacity-0 group-hover/card:opacity-100 -translate-x-1 group-hover/card:translate-x-0 transition-all text-gray-400 shrink-0"/>
                         </h3>
-                        <div className="text-[9px] md:text-[10px] text-gray-500 font-medium flex items-center gap-1 mt-0.5"><Clock size={12} />{contact.lastDate || '从未'} 更新</div>
+                        <div className="text-xs text-gray-500 font-medium flex items-center gap-1 mt-0.5"><Clock size={12} />{contact.lastDate || '从未'} 更新</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 md:gap-2" onClick={e => e.stopPropagation()}>
                       <button 
                         onClick={() => onUpdateStatus(contact.id, activeTab === 'following' ? 'contacted' : 'following')} 
-                        className="text-[9px] md:text-[10px] font-medium px-2 md:px-3 py-1 md:py-1.5 rounded-md bg-white border border-gray-200 hover:border-gray-300 transition-all flex items-center gap-1 md:gap-1.5 text-gray-700"
+                        className="text-xs font-medium px-2 md:px-3 py-1 md:py-1.5 rounded-md bg-white border border-gray-200 hover:border-gray-300 transition-all flex items-center gap-1 md:gap-1.5 text-gray-700"
                       >
                         {activeTab === 'following' ? <CheckCircle2 size={12} className="text-gray-500 md:w-[14px] md:h-[14px]" strokeWidth={2.5} /> : <Clock size={12} className="text-gray-500 md:w-[14px] md:h-[14px]" strokeWidth={2.5} />}
                         {activeTab === 'following' ? '移到已沟通' : '重新开始跟进'}
                       </button>
                       <button 
                         onClick={() => onAddProgress(contact.id)} 
-                        className="text-[9px] md:text-[10px] font-medium text-white bg-gray-900 hover:bg-gray-800 px-2 md:px-3 py-1 md:py-1.5 rounded-md transition-all flex items-center gap-1"
+                        className="text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 px-2 md:px-3 py-1 md:py-1.5 rounded-md transition-all flex items-center gap-1"
                       >
                         <Plus size={12} className="md:w-[14px] md:h-[14px]" strokeWidth={2.5} />写记录
                       </button>
@@ -172,7 +172,7 @@ const FollowUpDashboard: React.FC<FollowUpDashboardProps> = ({
                       <div className="space-y-3">
                          <div className="flex items-center gap-2">
                             <div className="h-px bg-gray-100 flex-1"></div>
-                            <span className="text-[9px] font-medium text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded">{latestDateGroup[0]}</span>
+                            <span className="text-xs font-medium text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded">{latestDateGroup[0]}</span>
                             <div className="h-px bg-gray-100 flex-1"></div>
                          </div>
                          <div className="space-y-2">
@@ -218,7 +218,7 @@ const FollowUpDashboard: React.FC<FollowUpDashboardProps> = ({
                         {!isExpanded ? (
                           <button 
                             onClick={() => toggleHistory(contact.id)}
-                            className="w-full py-2 flex items-center justify-center gap-2 text-[10px] font-medium text-gray-400 hover:text-gray-900 transition-all bg-gray-50 hover:bg-gray-100 rounded-md border border-dashed border-gray-200"
+                            className="w-full py-2 flex items-center justify-center gap-2 text-xs font-medium text-gray-400 hover:text-gray-900 transition-all bg-gray-50 hover:bg-gray-100 rounded-md border border-dashed border-gray-200"
                           >
                             <ChevronDown size={12} strokeWidth={3} />
                             查看历史跟进记录 ({olderDateGroups.reduce((acc, curr) => acc + curr[1].length, 0)} 条)
@@ -230,7 +230,7 @@ const FollowUpDashboard: React.FC<FollowUpDashboardProps> = ({
                                 <div key={date} className="space-y-3 opacity-80 hover:opacity-100 transition-opacity">
                                    <div className="flex items-center gap-2">
                                       <div className="h-px bg-gray-50 flex-1"></div>
-                                      <span className="text-[9px] font-medium text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded">{date}</span>
+                                      <span className="text-xs font-medium text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded">{date}</span>
                                       <div className="h-px bg-gray-50 flex-1"></div>
                                    </div>
                                    <div className="space-y-2">
@@ -273,7 +273,7 @@ const FollowUpDashboard: React.FC<FollowUpDashboardProps> = ({
                             </div>
                             <button 
                               onClick={() => toggleHistory(contact.id)}
-                              className="w-full py-2 flex items-center justify-center gap-2 text-[10px] font-medium text-gray-400 hover:text-gray-900 transition-all bg-gray-100 rounded-md"
+                              className="w-full py-2 flex items-center justify-center gap-2 text-xs font-medium text-gray-400 hover:text-gray-900 transition-all bg-gray-100 rounded-md"
                             >
                               <ChevronUp size={12} strokeWidth={3} />
                               收起历史记录

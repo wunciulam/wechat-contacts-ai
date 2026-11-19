@@ -1,10 +1,13 @@
+import WorkspaceDialog from './WorkspaceDialog';
+import PolicyPaymentSummary, { PaymentDate, formatMoney } from './PolicyPaymentSummary';
+import { ArrowLeft, Settings } from 'lucide-react';
 import PolicyDashboard from "./PolicyDashboard";
 import { PageHeader } from "./PageHeader";
 import PolicyDetail from "./PolicyDetail";
 import { saveImport } from "../services/renewalStorage";
 import React, { useEffect, useState } from "react";
 import { Contact } from "../types";
-import { supabase, saveToCloud } from "../services/supabaseService";
+import { getRenewalSnapshot, hasFreshRenewalSnapshot, loadRenewalSnapshot, rememberRenewalSnapshot, subscribeRenewalSnapshot } from "../services/renewalCache";
 import {
   RenewalData,
   ManagedPolicy,
@@ -24,6 +27,8 @@ import {
 const btn = "btn btn-secondary text-sm";
 export default function RenewalWorkspace({
   contacts,
+  importFiles,
+  onImportConsumed,
   onContacts,
   customerId,
   initialPolicyId,
@@ -31,6 +36,8 @@ export default function RenewalWorkspace({
   ...dashboardProps
 }: {
   contacts: Contact[];
+  importFiles?: FileList | null;
+  onImportConsumed?: () => void;
   onContacts: (c: Contact[]) => void;
   customerId?: string;
   initialPolicyId?: string;
@@ -42,6 +49,7 @@ export default function RenewalWorkspace({
   onBatchDeleteContacts?: (ids: string[]) => void;
   onDeletePolicy?: (contactId: string, policyId: string) => void;
 }) {
+  const [detailDirty, setDetailDirty] = useState(false);
   const [remindersOpen, setRemindersOpen] = useState(Boolean(customerId));
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [mailReady, setMailReady] = useState(false);
@@ -51,7 +59,16 @@ export default function RenewalWorkspace({
       .then((x) => setMailReady(x.configured === true))
       .catch(() => {});
   }, []);
-  const [data, setData] = useState<RenewalData | null>(null),
+  const contactsRef = React.useRef(contacts);
+  contactsRef.current = contacts;
+  const [syncing, setSyncing] = useState(!hasFreshRenewalSnapshot());
+  const [syncError, setSyncError] = useState("");
+  const [cloudReady, setCloudReady] = useState(hasFreshRenewalSnapshot());
+  const [retry, setRetry] = useState(0);
+  const [data, setData] = useState<RenewalData>(() => {
+    const cached = getRenewalSnapshot();
+    return { ...(cached || emptyData), policies: mergePolicies(cached?.policies || [], migrate(contacts)) };
+  }),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [modal, setModal] = useState(""),
@@ -64,45 +81,48 @@ export default function RenewalWorkspace({
     [settings, setSettings] = useState(emptyData.settings),
     [links, setLinks] = useState<Record<string, string>>({});
   useEffect(() => {
-    Promise.resolve(
-      supabase
-        .from("app_data")
-        .select("data")
-        .eq("app_id", import.meta.env.VITE_APP_ID)
-        .eq("data_type", "renewal_v1")
-        .maybeSingle(),
-    )
-      .then(({ data: row, error }) => {
-        if (error) throw error;
-        setData(
-          row?.data
-            ? {
-                ...row.data,
-                policies: mergePolicies(row.data.policies, migrate(contacts)),
-              }
-            : { ...emptyData, policies: migrate(contacts) },
-        );
-      })
-      .catch((e) => setError(String(e)));
-  }, []);
+    let active = true;
+    const apply = (loaded: RenewalData) => {
+      if (!active) return;
+      setData({ ...loaded, policies: mergePolicies(loaded.policies, migrate(contactsRef.current)) });
+      setCloudReady(true);
+      setSyncError("");
+    };
+    const unsubscribe = subscribeRenewalSnapshot(apply);
+    const fresh = retry === 0 && hasFreshRenewalSnapshot();
+    setSyncing(!fresh);
+    setCloudReady(fresh);
+    loadRenewalSnapshot(retry > 0).then(apply).catch(() => {
+      if (active) {
+        setCloudReady(false);
+        setSyncError("续期数据同步失败，当前显示已读取的保单。");
+      }
+    }).finally(() => { if (active) setSyncing(false); });
+    return () => { active = false; unsubscribe(); };
+  }, [retry]);
   useEffect(() => {
     setData(current => current ? { ...current, policies: mergePolicies(current.policies, migrate(contacts)) } : current);
   }, [contacts]);
   useEffect(() => {
-    if (data && initialPolicyId) {
+    if (data && initialPolicyId && !detailDirty) {
       const p = data.policies.find((x) => x.id === initialPolicyId);
       if (p) {
         setSelected(p);
         setModal("detail");
       }
     }
-  }, [Boolean(data), initialPolicyId]);
+  }, [data, initialPolicyId, detailDirty]);
   async function persist(next: RenewalData, baseContacts = contacts) {
+    if (!cloudReady) {
+      setError("请先完成续期数据同步，再保存修改。");
+      return false;
+    }
     setBusy(true);
     setError("");
     try {
       const projected = projectContacts(baseContacts, next.policies);
       await saveImport(next, projected);
+      rememberRenewalSnapshot(next);
       onContacts(projected);
       setData(next);
       return true;
@@ -113,6 +133,12 @@ export default function RenewalWorkspace({
       setBusy(false);
     }
   }
+  useEffect(() => {
+    if (!importFiles) return;
+    void upload(importFiles);
+    onImportConsumed?.();
+  }, [importFiles]);
+
   async function upload(list: FileList | null) {
     if (!list) return;
     setBusy(true);
@@ -214,7 +240,7 @@ export default function RenewalWorkspace({
               remarkName: p[role],
               nickname: p[role],
               wxid: "",
-              remarkInfo: "明亚保单导入",
+              remarkInfo: "保单表格导入",
               tags: [],
               addedAt: Date.now(),
               dealProducts: [],
@@ -257,7 +283,9 @@ export default function RenewalWorkspace({
     }
     setBusy(true);
     try {
+      if (!cloudReady) throw new Error("请先完成续期数据同步，再确认导入。");
       await saveImport(next, cs);
+      rememberRenewalSnapshot(next);
       setData(next);
       onContacts(cs);
       setModal("done");
@@ -308,21 +336,27 @@ export default function RenewalWorkspace({
     }
     return false;
   }
+  const syncStatus = syncing || syncError ? (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-5 py-3 text-sm text-gray-600" role="status">
+      <span>{syncing ? "正在同步续期数据…" : syncError}</span>
+      {syncError && <button className="btn btn-secondary btn-sm" disabled={syncing} onClick={() => setRetry(n => n + 1)}>重新同步</button>}
+    </div>
+  ) : null;
   if (onCloseDetail) {
     const policy = selected || data?.policies.find(p => p.id === initialPolicyId);
-    return <div className="fixed inset-0 bg-black/30 z-[100] flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-lg overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0"><h3 className="text-lg font-semibold">保单详情</h3><button className={btn} onClick={onCloseDetail}>关闭</button></div>
-        <div className="overflow-auto p-5 md:p-6">
+    return <WorkspaceDialog title="保单详情" onClose={() => {
+      if (busy) return;
+      if (detailDirty && !window.confirm('资料尚未保存，确认放弃修改？')) return;
+      onCloseDetail();
+    }}>
+          {syncStatus}
           {error && <p role="alert" className="text-red-600 mb-3">{error}</p>}
-          {!data ? <p>正在读取保单…</p> : !policy ? <p>未找到这份保单，请关闭后重新打开。</p> : <PolicyDetail policy={policy} contacts={contacts} busy={busy} onMark={date => mark(policy, "payment", date)} onSave={async p => {
+          {!data ? <p>正在读取保单…</p> : !policy ? <p>未找到这份保单，请关闭后重新打开。</p> : <PolicyDetail onDirtyChange={setDetailDirty} policy={policy} contacts={contacts} busy={busy} onMark={date => mark(policy, "payment", date)} onSave={async p => {
             if (data.policies.some(x => x.id !== p.id && key(x) === key(p))) { setError("该保单号已存在，请核对。"); return false; }
             const next = {...data, policies: data.policies.map(x => x.id === p.id ? p : x)};
             if (await persist(next)) {setSelected(p); return true;} return false;
           }} />}
-        </div>
-      </div>
-    </div>;
+    </WorkspaceDialog>;
   }
   if (!data)
     return <div className="p-6">{error || "正在读取保单与续费数据…"}</div>;
@@ -356,6 +390,7 @@ export default function RenewalWorkspace({
         accept=".xlsx,.xls"
         onChange={(e) => upload(e.target.files)}
       />
+      {syncStatus}
       {error && !modal && <p role="alert" className="p-4 text-red-600">{error}</p>}
       {!remindersOpen && !customerId ? (
         <PolicyDashboard
@@ -406,7 +441,7 @@ export default function RenewalWorkspace({
                       className={btn}
                       onClick={() => setRemindersOpen(false)}
                     >
-                      返回保单管理
+                      <ArrowLeft size={16}/>返回保单管理
                     </button>
                   )}
                   <button
@@ -416,7 +451,7 @@ export default function RenewalWorkspace({
                       setModal("settings");
                     }}
                   >
-                    通知设置
+                    <Settings size={16}/>通知设置
                   </button>
                 </div>
               }
@@ -436,16 +471,14 @@ export default function RenewalWorkspace({
               ].map(([v, l]) => (
                 <button
                   key={v}
-                  className={btn + " " + (filter === v ? "bg-gray-100" : "")}
+                  aria-pressed={filter === v}
+                  className={btn + " renewal-filter"}
                   onClick={() => setFilter(v)}
                 >
                   {l}
                 </button>
               ))}
             </div>
-            <p className="text-sm text-gray-500">
-              每份保单展示下一次缴费；7天内及逾期天数标红。剩余期数包含当前待缴这一期。
-            </p>
             <input
               className="input"
               placeholder="搜索投保人、被保人、产品或保单号"
@@ -460,7 +493,7 @@ export default function RenewalWorkspace({
             )}
             {filter === "history" ? (
               data.imports.map((h, i) => (
-                <div key={i} className="border rounded p-4">
+                <div key={i} className="rounded-lg border border-gray-200 p-4">
                   <p>
                     {new Date(h.at).toLocaleString()} · {h.count} 条原始记录
                   </p>
@@ -479,25 +512,45 @@ export default function RenewalWorkspace({
                     <button
                       key={p.id}
                       onClick={() => open(p)}
-                      className="w-full text-left p-4 border rounded"
+                      className="w-full rounded-lg border border-gray-200 p-4 text-left text-sm hover:bg-gray-50"
                     >
                       <div className="flex flex-wrap items-center gap-4">
                         <div className="min-w-28"><span className="block text-xs text-gray-400">投保人</span><strong>{p.applicant || "待补充"}</strong></div>
                         <div className="min-w-28"><span className="block text-xs text-gray-400">被保人</span><strong>{p.insured || "待补充"}</strong></div>
                         <div className="flex-1 min-w-56"><span className="block text-xs text-gray-400">保单</span><strong>{p.productName}</strong><span className="ml-2 text-xs text-gray-500">{p.policyNumber}</span></div>
-                        <div className="min-w-36"><span className="block text-xs text-gray-400">下次缴费</span><strong>{nextPayment(p)?.date || "待补充"}</strong>{nextPayment(p)?.estimated && <span className="ml-1 text-xs text-gray-500">预计</span>}{nextPayment(p) && <p className={daysLeft(nextPayment(p)!.date) <= 7 ? "text-red-600 font-medium" : "text-gray-500"}>{daysLabel(nextPayment(p)!.date)}</p>}</div><div className="flex flex-nowrap items-start gap-6 shrink-0"><div><span className="block text-xs text-gray-400">本期应缴</span>¥ {nextPayment(p)?.amount || "—"}</div><div><span className="block text-xs text-gray-400">剩余期数</span>{remainingLabel(p)}</div></div>
+                        <div className="min-w-36"><span className="block text-xs text-gray-400">下次缴费</span><PolicyPaymentSummary policy={p} amount={false}/></div><div className="flex flex-nowrap items-start gap-6 shrink-0"><div><span className="block text-xs text-gray-400">本期应缴</span>{formatMoney(nextPayment(p)?.amount)}</div><div><span className="block text-xs text-gray-400">剩余期数</span>{remainingLabel(p)}</div></div>
                       </div>
                     </button>
                   ))}
               </div>
             ) : (
-              <div className="overflow-auto rounded-lg border border-gray-200">
-                <table className="w-full text-sm">
-                  <thead>
+              <>
+              <div className="space-y-3 sm:hidden">
+                {tasks.map(t => <article key={t.policy.id + t.type} className="rounded-lg border border-gray-200 p-4">
+                  <button className="mb-3 text-left" onClick={() => open(t.policy)}>
+                    <div className="text-sm font-semibold">{t.policy.applicant || '投保人待补充'}</div>
+                    <div className="mt-1 text-sm">{t.policy.productName}</div>
+                    <div className="mt-1 text-xs text-gray-500">{t.policy.policyNumber}</div>
+                  </button>
+                  <PaymentDate date={t.date} estimated={t.estimated}/>
+                  <dl className="my-3 grid grid-cols-2 gap-3 text-sm">
+                    <div><dt className="text-xs text-gray-500">本期应缴</dt><dd className="mt-1 tabular-nums">{formatMoney(t.amount)}</dd></div>
+                    <div><dt className="text-xs text-gray-500">剩余期数</dt><dd className="mt-1">{remainingLabel(t.policy)}</dd></div>
+                  </dl>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {t.type === 'payment' && <button disabled={busy} className="btn btn-secondary btn-sm" onClick={() => mark(t.policy,'contact',t.date)}>{t.policy.payments.find(p => p.date === t.date)?.contactedAt ? '已联系' : '标记已联系'}</button>}
+                    <button disabled={busy} className="btn btn-primary btn-sm" onClick={() => {setSelected(t.policy);setModal(t.type === 'payment' ? 'paid:' + t.date : 'renewed');}}>确认{t.type === 'payment' ? '已缴费' : '已续保'}</button>
+                  </div>
+                </article>)}
+                {!tasks.length && <p className="py-8 text-center text-sm text-gray-500">暂无已知的30天内待缴记录</p>}
+              </div>
+              <div className="hidden sm:block overflow-auto rounded-lg border border-gray-200">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead className="table-header">
                     <tr>
                       {["客户 / 保单", "剩余期数", "下次缴费 / 本期应缴", "操作"].map(
                         (x) => (
-                          <th key={x} className="text-left p-3 border-b">
+                          <th key={x} className="text-left p-3 border-b border-gray-100">
                             {x}
                           </th>
                         ),
@@ -506,7 +559,7 @@ export default function RenewalWorkspace({
                   </thead>
                   <tbody>
                     {tasks.map((t) => (
-                      <tr key={t.policy.id + t.type} className="border-b">
+                      <tr key={t.policy.id + t.type} className="border-b border-gray-100">
                         <td className="p-3">
                           <button
                             onClick={() => open(t.policy)}
@@ -522,12 +575,9 @@ export default function RenewalWorkspace({
                         <td className="p-3">
                           {remainingLabel(t.policy)}
                         </td>
-                        <td className={t.date < today() ? "text-red-600" : ""}>
-                          {t.date}
-                          {t.estimated && (
-                            <span className="ml-1 text-gray-400">预计</span>
-                          )}
-                          <p>{t.amount && `¥ ${t.amount}`}</p><p className={daysLeft(t.date) <= 7 ? "text-red-600 font-medium" : "text-gray-500"}>{daysLabel(t.date)}</p>
+                        <td className="p-3">
+                          <PaymentDate date={t.date} estimated={t.estimated}/>
+                          <div className="mt-2 tabular-nums">{formatMoney(t.amount)}</div>
                         </td>
                         <td>
                           <div className="flex gap-2">
@@ -568,28 +618,26 @@ export default function RenewalWorkspace({
                 </table>
                 {!tasks.length && (
                   <p className="p-10 text-center text-gray-400">
-                    暂无符合条件的待办。可在“全部保单”补充到期日期，或上传应缴明细。
+                    当前没有已知的30天内待缴记录。日期不全的保单请到“全部保单”核对。
                   </p>
                 )}
               </div>
+              </>
             )}
           </div>
         </>
       )}
       {modal && (
-        <div className="fixed inset-0 bg-black/30 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-auto p-5 md:p-6 shadow-lg">
-            {error && (
-              <p role="alert" className="text-red-600 mb-3">
-                {error}
-              </p>
-            )}
-            <div className="sticky -top-5 md:-top-6 z-10 bg-white flex items-center justify-between py-3 border-b border-gray-100 mb-4">
-              <h3 className="text-lg font-semibold">{modal === "detail" ? "保单详情" : modal === "import" ? "导入预览" : ""}</h3>
-              <button className={btn} onClick={() => setModal("")}>
-                关闭
-              </button>
-            </div>
+        <WorkspaceDialog
+          title={modal === 'detail' ? '保单详情' : modal === 'import' ? '导入预览' : modal === 'settings' ? '通知设置' : modal === 'email' ? '邮件预览' : modal === 'done' ? '导入完成' : '确认缴费状态'}
+          compact={modal === 'settings' || modal.startsWith('paid:') || modal === 'renewed'}
+          onClose={() => {
+            if (busy) return;
+            if (detailDirty && modal === 'detail' && !window.confirm('资料尚未保存，确认放弃修改？')) return;
+            setDetailDirty(false);
+            setModal('');
+          }}>
+          {error && <p role="alert" className="mb-3 text-sm text-rose-700">{error}</p>}
             {modal === "import" && (
               <>
                 <p className="my-3">
@@ -602,7 +650,7 @@ export default function RenewalWorkspace({
                   重复保单更新；撤单等状态保留历史并退出提醒。最新导入的同一期缴费状态覆盖人工标记。未出现在表格中的保单不会删除。
                 </p>
                 {pending.map(({ p, role, id }) => (
-                  <div key={id} className="my-3 p-3 border rounded">
+                  <div key={id} className="my-3 rounded-lg border border-gray-200 p-3">
                     <b>{p[role]}</b>（
                     {role === "applicant" ? "投保人" : "被保人"}）
                     <p>
@@ -667,7 +715,7 @@ export default function RenewalWorkspace({
             )}
             {modal === "settings" && (
               <>
-                <h3 className="text-lg font-bold">提醒设置</h3>
+
                 <p className="text-sm text-gray-500 my-3">
                   发送服务接通后，每日汇总未来30天及逾期待办；同一保单只列最新待缴期次。
                 </p>
@@ -754,6 +802,7 @@ export default function RenewalWorkspace({
             )}
             {modal === "detail" && selected && (
               <PolicyDetail
+                onDirtyChange={setDetailDirty}
                 policy={selected}
                 contacts={contacts}
                 busy={busy}
@@ -802,8 +851,7 @@ export default function RenewalWorkspace({
                 </button>
               </>
             )}
-          </div>
-        </div>
+        </WorkspaceDialog>
       )}
     </div>
   );
