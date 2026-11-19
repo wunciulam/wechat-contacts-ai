@@ -34,8 +34,8 @@
   /* 状态色 - 极简 */
   --color-success-500: #16a34a;
   --color-success-600: #15803d;
-  --color-danger-500: #dc2626;
-  --color-danger-600: #b91c1c;
+  --color-danger-500: #e11d48;
+  --color-danger-600: #be123c;
 
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -75,7 +75,7 @@ body {
 
 /* 极简按钮 */
 .btn {
-  @apply inline-flex items-center justify-center gap-1.5 font-medium transition-all duration-150 rounded-md;
+  @apply inline-flex items-center justify-center gap-1.5 font-medium transition-colors duration-150 rounded-md;
   @apply focus:outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-gray-300 focus-visible:outline-offset-1;
   @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
   min-height: 36px;
@@ -112,7 +112,7 @@ body {
   @apply w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-md;
   @apply placeholder:text-gray-400;
   @apply focus:bg-white focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-200;
-  @apply transition-all duration-150;
+  @apply transition-colors duration-150;
   min-height: 38px;
 }
 
@@ -124,7 +124,7 @@ body {
 /* 卡片 - 极简 */
 .card {
   @apply bg-white border border-gray-100 rounded-lg;
-  @apply transition-all duration-150;
+  @apply transition-colors duration-150;
 }
 
 .card:hover {
@@ -299,3 +299,16 @@ body {
 .avatar-bg {
   @apply bg-gray-100 text-gray-600;
 }
+
+
+/* Shared business status and controls */
+.follow-status { @apply inline-flex items-center gap-1.5 text-xs text-gray-500; }
+.follow-status > span { @apply h-1.5 w-1.5 rounded-full bg-blue-500; }
+.tag-urgent { @apply bg-rose-100 text-rose-700; }
+input[type="checkbox"] { accent-color: var(--color-gray-900); }
+select.input { padding-right: 32px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+.workspace-dialog::backdrop { background: rgb(23 23 23 / .5); backdrop-filter: blur(3px); }
+.renewal-filter[aria-pressed="true"] { border-color: var(--color-gray-900); color: var(--color-gray-900); }

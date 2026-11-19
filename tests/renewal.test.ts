@@ -1,0 +1,195 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  mergePolicies,
+  latestPayment,
+  dueItems,
+  parseWorkbook,
+  candidates,
+} from "../services/renewal.ts";
+import * as XLSX from "xlsx";
+const p: any = {
+  id: "p",
+  company: "A",
+  policyNumber: "001",
+  productName: "产品",
+  status: "正式保单",
+  applicant: "甲",
+  insured: "乙",
+  payments: [],
+};
+test("reimport keeps identity and overwrites one installment, retaining audit", () => {
+  const a = {
+    ...p,
+    payments: [
+      { date: "2026-11-01", amount: "20", status: "已缴费" },
+      { date: "2025-11-01", amount: "20", status: "已缴费" },
+    ],
+  };
+  const b = {
+    ...p,
+    id: "other",
+    payments: [{ date: "2026-11-01", amount: "20", status: "未缴费" }],
+  };
+  const [r] = mergePolicies([a], [b, b]);
+  assert.equal(r.id, "p");
+  assert.equal(r.payments.length, 2);
+  assert.equal(latestPayment(r)?.date, "2026-11-01");
+  assert.equal(r.payments[1].history?.length, 1);
+});
+test("only latest unpaid installment; thirty-day window and inactive exclusions", () => {
+  const a = {
+    ...p,
+    payments: [
+      { date: "2025-11-01", amount: "20", status: "未缴费" },
+      { date: "2026-11-01", amount: "20", status: "未缴费" },
+    ],
+  };
+  assert.equal(dueItems([a], "2026-10-22").length, 1);
+  assert.equal(dueItems([a], "2026-01-01").length, 0);
+  assert.equal(dueItems([{ ...a, status: "撤单" }], "2026-10-22").length, 0);
+});
+test("duplicate status headers use policy status, not business category", () => {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    wb,
+    XLSX.utils.aoa_to_sheet([
+      ["保单号", " 保单状态 ", " 保单状态 ", "应缴费时间", "缴费状态"],
+      ["001", "个寿", "正式保单", "2026-11-01", "未缴费"],
+    ]),
+    "表",
+  );
+  const [r] = parseWorkbook(
+    XLSX.write(wb, { type: "array", bookType: "xlsx" }),
+    "test",
+  );
+  assert.equal(r.status, "正式保单");
+  assert.equal(r.payments[0].status, "未缴费");
+});
+test("name alone never auto-merges; contradictory identifiers rejected", () => {
+  const c: any = {
+    id: "a",
+    remarkName: "甲",
+    phoneNumber: "13812345678",
+    idCard: "123456789012345678",
+  };
+  assert.equal(candidates("甲", undefined, undefined, [c])[0].strong, false);
+  assert.equal(
+    candidates("甲", "138****5678", "***1111", [c])[0].strong,
+    false,
+  );
+  assert.equal(candidates("甲", "138****5678", "***5678", [c])[0].strong, true);
+});
+
+test("paid latest installment does not resurrect old unpaid history", () => {
+  assert.equal(
+    latestPayment({
+      ...p,
+      payments: [
+        { date: "2025-11-01", amount: "20", status: "未缴费" },
+        { date: "2026-11-01", amount: "20", status: "已缴费" },
+      ],
+    }),
+    undefined,
+  );
+});
+
+import {
+  nextPayment,
+  addMonths,
+  projectContacts,
+} from "../services/renewal.ts";
+test("annual next payment is estimated and stops at payment term", () => {
+  const a = {
+    ...p,
+    effectiveDate: "2024-02-29",
+    paymentFrequency: "期交-年",
+    paymentYears: "3年",
+    payments: [{ date: "2025-02-28", amount: "100", status: "已缴费" }],
+  };
+  assert.equal(nextPayment(a)?.date, "2026-02-28");
+  assert.equal(nextPayment(a)?.estimated, true);
+  assert.equal(
+    nextPayment({
+      ...a,
+      payments: [{ date: "2026-02-28", amount: "100", status: "已缴费" }],
+    }),
+    undefined,
+  );
+});
+test("month end uses original anchor; explicit due dates win", () => {
+  assert.equal(addMonths("2026-01-31", 1), "2026-02-28");
+  assert.equal(addMonths("2026-01-31", 2), "2026-03-31");
+  const a = {
+    ...p,
+    effectiveDate: "2026-01-31",
+    paymentFrequency: "期交-月",
+    paymentYears: "1年",
+    payments: [{ date: "2026-02-28", amount: "10", status: "已缴费" }],
+  };
+  assert.equal(nextPayment(a)?.date, "2026-03-31");
+  assert.equal(
+    nextPayment({
+      ...a,
+      payments: [{ date: "2026-03-20", amount: "12", status: "未缴费" }],
+    })?.date,
+    "2026-03-20",
+  );
+});
+test("single payment and incomplete term do not invent next date", () => {
+  assert.equal(nextPayment({ ...p, paymentFrequency: "趸交" }), undefined);
+  assert.equal(
+    nextPayment({
+      ...p,
+      paymentFrequency: "期交-年",
+      effectiveDate: "2024-01-01",
+    }),
+    undefined,
+  );
+});
+test("both customer roles project same policy identity", () => {
+  const cs: any = [
+    { id: "a", policies: [] },
+    { id: "b", policies: [] },
+  ];
+  const projected = projectContacts(
+    cs,
+    [{ ...p, applicantId: "a", insuredId: "b" }],
+    true,
+  );
+  assert.equal(projected[0].policies?.[0], projected[1].policies?.[0]);
+});
+
+test("policy numbers with leading zero merge into the existing record", () => {
+  const [merged] = mergePolicies([{...p, policyNumber:"2211805182135", id:"old"}], [{...p, policyNumber:"002211805182135", id:"export", paymentFrequency:"期交-年", payments:[{date:"2026-11-01", amount:"100", status:"未缴费"}]}]);
+  assert.equal(merged.id,"old");
+  assert.equal(merged.payments.length,1);
+  assert.equal(merged.paymentFrequency,"期交-年");
+});
+
+import { remainingInstallments } from '../services/renewal.ts';
+test('remaining installments include current due and stop at payment end', () => {
+  const a = {...p, effectiveDate:'2024-02-29', paymentFrequency:'期交-年', paymentYears:'3年', payments:[{date:'2025-02-28',amount:'100',status:'未缴费'}]};
+  assert.equal(remainingInstallments(a),2);
+  assert.equal(remainingInstallments({...a,payments:[{date:'2025-02-28',amount:'100',status:'已缴费'}]}),1);
+  assert.equal(remainingInstallments({...a,payments:[{date:'2026-02-28',amount:'100',status:'已缴费'}]}),0);
+  assert.equal(remainingInstallments({...a,paymentYears:''}),undefined);
+});
+
+
+test("conflicting paid due date requires reconciliation instead of guessing its installment", () => {
+  const policy = { ...p, effectiveDate: "2024-06-01", paymentFrequency: "期交-年", paymentYears: "10年", payments: [
+    { date: "2025-06-01", amount: "2400", status: "已缴费" },
+    { date: "2026-05-31", amount: "2400", status: "已缴费" },
+  ] };
+  assert.equal(nextPayment(policy), undefined);
+});
+
+
+test("actual confirmation date never moves the contractual next date", () => {
+  const policy = { ...p, effectiveDate: "2024-06-01", paymentFrequency: "期交-年", paymentYears: "10年", payments: [
+    { date: "2026-06-01", confirmedAt: "2026-05-20", amount: "2400", status: "已缴费" },
+  ] };
+  assert.equal(nextPayment(policy)?.date, "2027-06-01");
+  assert.equal(nextPayment({ ...policy, payments: [{ ...policy.payments[0], confirmedAt: "2026-07-10" }] })?.date, "2027-06-01");
+});

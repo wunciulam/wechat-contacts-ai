@@ -4,7 +4,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Category, Contact } from '../types';
 import ContactCard from './ContactCard';
 import * as LucideIcons from 'lucide-react';
-import { Plus, Search, X, UserPlus } from 'lucide-react';
+import { GripVertical, Plus, Search, X, UserPlus } from 'lucide-react';
 
 interface CategoryColumnProps {
   category: Category | null;
@@ -20,6 +20,7 @@ interface CategoryColumnProps {
   availableContacts?: Contact[];
   onFilterClick: () => void;
   isUncategorized?: boolean;
+  dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
 }
 
 const CategoryColumn: React.FC<CategoryColumnProps> = ({
@@ -35,7 +36,8 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
   onQuickCreateContact,
   availableContacts = [],
   onFilterClick,
-  isUncategorized
+  isUncategorized,
+  dragHandleProps
 }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -79,7 +81,7 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
 
   return (
     <div
-      className={`w-72 shrink-0 flex flex-col bg-gray-50 rounded-xl transition-all ${
+      className={`w-72 h-full min-h-0 shrink-0 flex flex-col bg-gray-50 rounded-xl transition-all ${
         isOver || isDropOver ? 'ring-2 ring-gray-900 ring-offset-2' : ''
       }`}
     >
@@ -110,16 +112,28 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
               {count}
             </span>
           </div>
-          {/* 添加联系人按钮 */}
-          {onAddToFollowUp && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setIsAdding(!isAdding); }}
-              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all"
-              title="添加联系人"
-            >
-              <Plus size={16} />
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {dragHandleProps && (
+              <button
+                {...dragHandleProps}
+                onClick={(e) => e.stopPropagation()}
+                className="p-1 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded transition-all cursor-grab active:cursor-grabbing"
+                title="拖拽排序栏目"
+              >
+                <GripVertical size={16} />
+              </button>
+            )}
+            {/* 添加联系人按钮 */}
+            {onAddToFollowUp && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsAdding(!isAdding); }}
+                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all"
+                title="添加联系人"
+              >
+                <Plus size={16} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -180,7 +194,7 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
       {/* Drop Zone */}
       <div
         ref={setNodeRef}
-        className={`flex-1 overflow-y-auto p-2 space-y-2 min-h-[200px] ${
+        className={`flex-1 min-h-0 overflow-y-auto p-2 space-y-2 ${
           isDropOver ? 'bg-gray-100' : ''
         }`}
       >

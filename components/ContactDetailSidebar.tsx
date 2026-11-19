@@ -313,7 +313,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
               
               {/* 快捷键提示 - 仅在聚焦时显示 */}
               {isInputFocused && (
-                <div className="px-3 py-1.5 border-t border-gray-100 bg-gray-50 flex items-center justify-between text-[10px] text-gray-400 animate-in slide-in-from-bottom-1">
+                <div className="px-3 py-1.5 border-t border-gray-100 bg-gray-50 flex items-center justify-between text-xs text-gray-400 animate-in slide-in-from-bottom-1">
                   <span>Enter 发送，Shift+Enter 换行</span>
                   <button
                     onClick={() => setIsInputFocused(false)}
@@ -404,7 +404,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-700">{contact.birthday}</span>
                     {birthdaySoon && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-900 text-white">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-900 text-white">
                         <Gift size={10} />
                         快过生日
                       </span>
@@ -554,7 +554,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                         <td className="px-3 py-2 font-mono text-gray-600 text-xs">{policy.policyNumber || '-'}</td>
                         <td className="px-3 py-2 text-right font-medium text-gray-900">¥ {policy.premium}</td>
                         <td className="px-3 py-2 text-center">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                             policy.status.includes('有效') ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
                           }`}>
                             {policy.status}

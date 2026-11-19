@@ -1,0 +1,27 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import { parseWorkbook, mergePolicies, dueItems, projectContacts, nextPayment } from '../services/renewal.ts';
+const files = process.argv.slice(2);
+assert.equal(files.length, 3, 'Provide the three export files');
+const groups = files.map(file => {
+  const b = readFileSync(file);
+  return parseWorkbook(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength), file);
+});
+const policies = mergePolicies([], groups.flat());
+const again = mergePolicies(policies, groups.flat());
+assert.equal(again.length, policies.length);
+assert.equal(again.reduce((n,p)=>n+p.payments.length,0), policies.reduce((n,p)=>n+p.payments.length,0));
+const sample = policies.find(p=>p.payments.length && p.paymentYears && p.paymentFrequency)!;
+assert.ok(sample, 'Real due export must supply payment terms');
+const old = {...sample, id:'existing-policy', applicantId:'owner', insuredId:'insured', paymentYears:undefined, paymentFrequency:undefined, payments:[], coveragePeriod:'待保单核实'};
+const [updated] = mergePolicies([old], [sample]);
+assert.equal(updated.id,'existing-policy');
+assert.equal(updated.paymentYears,sample.paymentYears);
+assert.equal(updated.paymentFrequency,sample.paymentFrequency);
+assert.equal(updated.coveragePeriod, sample.coveragePeriod || '待保单核实');
+const views = projectContacts([{id:'owner',policies:[old]},{id:'insured',policies:[]}] as any,[updated],true);
+assert.equal(views[0].policies?.length,1);
+assert.equal(views[0].policies?.[0], views[1].policies?.[0]);
+assert.deepEqual(nextPayment(views[0].policies![0] as any),nextPayment(updated));
+assert.equal(dueItems([{...updated,status:'撤单'}],'2026-10-22').length,0);
+console.log(JSON.stringify({rows:groups.map(g=>g.length),policies:policies.length,installments:policies.reduce((n,p)=>n+p.payments.length,0),estimated:policies.filter(p=>nextPayment(p)?.estimated).length,reminders:dueItems(policies,'2026-10-22').length,updateAndReimport:'passed'},null,2));

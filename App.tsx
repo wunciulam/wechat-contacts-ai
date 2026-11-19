@@ -1,3 +1,5 @@
+import { migrate, projectContacts } from './services/renewal';
+import RenewalWorkspace from './components/RenewalWorkspace';
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import { Menu, Users, ClipboardList, FileText, Cloud, CloudOff } from 'lucide-react';
@@ -68,10 +70,13 @@ const applyAutoTags = (contact: Contact): Contact => {
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const App: React.FC = () => {
+  const [policyImportFiles, setPolicyImportFiles] = useState<FileList | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentView, setCurrentView] = useState<'contacts' | 'followups' | 'policies'>('contacts');
+  const [detailPolicyId,setDetailPolicyId]=useState<string | undefined>();
+  const [policyContactId, setPolicyContactId] = useState<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
   // 跟进状态筛选
@@ -378,7 +383,7 @@ const App: React.FC = () => {
       const newContactData = newContactDataArray[0];
       setContacts(prev => prev.map(c => {
         if (c.id === editingContact.id) {
-            const updated = { ...c, ...newContactData };
+            const updated = { ...c, ...newContactData, policies:[...(c.policies||[]),...(newContactData.policies||[]).filter(p=>!c.policies?.some(x=>x.id===p.id))], dealProducts:Array.from(new Set([...(c.dealProducts||[]),...(newContactData.dealProducts||[])])) };
             return applyAutoTags(updated);
         }
         return c;
@@ -937,6 +942,15 @@ const App: React.FC = () => {
     ));
   };
 
+  const handleReorderCategories = (reorderedCategories: Category[]) => {
+    const now = Date.now();
+    setCategories(reorderedCategories.map((category, index) => ({
+      ...category,
+      order: index,
+      updatedAt: now
+    })));
+  };
+
   const handleDeleteCategory = (id: string) => {
     // 删除类目时，将该类目下的联系人移到"无类目"
     setContacts(prev => prev.map(c =>
@@ -953,6 +967,7 @@ const App: React.FC = () => {
 
   const renderContent = () => {
       switch (currentView) {
+
           case 'contacts':
               return (
                   <ContactList 
@@ -995,12 +1010,16 @@ const App: React.FC = () => {
                      onAddToFollowUp={handleAddToFollowUp}
                      onQuickCreateContact={handleQuickCreateContact}
                      onCategoryFilter={setCategoryFilter}
+                     onCategoryReorder={handleReorderCategories}
                      onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
                   />
               );
           case 'policies':
               return (
-                  <PolicyDashboard 
+                  <RenewalWorkspace 
+                     importFiles={policyImportFiles}
+                     onImportConsumed={() => setPolicyImportFiles(null)}
+                     onContacts={setContacts}
                      contacts={contacts}
                      filterTags={selectedTags}
                     followUpFilter={followUpFilter}
@@ -1100,7 +1119,11 @@ const App: React.FC = () => {
         </div>
       </div>
 
+      {policyContactId && detailPolicyId && <RenewalWorkspace contacts={contacts} onContacts={setContacts} customerId={policyContactId} initialPolicyId={detailPolicyId} onCloseDetail={() => { setPolicyContactId(null); setDetailPolicyId(undefined); }} />}
       <ImportModal 
+        onPolicyImport={files => { setPolicyImportFiles(files); setIsModalOpen(false); setCurrentView('policies'); }}
+        relatedPolicies={editingContact ? projectContacts(contacts, migrate(contacts), true).find(c => c.id === editingContact.id)?.policies : []}
+        onPolicyDetail={p=>{if(editingContact){setDetailPolicyId(p.id);setPolicyContactId(editingContact.id);}}}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveContact}
@@ -1148,6 +1171,7 @@ const App: React.FC = () => {
         onAdd={handleAddCategory}
         onUpdate={handleUpdateCategory}
         onDelete={handleDeleteCategory}
+        onReorder={handleReorderCategories}
       />
     </div>
   );
