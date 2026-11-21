@@ -128,7 +128,7 @@
           if (!detail.policyIndexId && !detail.policyId && !detail.policyCode) throw new Error('详情为空');
           if (p.policyIndexId && detail.policyIndexId && p.policyIndexId !== detail.policyIndexId) throw new Error('详情与保单不匹配');
           if (p.policyCode && detail.policyCode && p.policyCode !== detail.policyCode) throw new Error('详情与保单不匹配');
-          entry.detail = detail; detailDone++;
+          entry.detail = detail; entry.detailSource = 'policyCenter/policyInfo'; entry.detailCapturedAt = new Date().toISOString(); detailDone++;
         } catch (error) {
           if (cancelled || /登录/.test(error.message)) throw error;
           failures.push({ 保单号: p.policyCode || '', 标识: entry.key, 原因: error.message });

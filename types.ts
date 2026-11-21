@@ -1,3 +1,4 @@
+import type {MingyaFinancial} from './services/mingyaFinancial';
 
 export interface ProgressRecord {
   id: string;
@@ -9,7 +10,7 @@ export interface ProgressRecord {
 export interface MingyaPerson {
   name: string; idCard: string; phone: string; birthday: string; sex: string; address: string; share: string; order: string;
 }
-export interface MingyaPolicyData {
+export interface MingyaPolicyData extends Partial<MingyaFinancial> {
   key: string; captureId?: string; capturedAt: string; policyId: string; policyIndexId: string; companyId: string;
   currency: string; rawStatus: string; endDate: string; nextPayDate: string; nextPremium: string;
   applicant: MingyaPerson; insureds: MingyaPerson[]; beneficiaries: MingyaPerson[];

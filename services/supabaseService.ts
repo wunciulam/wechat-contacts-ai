@@ -301,25 +301,30 @@ export interface ContactImportSnapshot {
   revision: string;
   contacts: import('../types').Contact[];
   localVersion: string;
+  renewalRevision: string | null;
+  renewalData: import('./renewal').RenewalData;
 }
 
 export const readContactImportSnapshot = async (): Promise<Omit<ContactImportSnapshot, 'localVersion'>> => {
   const appId = configuredAppId || getStoredAppId();
   if (!appId) throw new Error('尚未确定当前数据空间，请先加载客户数据。');
-  const {data,error}=await supabase.from('app_data').select('id,app_id,data,updated_at')
-    .eq('app_id',appId).eq('data_type','contacts').single();
-  if(error||!data||!Array.isArray(data.data))throw new Error('无法读取当前云端客户，请检查网络后重试。');
-  return {id:data.id,appId:data.app_id,revision:data.updated_at,contacts:data.data};
+  const {data,error}=await supabase.from('app_data').select('id,app_id,data_type,data,updated_at')
+    .eq('app_id',appId).in('data_type',['contacts','renewal_v1']);
+  const contacts=data?.find(row=>row.data_type==='contacts'),renewal=data?.find(row=>row.data_type==='renewal_v1');
+  if(error||!contacts||!Array.isArray(contacts.data))throw new Error('无法读取当前云端客户，请检查网络后重试。');
+  return {id:contacts.id,appId:contacts.app_id,revision:contacts.updated_at,contacts:contacts.data,
+    renewalRevision:renewal?.updated_at||null,renewalData:renewal?.data||{policies:[],imports:[],settings:{email:'',time:'09:00',enabled:false}}};
 };
 
-export const commitContactImport = async (snapshot: ContactImportSnapshot, contacts: import('../types').Contact[]): Promise<void> => {
+export const commitContactImport = async (snapshot: ContactImportSnapshot, contacts: import('../types').Contact[], renewalData: import('./renewal').RenewalData): Promise<void> => {
   const appId=configuredAppId||getStoredAppId();
   if(!appId||snapshot.appId!==appId)throw new Error('数据空间已变化，请重新预览导入。');
-  // Compare-and-set prevents overwriting edits made from another device after the preview.
-  const {data,error}=await supabase.from('app_data').update({data:contacts,updated_at:new Date().toISOString()})
-    .eq('id',snapshot.id).eq('app_id',appId).eq('data_type','contacts').eq('updated_at',snapshot.revision).select('id');
-  if(error)throw new Error('导入未保存到云端，请检查网络后重试。');
-  if(data?.length!==1)throw new Error('云端客户已变化，请重新预览后导入。');
+  const {error}=await supabase.rpc('commit_mingya_import_v2',{
+    p_app_id:appId,p_contact_id:snapshot.id,p_contact_revision:snapshot.revision,
+    p_renewal_revision:snapshot.renewalRevision,p_contacts:contacts,p_renewal:renewalData
+  });
+  if(error?.code==='PT409')throw new Error('客户或续期记录已变化，请重新预览后导入。');
+  if(error)throw new Error('导入未保存，请检查网络后重试。');
 };
 
 export const archiveMingyaCapture = async (snapshot: ContactImportSnapshot, payload: unknown): Promise<string> => {
@@ -332,7 +337,8 @@ export const archiveMingyaCapture = async (snapshot: ContactImportSnapshot, payl
   let binary='';for(let i=0;i<compressed.length;i+=32768)binary+=String.fromCharCode(...compressed.subarray(i,i+32768));
   const {error}=await supabase.from('app_data').upsert([
     {app_id:snapshot.appId,data_type:`mingya_capture:${hash}`,data:{encoding:'gzip-base64',content:btoa(binary),sha256:hash},updated_at:new Date().toISOString()},
-    {app_id:snapshot.appId,data_type:`contacts_backup:mingya:${hash}:${snapshot.revision}`,data:snapshot.contacts,updated_at:new Date().toISOString()}
+    {app_id:snapshot.appId,data_type:`contacts_backup:mingya:${hash}:${snapshot.revision}`,data:snapshot.contacts,updated_at:new Date().toISOString()},
+    {app_id:snapshot.appId,data_type:`renewal_backup:mingya:${hash}:${snapshot.renewalRevision||'new'}`,data:snapshot.renewalData,updated_at:new Date().toISOString()}
   ],{onConflict:'app_id,data_type'});
   if(error)throw new Error('原始采集信息和导入前备份未保存成功，本次未修改客户。');
   return hash;

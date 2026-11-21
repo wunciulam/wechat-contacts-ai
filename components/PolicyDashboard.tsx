@@ -161,7 +161,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                   </div>
                   <div className="flex items-center gap-6 md:justify-end border-t md:border-t-0 border-gray-100 pt-3 md:pt-0">
                     <div className="text-right"><div className="text-xs text-gray-500 font-medium">保单数量</div><div className="text-lg font-medium text-gray-700">{count} <span className="text-xs font-normal text-gray-500">份</span></div></div>
-                    <div className="text-right pr-4 border-r border-gray-100"><div className="text-xs text-gray-500 font-medium">总保费</div><div className="text-lg font-medium text-gray-900 tabular-nums">{totalPremium}</div></div>
+                    <div className="text-right pr-4 border-r border-gray-100"><div className="text-xs text-gray-500 font-medium">单期保费合计</div><div className="text-lg font-medium text-gray-900 tabular-nums">{totalPremium}</div></div>
                     <ChevronDown size={20} className={`text-gray-500 transition-transform ${isExpanded ? 'rotate-180 text-gray-900' : ''}`} />
                   </div>
                 </div>

@@ -1,8 +1,9 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const ts=require('typescript');const crypto=require('node:crypto').webcrypto;
-const exportsObject={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/mingyaImport.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsObject,crypto,structuredClone,console});
+const moduleCache={};function localRequire(name){name=name.replace(/\.ts$/,'');if(moduleCache[name])return moduleCache[name];if(!['./mingyaFinancial','./mingyaPayments','./mingyaImport','./mingyaRepair'].includes(name))throw Error(name);const exp={};moduleCache[name]=exp;vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/'+name.slice(2)+'.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exp,require:localRequire,structuredClone});return exp;}
+const exportsObject={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/mingyaImport.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsObject,crypto,structuredClone,console,require:localRequire});
 const {planMingyaImport,parseMingyaPayload}=exportsObject;
 const contact=(extra={})=>({id:'c1',wxid:'wechat',nickname:'客户甲',remarkName:'客户甲',remarkInfo:'手动备注',tags:['重点'],addedAt:1,dealProducts:[],intentProducts:['养老'],progressHistory:[{id:'h',date:'2026-01-01',content:'保留跟进'}],policies:[],...extra});
-const record=(extra={})=>({list:{},detail:{policyIndexId:'m1',policyCode:'000001',insComName:'公司甲',productName:'产品',totalFee:0,effectDate:'2026-01-01',policyState:'16',appntName:'客户甲',appnt:{name:'客户甲',cardNo:'ID001',mobile:'13800000000'},insureds:[],beneficiaries:[],riskList:[],...extra}});
+const record=(extra={})=>({list:{},detail:{policyIndexId:'m1',policyCode:'000001',insComName:'公司甲',productName:'产品',fee:0,totalFee:0,effectDate:'2026-01-01',policyState:'16',appntName:'客户甲',appnt:{name:'客户甲',cardNo:'ID001',mobile:'13800000000'},insureds:[],beneficiaries:[],riskList:[],...extra}});
 const payload=(records)=>({version:1,status:{complete:true,finishedAt:'2026-11-21'},records});
 test('adds by applicant and repeated imports do not duplicate or alter follow-up data',()=>{
  const source=payload([record()]);const first=planMingyaImport([],source);assert.equal(first.addedPolicies,1);assert.equal(first.contacts[0].policies[0].premium,'0');const second=planMingyaImport(first.contacts,source);assert.equal(second.addedPolicies,0);assert.equal(second.updatedPolicies,0);assert.equal(second.unchangedPolicies,1);assert.equal(second.contacts.length,1);
@@ -37,4 +38,23 @@ test('renewal terms sharing a policy number remain separate; repeat import stays
 test('uses website effective date instead of underwriting date; JSON key order does not change data comparison',()=>{
  const p=payload([record({effectDate:'2026-11-02 00:00:00',validDate:'2026-11-06 00:00:00'})]);const result=planMingyaImport([],p);assert.equal(result.contacts[0].policies[0].effectiveDate,'2026-11-06');
  assert.equal(exportsObject.canonicalContactData([{id:'1',tags:['a']}]),exportsObject.canonicalContactData([{tags:['a'],id:'1'}]));
+});
+test('repairs the known v1 cumulative-premium bug while preserving an unrelated manual premium',()=>{
+ const r=record({fee:12000,totalFee:120000,nextPayDate:'2027-11-18',nextPrem:12000});const p=payload([r]);
+ const old={id:'old',policyNumber:'000001',company:'公司甲',productName:'产品',premium:'120000',effectiveDate:'2026-01-01',status:'正式保单',applicant:'客户甲',insured:'客户甲',mingya:{key:'index:m1',captureId:'original'}};
+ const fixed=planMingyaImport([contact({policies:[old]})],p);assert.equal(fixed.contacts[0].policies[0].premium,'12000');
+ const manual=planMingyaImport([contact({policies:[{...old,premium:'777'}]})],p);assert.equal(manual.contacts[0].policies[0].premium,'777');
+});
+test('future detail captures update source-owned premium without undoing a user edit',()=>{
+ const first=planMingyaImport([],payload([record({fee:100,totalFee:1000})]));
+ const refresh=planMingyaImport(first.contacts,payload([record({fee:120,totalFee:1200})]));assert.equal(refresh.contacts[0].policies[0].premium,'120');
+ first.contacts[0].policies[0].premium='90';const manual=planMingyaImport(first.contacts,payload([record({fee:120,totalFee:1200})]));assert.equal(manual.contacts[0].policies[0].premium,'90');
+});
+test('data repair changes only source-linked financial data in both stores, and is idempotent',()=>{
+ const fix=localRequire('./mingyaRepair').repairCapturedPolicies;
+ const old={id:'old',policyNumber:'000001',company:'公司甲',productName:'产品',premium:'120000',effectiveDate:'2025-11-18',paymentFrequency:'期交-年',status:'正式保单',applicant:'客户甲',insured:'客户甲',payments:[{date:'2026-11-18',amount:'12000',status:'未缴费'}],mingya:{key:'index:m1',captureId:'original'}};
+ const customers=[contact({policies:[old]})];const renewal={policies:[old],imports:[{at:'keep'}],settings:{enabled:false}};
+ const source=payload([record({fee:12000,totalFee:120000,validDate:'2025-11-18',nextPayDate:'2027-11-18',nextPrem:12000,nextContent:'应缴金额未产生',riskList:[{prem:12000,lastPrem:12000,lastPayDate:'2026-11-18',payType:'Y',state:'01'}]})]);
+ const result=fix(customers,renewal,source,'original');assert.equal(result.contacts[0].policies[0].premium,'12000');assert.equal(result.renewal.policies[0].payments[0].status,'已缴费');assert.equal(result.contacts[0].wxid,customers[0].wxid);assert.equal(result.contacts[0].remarkInfo,customers[0].remarkInfo);assert.equal(JSON.stringify(result.renewal.imports),JSON.stringify(renewal.imports));assert.equal(customers[0].policies[0].premium,'120000');
+ const repeat=fix(result.contacts,result.renewal,source,'original');assert.equal(repeat.counts.metadata,0);assert.equal(exportsObject.canonicalContactData(repeat.contacts),exportsObject.canonicalContactData(result.contacts));
 });

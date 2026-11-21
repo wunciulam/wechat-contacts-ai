@@ -1,4 +1,5 @@
-import { migrate, projectContacts } from './services/renewal';
+import { rememberRenewalSnapshot } from './services/renewalCache';
+import { migrate, projectContacts, mergePolicies } from './services/renewal';
 import RenewalWorkspace from './components/RenewalWorkspace';
 import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
@@ -193,9 +194,12 @@ const App: React.FC = () => {
         if (policy.mingya && importedKeys.has(policy.mingya.key) && !policy.mingya.captureId) policy.mingya.captureId = captureId;
       }
       if (JSON.stringify(contactsRef.current) !== snapshot.localVersion) throw new Error('客户资料已变化，请重新预览后导入。');
-      await commitContactImport(snapshot, plan.contacts);
-      skipImportSyncRef.current = plan.contacts;
-      setContacts(plan.contacts);
+      const renewalData={...snapshot.renewalData,policies:mergePolicies(snapshot.renewalData.policies,migrate(plan.contacts))};
+      const contacts=projectContacts(plan.contacts,renewalData.policies);
+      await commitContactImport(snapshot, contacts, renewalData);
+      rememberRenewalSnapshot(renewalData);
+      skipImportSyncRef.current = contacts;
+      setContacts(contacts);
       setCurrentView('policies');
     } finally { importSavingRef.current = false; }
   };

@@ -1,3 +1,4 @@
+import { detailNextPayment, reconcileMingyaPayments } from './mingyaPayments.ts';
 import * as XLSX from "xlsx";
 import type { Contact, Policy } from "../types";
 export interface Payment {
@@ -6,6 +7,10 @@ export interface Payment {
   status: string;
   confirmedAt?: string;
   estimated?: boolean;
+  paidAt?: string;
+  amountReference?: boolean;
+  source?: string;
+  sourceCapturedAt?: string;
   contactedAt?: string;
   history?: { at: string; from: string; to: string; source: string }[];
 }
@@ -157,27 +162,15 @@ export function mergePolicies(old: ManagedPolicy[], incoming: ManagedPolicy[]) {
       map.set(key(p), structuredClone(p));
       continue;
     }
-    const payments = new Map(prev.payments.map((x) => [x.date, x]));
+    const payments = new Map((prev.payments||[]).map((x) => [x.date, x]));
     for (const x of p.payments) {
-      const before = payments.get(x.date);
-      payments.set(x.date, {
-        ...before,
-        ...x,
-        contactedAt: before?.contactedAt,
-        history: [
-          ...(before?.history || []),
-          ...(before && before.status !== x.status
-            ? [
-                {
-                  at: new Date().toISOString(),
-                  from: before.status,
-                  to: x.status,
-                  source: p.source || "导入",
-                },
-              ]
-            : []),
-        ],
-      });
+      const before=payments.get(x.date);
+      const histories=[...(before?.history||[]),...(x.history||[])];
+      if(before&&before.status!==x.status&&!histories.some(h=>h.from===before.status&&h.to===x.status)) {
+        histories.push({at:x.sourceCapturedAt||p.mingya?.capturedAt||new Date().toISOString(),from:before.status,to:x.status,source:x.source||p.source||'导入'});
+      }
+      const history=[...new Map(histories.map(h=>[`${h.at}|${h.from}|${h.to}|${h.source}`,h])).values()];
+      payments.set(x.date,{...before,...x,contactedAt:before?.contactedAt,history});
     }
     const nonempty = Object.fromEntries(
       Object.entries(p).filter(
@@ -189,16 +182,14 @@ export function mergePolicies(old: ManagedPolicy[], incoming: ManagedPolicy[]) {
       ...prev,
       ...nonempty,
       id: prev.id,
-      ...(p.payments.length
+      ...(p.payments.length && !p.mingya
         ? {
             status: prev.status || p.status,
             premium: prev.premium || p.premium,
             effectiveDate: prev.effectiveDate || p.effectiveDate,
           }
         : {}),
-      payments: [...payments.values()].sort((a, b) =>
-        a.date.localeCompare(b.date),
-      ),
+      payments: reconcileMingyaPayments([...payments.values()].sort((a,b)=>a.date.localeCompare(b.date)), {...prev,...nonempty} as ManagedPolicy),
     });
   }
   return [...map.values()];
@@ -272,7 +263,8 @@ export function addMonths(anchor: string, months: number): string {
 }
 export function nextPayment(p: ManagedPolicy): Payment | undefined {
   if (inactive(p.status) || p.status.includes('明亚状态')) return;
-  const latest = [...(p.payments || [])].sort((a, b) =>
+  const detail=detailNextPayment(p,p.payments||[]);if(detail)return detail;
+  const latest = [...reconcileMingyaPayments(p.payments||[],p)].sort((a, b) =>
     b.date.localeCompare(a.date),
   )[0];
   if (latest?.status === "未缴费") return latest;

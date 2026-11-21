@@ -2,11 +2,11 @@
   'use strict';
   const fields = {
     policyCode: '保单号', productName: '产品名称', insComName: '保险公司',
-    totalFee: '保费', validDate: '生效日期', effectDate: '承保日期', appntName: '投保人姓名', insuredName: '被保人',
+    fee: '保费', totalFee: '缴费期总保费', validDate: '生效日期', effectDate: '承保日期', appntName: '投保人姓名', insuredName: '被保人',
     appntMobile: '手机号', appntCardNo: '证件号', amount: '保额', currency: '币种',
     policyState: '保单状态代码', dataSource: '数据来源代码', policySource: '保单来源代码',
     endDate: '结束日期', guaranteeEndDate: '保障结束日期', receiveDate: '交单日期',
-    nextPayDate: '下次缴费日期', nextPrem: '下次保费', insurancePeriod: '保险期间',
+    nextPayDate: '下次缴费日期', nextPrem: '下期金额', nextContent: '下期金额说明', insurancePeriod: '保险期间',
     insurancePeriodUnit: '保险期间单位代码', salerName: '销售人员', salerServiceName: '服务人员',
     benefName: '受益人', remark: '备注', policyId: '保单ID', policyIndexId: '保单索引ID'
   };
@@ -27,7 +27,8 @@
     for (const entry of payload.records) {
       const p={...entry.list,...(entry.detail||{})};
       const number=String(p.policyCode||'');
-      const summaryPolicy={...p,appntMobile:p.appnt?.mobile||p.appntMobile,appntCardNo:p.appnt?.cardNo||p.appntCardNo};
+      const financial=MingyaFinancial.financialFromDetail(entry.detail);
+      const summaryPolicy={...p,fee:financial.periodicPremium===''?'':Number(financial.periodicPremium),appntMobile:p.appnt?.mobile||p.appntMobile,appntCardNo:p.appnt?.cardNo||p.appntCardNo};
       const row=Object.fromEntries(Object.entries(fields).map(([key,label])=>[label,summaryPolicy[key] ?? '']));
       // Keep backend codes explicit; do not invent a status or convert currencies/units.
       row['详情采集']=entry.detail?'成功':'未取得';

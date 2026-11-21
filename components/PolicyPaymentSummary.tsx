@@ -32,6 +32,7 @@ export default function PolicyPaymentSummary({ policy, amount = true }: { policy
   if (!next) return <span className="text-sm text-gray-500">{paymentStatus(policy)}</span>;
   return <div className="space-y-2">
     <PaymentDate date={next.date} estimated={next.estimated} />
-    {amount && <div className="flex items-baseline gap-2 text-sm tabular-nums"><span className="text-xs text-gray-500">本期应缴</span>{formatMoney(next.amount, policy.mingya?.currency)}</div>}
+    {next.amountReference&&<span className="text-xs text-gray-500">应缴金额尚未生成</span>}
+    {amount && <div className="flex items-baseline gap-2 text-sm tabular-nums"><span className="text-xs text-gray-500">{next.amountReference?'下期参考金额':'本期应缴'}</span>{formatMoney(next.amount, policy.mingya?.currency)}</div>}
   </div>;
 }

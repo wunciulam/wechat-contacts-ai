@@ -209,3 +209,24 @@ test('Mingya source identity preserves separate annual terms and old payment his
 test('unrecognized Mingya states do not create renewal alerts',()=>{
   assert.equal(dueItems([{...p,status:'明亚状态（23）',expiryDate:'2026-11-01',payments:[]}], '2026-11-01').length,0);
 });
+
+test('detail paid date resolves the old unpaid installment and shows the official next date as a reference',()=>{
+  const policy:any={...p,effectiveDate:'2025-11-18',paymentFrequency:'期交-年',paymentYears:'10年',paymentEndDate:'2035-11-18',
+    payments:[{date:'2026-11-18',amount:'12000.0000',status:'未缴费',history:[]}],
+    mingya:{mappingVersion:2,capturedAt:'2026-11-21T03:35:47Z',nextPayDate:'2027-11-18',nextPremium:'12000',nextPremiumIsReference:true,lastPaidDate:'2026-11-18',lastPaidPremium:'12000'}};
+  const next=nextPayment(policy)!;assert.equal(next.date,'2027-11-18');assert.equal(next.amount,'12000');assert.equal(next.amountReference,true);assert.equal(next.estimated,undefined);
+  assert.equal(dueItems([policy],'2026-11-21').length,0);
+  const merged=mergePolicies([policy],[policy]);assert.equal(merged[0].payments[0].status,'已缴费');assert.equal(merged[0].payments[0].paidAt,'2026-11-18');
+  assert.equal(mergePolicies(merged,[merged[0]])[0].payments[0].history!.length,1);
+});
+test('manual payment changes after capture take priority over the old detail snapshot',()=>{
+  const policy:any={...p,effectiveDate:'2025-11-18',paymentFrequency:'期交-年',paymentYears:'10年',
+    payments:[{date:'2026-11-18',amount:'12000',status:'未缴费',history:[{at:'2026-11-21T05:00:00Z',source:'手动标记',from:'已缴费',to:'未缴费'}]}],
+    mingya:{mappingVersion:2,capturedAt:'2026-11-21T03:35:47Z',nextPayDate:'2027-11-18',nextPremium:'12000',lastPaidDate:'2026-11-18',lastPaidPremium:'12000'}};
+  assert.equal(nextPayment(policy)!.date,'2026-11-18');assert.equal(mergePolicies([policy],[policy])[0].payments[0].status,'未缴费');
+});
+test('merging a detail-paid installment preserves its source audit rather than turning it into a manual change',()=>{
+ const old:any={...p,payments:[{date:'2026-11-18',amount:'12000',status:'未缴费',history:[]}]};
+ const detail:any={...old,mingya:{mappingVersion:2,key:'sample',capturedAt:'2026-11-21T03:35:47Z'},payments:[{date:'2026-11-18',amount:'12000',status:'已缴费',source:'明亚保单详情',history:[{at:'2026-11-21T03:35:47Z',from:'未缴费',to:'已缴费',source:'明亚保单详情·上期实缴'}]}]};
+ const result=mergePolicies([old],[detail]);assert.equal(result[0].payments[0].history!.length,1);assert.match(result[0].payments[0].history![0].source,/^明亚/);
+});

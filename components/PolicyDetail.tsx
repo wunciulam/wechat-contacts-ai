@@ -36,7 +36,7 @@ export default function PolicyDetail({
     ["policyNumber", "保单号"],
     ["applicationNumber", "投保单号"],
     ["status", "保单状态"],
-    ["premium", "保费"],
+    ["premium", "单期保费"],
 
     ["effectiveDate", "生效日期", "date"],
     ["paymentFrequency", "缴费方式"],
@@ -153,6 +153,7 @@ export default function PolicyDetail({
             <thead className="bg-gray-50 text-xs text-gray-500">
               <tr>
                 <th className="p-3 text-left">应缴日期</th>
+                <th className="p-3 text-left">实缴日期</th>
                 <th className="p-3 text-right">金额</th>
                 <th className="p-3 text-left">缴费状态</th>
                 <th className="p-3 text-right">操作</th>
@@ -165,6 +166,7 @@ export default function PolicyDetail({
                   <React.Fragment key={q.date}>
                     <tr className="border-b border-gray-100">
                       <td className="p-3 whitespace-nowrap">{q.date}</td>
+                      <td className="p-3 whitespace-nowrap">{q.paidAt || '—'}</td>
                       <td className="p-3 whitespace-nowrap text-right tabular-nums">{formatMoney(q.amount, policy.mingya?.currency)}</td>
                       <td className="p-3">{q.status}</td>
                       <td className="p-3 text-right">
@@ -179,7 +181,7 @@ export default function PolicyDetail({
                     </tr>
                     {!!q.history?.length && (
                       <tr>
-                        <td colSpan={4}>
+                        <td colSpan={5}>
                           <details className="p-3 text-xs text-gray-500">
                             <summary>查看状态变更</summary>
                             {q.history.map((h, i) => (

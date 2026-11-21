@@ -1,3 +1,5 @@
+import { financialFromDetail, money } from './mingyaFinancial';
+import { reconcileMingyaPayments } from './mingyaPayments';
 import type { Contact, Policy, MingyaPolicyData, MingyaPerson } from '../types';
 
 type Json = Record<string, any>;
@@ -24,14 +26,14 @@ const policyKey = (p: Policy) => normalizeId(p.policyNumber)+'|'+companyKey(p.co
 const uuid = () => crypto.randomUUID();
 const has = (v: unknown) => v !== undefined && v !== null && text(v) !== '';
 const person = (input: Json = {}): MingyaPerson => { const p=input||{};return ({ name:text(p.name),idCard:readable(p.cardNo),phone:readable(p.mobile),birthday:text(p.birthday).slice(0,10),sex:text(p.sex),address:text(p.homeAddress||p.postAddress),share:text(p.bnfRate),order:text(p.bnfOrder) }); };
-const period = (n: unknown, unit: unknown) => {const s=text(n),u=text(unit);return s ? `${s}${u==='Y'?'年':u==='M'?'月':u==='D'?'天':u?`（单位代码 ${u}）`:''}` : '';};
+const period = (n: unknown, unit: unknown) => {const s=text(n),u=text(unit);return s ? `${u==='A'?'至':''}${s}${u==='Y'?'年':u==='M'?'月':u==='D'?'天':u==='A'?'周岁':u?`（单位代码 ${u}）`:''}` : '';};
 function compact(source: Json, capturedAt: string, key: string): MingyaPolicyData {
-  return { key,capturedAt,policyId:text(source.policyId),policyIndexId:text(source.policyIndexId),companyId:text(source.insComId),
+  return { ...financialFromDetail(source),key,capturedAt,policyId:text(source.policyId),policyIndexId:text(source.policyIndexId),companyId:text(source.insComId),
     currency:text(source.currency),rawStatus:text(source.policyState),endDate:text(source.guaranteeEndDate||source.endDate).slice(0,10),
-    nextPayDate:text(source.nextPayDate).slice(0,10),nextPremium:text(source.nextPrem),applicant:person(source.appnt),
+    applicant:person(source.appnt),
     insureds:(source.insureds||[]).map(person),beneficiaries:(source.beneficiaries||[]).map(person),
     risks:(source.riskList||[]).map((r:Json)=>({name:text(r.risk?.riskName||r.riskName),premium:text(r.prem),coverage:text(r.amntDesc||r.amnt),
-      main:r.mainRiskFlag===true||['1','Y'].includes(text(r.mainRiskFlag)),paymentPeriod:period(r.payPeriod,r.payPeriodUnit),insurancePeriod:period(r.insurancePeriod,r.insurancePeriodUnit),
+      main:r.mainRiskFlag===true||['01','1','Y'].includes(text(r.mainRiskFlag)),paymentPeriod:period(r.payPeriod,r.payPeriodUnit),insurancePeriod:period(r.insurancePeriod,r.insurancePeriodUnit),
       effectiveDate:text(r.validDate).slice(0,10),endDate:text(r.endDate).slice(0,10),state:text(r.state),insureds:(r.insureds||[]).map((p:Json)=>text(p.name)).filter(Boolean)})) };
 }
 export function parseMingyaPayload(input: unknown): MingyaPayload {
@@ -52,12 +54,12 @@ export function normalizeMingya(payload: MingyaPayload): {items: IncomingPolicy[
     if(seen.has(key)||seen.has(deDupe)){duplicates++;continue;}seen.add(key);seen.add(deDupe);
     const applicant=person(p.appnt);applicant.name ||= text(p.appntName);
     applicant.idCard ||= readable(p.appntCardNo);applicant.phone ||= readable(p.appntMobile);
-    const source=compact(p,text(payload.status.finishedAt),key);
+    const source=compact(r.detail||{},text(payload.status.finishedAt),key);
     const policy:Policy={id:`mingya-${encodeURIComponent(key)}`,policyNumber:number,productName:text(p.productName),company,
-      premium:text(p.totalFee??p.fee),effectiveDate:dateKey(p.validDate||p.effectDate),
+      premium:source.periodicPremium||'',effectiveDate:dateKey(p.validDate||p.effectDate),
       status:({'16':'正式保单','17':'终止保单'} as Record<string,string>)[text(p.policyState)]||`明亚状态（${text(p.policyState)||'未知'}）`,
       applicant:applicant.name,insured:text(p.insuredName)||source.insureds.map(x=>x.name).join('、'),
-      coverage:+p.amount===-1?'详见条款':text(p.amount),paymentYears:[...new Set(source.risks.map(x=>x.paymentPeriod).filter(Boolean))].join('、'),mingya:source};
+      coverage:+p.amount===-1?'详见条款':text(p.amount),paymentYears:[...new Set(source.risks.map(x=>x.paymentPeriod).filter(Boolean))].join('、'),paymentFrequency:source.paymentFrequency||'',paymentEndDate:source.paymentEndDate||'',mingya:source};
     const personKey=identity(applicant.idCard)?`id:${identity(applicant.idCard)}`:phoneKey(applicant.phone)?`phone:${phoneKey(applicant.phone)}:${nameKey(applicant.name)}`:`name:${nameKey(applicant.name)}`;
     items.push({key,personKey,policy,applicant,hasDetail:!!r.detail});
   }
@@ -90,7 +92,8 @@ export function planMingyaImport(existing: Contact[], payload:MingyaPayload, res
     if(selection==='skip'){plan.skippedPolicies++;row.action='跳过';continue;}
     const matches=contacts.flatMap(c=>(c.policies||[]).filter(x=>policyMatches(x,incoming)&&!ambiguousTerm(x,incoming)).map(x=>({contact:c,policy:x})));
     let owner:Contact|undefined,issue='';let candidates:Contact[]=[];let allowNew=true;
-    if(!p.policyNumber||!p.company||!a.name){issue='缺少保单号、保险公司或投保人';allowNew=false;}
+    if(!incoming.hasDetail){issue='保单详情未取得，请重新采集';allowNew=false;}
+    else if(!p.policyNumber||!p.company||!a.name){issue='缺少保单号、保险公司或投保人';allowNew=false;}
     else if(matches.length>1){issue='这份保单已存在于多条记录，请先核对现有保单';candidates=matches.map(x=>x.contact);allowNew=false;}
     else if(matches.length===1){
       owner=matches[0].contact;allowNew=false;
@@ -128,16 +131,20 @@ export function planMingyaImport(existing: Contact[], payload:MingyaPayload, res
     }
     if(matches.length===1){
       const old=matches[0].policy;const merged={...old};
-      for(const key of ['policyNumber','productName','company','premium','effectiveDate','status','applicant','insured','paymentYears','insuranceType','coverage'] as const){
+      for(const key of ['policyNumber','productName','company','premium','effectiveDate','status','applicant','insured','paymentYears','paymentFrequency','paymentEndDate','insuranceType','coverage'] as const){
         const value=p[key];if(has(old[key])&&has(value)&&text(old[key])!==text(value)){plan.fieldConflicts++;plan.conflicts.push({number:p.policyNumber,field:key,existing:text(old[key]),incoming:text(value)});}
-        if(has(value)&&(mode==='source'||!has(old[key])))merged[key]=value;
+        const fixOldPremium=key==='premium'&&old.mingya&&old.mingya.mappingVersion!==2&&money(old.premium)!==''&&money(old.premium)===p.mingya?.termTotalPremium;
+        const sourceField=({premium:'periodicPremium',paymentFrequency:'paymentFrequency',paymentEndDate:'paymentEndDate'} as Record<string,string>)[key];
+        const sourceOwned=old.mingya?.mappingVersion===2&&sourceField&&text(old[key])===text((old.mingya as any)[sourceField]);
+        if(has(value)&&(mode==='source'||!has(old[key])||fixOldPremium||sourceOwned))merged[key]=value;
       }
       merged.mingya=p.mingya;
+      (merged as any).payments=reconcileMingyaPayments((old as any).payments||[],merged);
       // A new capture time alone does not create a changed policy on every run.
       if(old.mingya&&JSON.stringify({...old.mingya,capturedAt:'',captureId:undefined})===JSON.stringify({...p.mingya,capturedAt:'',captureId:undefined}))merged.mingya=old.mingya;
       if(JSON.stringify(old)!==JSON.stringify(merged)){owner.policies=(owner.policies||[]).map(x=>x.id===old.id?merged:x);plan.updatedPolicies++;row.action='补充 / 更新';}
       else{plan.unchangedPolicies++;row.action='已存在';}
-    }else{owner.policies=[...(owner.policies||[]),p];plan.addedPolicies++;row.action='新增保单';}
+    }else{(p as any).payments=reconcileMingyaPayments([],p);owner.policies=[...(owner.policies||[]),p];plan.addedPolicies++;row.action='新增保单';}
     if(p.productName)owner.dealProducts=[...new Set([...(owner.dealProducts||[]),p.productName])];
     owner.tags=[...new Set([...(owner.tags||[]),'成交客户'])];
     if(before!==JSON.stringify(owner)&&!created.has(owner.id))touched.add(owner.id);

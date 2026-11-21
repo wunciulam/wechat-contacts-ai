@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "明亚保单导出",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "minimum_chrome_version": "111",
   "description": "在已登录的明亚页面批量读取保单与详情，导出本地 Excel 或 JSON，不调用 AI。",
   "permissions": [
