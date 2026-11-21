@@ -200,10 +200,9 @@ export function latestPayment(p: ManagedPolicy) {
   )[0];
   return latest?.status === "未缴费" ? latest : undefined;
 }
+const shanghaiDateFormatter = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" });
 export function today() {
-  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" }).format(
-    new Date(),
-  );
+  return shanghaiDateFormatter.format(new Date());
 }
 export function dueItems(policies: ManagedPolicy[], now = today()) {
   const end = new Date(`${now}T00:00:00Z`);
@@ -315,12 +314,12 @@ export function projectContacts(
   policies: ManagedPolicy[],
   bothRoles = false,
 ): Contact[] {
+  const known = new Set(policies.map(key));
+  const knownIds = new Set(policies.map(p => p.id));
   return contacts.map((c) => {
     const associated = policies.filter(
       (p) => p.applicantId === c.id || (bothRoles && p.insuredId === c.id),
     );
-    const known = new Set(policies.map(key));
-    const knownIds = new Set(policies.map(p => p.id));
     return {
       ...c,
       policies: [

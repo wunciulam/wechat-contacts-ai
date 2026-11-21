@@ -171,6 +171,12 @@ const App: React.FC = () => {
     return () => { delete document.documentElement.dataset.mingyaImport; window.removeEventListener('message', receive); };
   }, [isLoaded]);
 
+  const acceptSavedPolicyContacts = (saved: Contact[]) => {
+    skipImportSyncRef.current = saved;
+    setContacts(saved);
+  };
+  const beforePolicySave = () => contactsWriteRef.current;
+
   const loadMingyaSnapshot = async (): Promise<ContactImportSnapshot> => {
     await contactsWriteRef.current;
     const localVersion = JSON.stringify(contactsRef.current);
@@ -225,6 +231,7 @@ const App: React.FC = () => {
               };
               return applyAutoTags(baseContact);
             });
+            skipImportSyncRef.current = migratedData;
             setContacts(migratedData);
             localStorage.setItem('wechat-contacts', JSON.stringify(migratedData));
             localStorage.setItem('wechat-contacts-backup', JSON.stringify(migratedData));
@@ -1078,7 +1085,7 @@ const App: React.FC = () => {
                   <RenewalWorkspace 
                      importFiles={policyImportFiles}
                      onImportConsumed={() => setPolicyImportFiles(null)}
-                     onContacts={setContacts}
+                     onContacts={acceptSavedPolicyContacts} beforeSave={beforePolicySave}
                      contacts={contacts}
                      filterTags={selectedTags}
                     followUpFilter={followUpFilter}
@@ -1178,7 +1185,7 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {policyContactId && detailPolicyId && <RenewalWorkspace contacts={contacts} onContacts={setContacts} customerId={policyContactId} initialPolicyId={detailPolicyId} onCloseDetail={() => { setPolicyContactId(null); setDetailPolicyId(undefined); }} />}
+      {policyContactId && detailPolicyId && <RenewalWorkspace contacts={contacts} onContacts={acceptSavedPolicyContacts} beforeSave={beforePolicySave} customerId={policyContactId} initialPolicyId={detailPolicyId} onCloseDetail={() => { setPolicyContactId(null); setDetailPolicyId(undefined); }} />}
       <MingyaImportModal
         open={isMingyaImportOpen}
         initialPayload={mingyaPayload}

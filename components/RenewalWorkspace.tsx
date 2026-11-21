@@ -4,7 +4,7 @@ import { ArrowLeft, Settings } from 'lucide-react';
 import PolicyDashboard from "./PolicyDashboard";
 import { PageHeader } from "./PageHeader";
 import PolicyDetail from "./PolicyDetail";
-import { saveImport } from "../services/renewalStorage";
+import { saveImport, savePolicyMark } from "../services/renewalStorage";
 import React, { useEffect, useState } from "react";
 import { Contact } from "../types";
 import { getRenewalSnapshot, hasFreshRenewalSnapshot, loadRenewalSnapshot, rememberRenewalSnapshot, subscribeRenewalSnapshot } from "../services/renewalCache";
@@ -30,6 +30,7 @@ export default function RenewalWorkspace({
   importFiles,
   onImportConsumed,
   onContacts,
+  beforeSave,
   customerId,
   initialPolicyId,
   onCloseDetail,
@@ -39,6 +40,7 @@ export default function RenewalWorkspace({
   importFiles?: FileList | null;
   onImportConsumed?: () => void;
   onContacts: (c: Contact[]) => void;
+  beforeSave?: () => Promise<unknown>;
   customerId?: string;
   initialPolicyId?: string;
   onCloseDetail?: () => void;
@@ -49,6 +51,9 @@ export default function RenewalWorkspace({
   onBatchDeleteContacts?: (ids: string[]) => void;
   onDeletePolicy?: (contactId: string, policyId: string) => void;
 }) {
+  const markPending = React.useRef(false);
+  const ownSnapshot = React.useRef<RenewalData>();
+  const skipContactsMerge = React.useRef<Contact[]>();
   const [detailDirty, setDetailDirty] = useState(false);
   const [remindersOpen, setRemindersOpen] = useState(Boolean(customerId));
   const fileRef = React.useRef<HTMLInputElement>(null);
@@ -84,7 +89,7 @@ export default function RenewalWorkspace({
     let active = true;
     const apply = (loaded: RenewalData) => {
       if (!active) return;
-      setData({ ...loaded, policies: mergePolicies(loaded.policies, migrate(contactsRef.current)) });
+      setData(loaded === ownSnapshot.current ? loaded : { ...loaded, policies: mergePolicies(loaded.policies, migrate(contactsRef.current)) });
       setCloudReady(true);
       setSyncError("");
     };
@@ -101,6 +106,7 @@ export default function RenewalWorkspace({
     return () => { active = false; unsubscribe(); };
   }, [retry]);
   useEffect(() => {
+    if (skipContactsMerge.current === contacts) { skipContactsMerge.current = undefined; return; }
     setData(current => current ? { ...current, policies: mergePolicies(current.policies, migrate(contacts)) } : current);
   }, [contacts]);
   useEffect(() => {
@@ -121,7 +127,10 @@ export default function RenewalWorkspace({
     setError("");
     try {
       const projected = projectContacts(baseContacts, next.policies);
+      await beforeSave?.();
       await saveImport(next, projected);
+      ownSnapshot.current = next;
+      skipContactsMerge.current = projected;
       rememberRenewalSnapshot(next);
       onContacts(projected);
       setData(next);
@@ -297,44 +306,30 @@ export default function RenewalWorkspace({
   }
   async function mark(p: ManagedPolicy, kind: string, dt?: string) {
     if (!data) return;
-    const next = {
-      ...data,
-      policies: data.policies.map((x) =>
-        x.id !== p.id
-          ? x
-          : {
-              ...x,
-              ...(kind === "renewal" ? { renewed: !x.renewed } : {}),
-              payments: (x.payments.some((q) => q.date === dt) || !dt
-                ? x.payments
-                : [...x.payments, { ...nextPayment(x)!, date: dt }]
-              ).map((q) =>
-                q.date !== dt
-                  ? q
-                  : kind === "contact"
-                    ? { ...q, contactedAt: new Date().toISOString() }
-                    : {
-                        ...q,
-                        status: q.status === "已缴费" ? "未缴费" : "已缴费",
-                        history: [
-                          ...(q.history || []),
-                          {
-                            at: new Date().toISOString(),
-                            from: q.status,
-                            to: q.status === "已缴费" ? "未缴费" : "已缴费",
-                            source: "人工标记",
-                          },
-                        ],
-                      },
-              ),
-            },
-      ),
-    };
-    if (await persist(next)) {
-      setSelected(next.policies.find((x) => x.id === p.id) || null);
+    if (markPending.current || busy || !cloudReady) return false;
+    markPending.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      await beforeSave?.();
+      const result = await savePolicyMark(p, kind, dt);
+      const update = (policy: ManagedPolicy): ManagedPolicy => policy.id === p.id
+        ? { ...policy, payments: result.payments, ...(kind === 'renewal' ? { renewed: result.renewed } : {}) }
+        : policy;
+      const next = { ...data, policies: data.policies.map(update) };
+      const projected = contactsRef.current.map(c => c.policies?.some(policy => policy.id === p.id)
+        ? { ...c, policies: c.policies.map(policy => update(policy as ManagedPolicy)) } : c);
+      ownSnapshot.current = next;
+      skipContactsMerge.current = projected;
+      rememberRenewalSnapshot(next);
+      onContacts(projected);
+      setData(next);
+      setSelected(next.policies.find(x => x.id === p.id) || null);
       return true;
-    }
-    return false;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      return false;
+    } finally { markPending.current = false; setBusy(false); }
   }
   const syncStatus = syncing || syncError ? (
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-5 py-3 text-sm text-gray-600" role="status">
@@ -373,7 +368,8 @@ export default function RenewalWorkspace({
         search,
       ),
   );
-  const daysLeft = (date: string) => Math.round((Date.parse(date + "T00:00:00Z") - Date.parse(today() + "T00:00:00Z")) / 86400000);
+  const currentDay = today();
+  const daysLeft = (date: string) => Math.round((Date.parse(date + "T00:00:00Z") - Date.parse(currentDay + "T00:00:00Z")) / 86400000);
   const daysLabel = (date: string) => { const n = daysLeft(date); return n < 0 ? `逾期 ${-n} 天` : n === 0 ? "今天缴费" : `剩余 ${n} 天`; };
   const remainingLabel = (p: ManagedPolicy) => { const n = remainingInstallments(p); return n === undefined ? "待补充" : `${n} 期`; };
   const open = (p: ManagedPolicy) => {
@@ -391,7 +387,8 @@ export default function RenewalWorkspace({
         onChange={(e) => upload(e.target.files)}
       />
       {syncStatus}
-      {error && !modal && <p role="alert" className="p-4 text-red-600">{error}</p>}
+      {busy && !modal && <p role="status" className="px-6 py-2 text-gray-600">正在保存…</p>}
+      {error && !modal && !remindersOpen && <p role="alert" className="p-4 text-red-600">{error}</p>}
       {!remindersOpen && !customerId ? (
         <PolicyDashboard
           {...dashboardProps}
@@ -458,7 +455,7 @@ export default function RenewalWorkspace({
             />
           </div>
           <div className="p-6 space-y-4">
-            {error && (
+            {error && !modal && (
               <div role="alert" className="p-3 bg-red-50 text-red-700">
                 {error}
               </div>
@@ -629,7 +626,7 @@ export default function RenewalWorkspace({
       )}
       {modal && (
         <WorkspaceDialog
-          title={modal === 'detail' ? '保单详情' : modal === 'import' ? '导入预览' : modal === 'settings' ? '通知设置' : modal === 'email' ? '邮件预览' : modal === 'done' ? '导入完成' : '确认缴费状态'}
+          title={modal === 'detail' ? '保单详情' : modal === 'import' ? '导入预览' : modal === 'settings' ? '通知设置' : modal === 'email' ? '邮件预览' : modal === 'done' ? '导入完成' : modal === 'renewed' ? '确认本次已续保' : '确认本期已缴费'}
           compact={modal === 'settings' || modal.startsWith('paid:') || modal === 'renewed'}
           onClose={() => {
             if (busy) return;
@@ -828,9 +825,6 @@ export default function RenewalWorkspace({
             )}
             {(modal.startsWith("paid:") || modal === "renewed") && selected && (
               <>
-                <h3 className="font-bold">
-                  确认{modal === "renewed" ? "本次已续保" : "本期已缴费"}
-                </h3>
                 <p className="my-4">
                   {selected.productName} · {selected.policyNumber} ·{" "}
                   {modal.split(":")[1]}
@@ -847,7 +841,7 @@ export default function RenewalWorkspace({
                     if (saved) setModal("");
                   }}
                 >
-                  确认标记
+                  {busy ? "正在保存…" : "确认标记"}
                 </button>
               </>
             )}
