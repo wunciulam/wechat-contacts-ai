@@ -30,5 +30,10 @@ begin
  select data into after_data from public.app_data where app_id='test_fast_policy_marks' and data_type='contacts';
  if ((before_data->0->'policies'->0) -'payments') is distinct from ((after_data->0->'policies'->0) -'payments'-'renewed') then raise exception 'unrelated policy fields changed'; end if;
 end $$;
+-- A manually entered policy may only exist in contacts before the first mark.
+reset role;
+update app_data set data=data||'[{"id":"c2","policies":[{"id":"contact-only","premium":"100"}]}]'::jsonb where app_id='test_fast_policy_marks' and data_type='contacts';
+set local role anon;
+select public.mark_policy_installment_v1('test_fast_policy_marks','contact-only','contact','2026-11-01',null,'{"date":"2026-11-01","amount":"100","status":"未缴费"}','"已缴费"');
 reset role;
 rollback;
