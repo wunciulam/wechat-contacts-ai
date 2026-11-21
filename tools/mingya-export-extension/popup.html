@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>明亚保单导出</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+<main>
+  <h1>保单导出</h1>
+  <p id="message" role="status" aria-live="polite">正在连接明亚页面…</p>
+  <div class="numbers" aria-label="采集进度"><strong id="count">0</strong><span id="progress">份保单</span></div>
+  <label for="scope">采集范围</label>
+  <select id="scope"><option value="all">全部保单（含终止、托管）</option><option value="current">当前筛选的全部分页</option></select>
+  <button id="start" class="primary" disabled>开始采集</button>
+  <button id="stop" hidden>停止采集</button>
+  <button id="import" disabled>导入跟单仔</button>
+  <div class="export"><button id="excel" disabled>导出 Excel</button><button id="json" disabled>导出原始 JSON</button></div>
+  <details><summary>使用说明</summary><p>登录工作台 → 点击顶部「保单」→ 再点内页「保单」。首次安装后请刷新网页。</p><p>采集时保持网页打开；可关闭此弹窗。刷新网页会清空本次数据。</p><p>跟单仔中先预览合并结果，确认后才保存。仅导出账号可读取的信息。影像附件、电子保单 PDF 文件需另行下载。</p><p>采集和去重不调用 AI。</p><button id="clear" class="text">清空本次数据</button></details>
+</main>
+<script src="vendor/xlsx.full.min.js"></script><script src="export.js"></script><script src="popup.js"></script>
+</body></html>

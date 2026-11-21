@@ -518,7 +518,7 @@ export default function RenewalWorkspace({
                         <div className="min-w-28"><span className="block text-xs text-gray-400">投保人</span><strong>{p.applicant || "待补充"}</strong></div>
                         <div className="min-w-28"><span className="block text-xs text-gray-400">被保人</span><strong>{p.insured || "待补充"}</strong></div>
                         <div className="flex-1 min-w-56"><span className="block text-xs text-gray-400">保单</span><strong>{p.productName}</strong><span className="ml-2 text-xs text-gray-500">{p.policyNumber}</span></div>
-                        <div className="min-w-36"><span className="block text-xs text-gray-400">下次缴费</span><PolicyPaymentSummary policy={p} amount={false}/></div><div className="flex flex-nowrap items-start gap-6 shrink-0"><div><span className="block text-xs text-gray-400">本期应缴</span>{formatMoney(nextPayment(p)?.amount)}</div><div><span className="block text-xs text-gray-400">剩余期数</span>{remainingLabel(p)}</div></div>
+                        <div className="min-w-36"><span className="block text-xs text-gray-400">下次缴费</span><PolicyPaymentSummary policy={p} amount={false}/></div><div className="flex flex-nowrap items-start gap-6 shrink-0"><div><span className="block text-xs text-gray-400">本期应缴</span>{formatMoney(nextPayment(p)?.amount, p.mingya?.currency)}</div><div><span className="block text-xs text-gray-400">剩余期数</span>{remainingLabel(p)}</div></div>
                       </div>
                     </button>
                   ))}
@@ -534,7 +534,7 @@ export default function RenewalWorkspace({
                   </button>
                   <PaymentDate date={t.date} estimated={t.estimated}/>
                   <dl className="my-3 grid grid-cols-2 gap-3 text-sm">
-                    <div><dt className="text-xs text-gray-500">本期应缴</dt><dd className="mt-1 tabular-nums">{formatMoney(t.amount)}</dd></div>
+                    <div><dt className="text-xs text-gray-500">本期应缴</dt><dd className="mt-1 tabular-nums">{formatMoney(t.amount, t.policy.mingya?.currency)}</dd></div>
                     <div><dt className="text-xs text-gray-500">剩余期数</dt><dd className="mt-1">{remainingLabel(t.policy)}</dd></div>
                   </dl>
                   <div className="flex flex-wrap justify-end gap-2">
@@ -577,7 +577,7 @@ export default function RenewalWorkspace({
                         </td>
                         <td className="p-3">
                           <PaymentDate date={t.date} estimated={t.estimated}/>
-                          <div className="mt-2 tabular-nums">{formatMoney(t.amount)}</div>
+                          <div className="mt-2 tabular-nums">{formatMoney(t.amount, t.policy.mingya?.currency)}</div>
                         </td>
                         <td>
                           <div className="flex gap-2">

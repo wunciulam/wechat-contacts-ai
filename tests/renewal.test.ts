@@ -193,3 +193,19 @@ test("actual confirmation date never moves the contractual next date", () => {
   assert.equal(nextPayment(policy)?.date, "2027-06-01");
   assert.equal(nextPayment({ ...policy, payments: [{ ...policy.payments[0], confirmedAt: "2026-07-10" }] })?.date, "2027-06-01");
 });
+
+test('Mingya source identity preserves separate annual terms and old payment history', () => {
+  const history={...p, effectiveDate:'2025-01-01', payments:[{date:'2026-01-01',amount:'20',status:'已缴费'}]};
+  const source={...history, mingya:{key:'index:2025'},payments:[]};
+  const newer={...p,id:'new',effectiveDate:'2026-01-01',mingya:{key:'index:2026'},payments:[]};
+  const merged=mergePolicies([history],[source,newer] as any);
+  assert.equal(merged.length,2);
+  assert.equal(merged[0].payments.length,1);
+  assert.equal(mergePolicies(merged,[source,newer] as any).length,2);
+  const excel={...p,id:'random-excel-id',effectiveDate:'2026-01-01',payments:[]};
+  assert.equal(mergePolicies(merged,[excel]).length,2);
+});
+
+test('unrecognized Mingya states do not create renewal alerts',()=>{
+  assert.equal(dueItems([{...p,status:'明亚状态（23）',expiryDate:'2026-11-01',payments:[]}], '2026-11-01').length,0);
+});

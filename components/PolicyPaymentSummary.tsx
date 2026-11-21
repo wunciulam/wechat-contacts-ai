@@ -1,15 +1,16 @@
 import React from 'react';
 import { inactive, nextPayment, remainingInstallments, today, type ManagedPolicy } from '../services/renewal';
 
-export function formatMoney(value: unknown) {
+export function formatMoney(value: unknown, currency = 'CNY') {
   if (value === null || value === undefined || String(value).trim() === '') return '待补充';
   const amount = Number(String(value).replace(/[,，]/g, ''));
   return Number.isFinite(amount)
-    ? '¥ ' + amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    ? (currency === 'USD' ? 'US$ ' : currency === 'CNY' ? '¥ ' : currency + ' ') + amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : '待补充';
 }
 
 export function paymentStatus(policy: ManagedPolicy) {
+  if (policy.status.includes('明亚状态')) return '保单状态待确认，暂不提醒';
   if (inactive(policy.status)) return '已退出续期提醒';
   if (remainingInstallments(policy) === 0) return '缴费期已完成';
   if (/趸|一次/.test(policy.paymentFrequency || '') || /趸/.test(policy.paymentYears || '')) return '一次性缴费';
@@ -31,6 +32,6 @@ export default function PolicyPaymentSummary({ policy, amount = true }: { policy
   if (!next) return <span className="text-sm text-gray-500">{paymentStatus(policy)}</span>;
   return <div className="space-y-2">
     <PaymentDate date={next.date} estimated={next.estimated} />
-    {amount && <div className="flex items-baseline gap-2 text-sm tabular-nums"><span className="text-xs text-gray-500">本期应缴</span>{formatMoney(next.amount)}</div>}
+    {amount && <div className="flex items-baseline gap-2 text-sm tabular-nums"><span className="text-xs text-gray-500">本期应缴</span>{formatMoney(next.amount, policy.mingya?.currency)}</div>}
   </div>;
 }

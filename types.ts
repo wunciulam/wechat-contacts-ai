@@ -6,6 +6,16 @@ export interface ProgressRecord {
   completed?: boolean;
 }
 
+export interface MingyaPerson {
+  name: string; idCard: string; phone: string; birthday: string; sex: string; address: string; share: string; order: string;
+}
+export interface MingyaPolicyData {
+  key: string; captureId?: string; capturedAt: string; policyId: string; policyIndexId: string; companyId: string;
+  currency: string; rawStatus: string; endDate: string; nextPayDate: string; nextPremium: string;
+  applicant: MingyaPerson; insureds: MingyaPerson[]; beneficiaries: MingyaPerson[];
+  risks: { name:string; premium:string; coverage:string; main:boolean; paymentPeriod:string; insurancePeriod:string; effectiveDate:string; endDate:string; state:string; insureds:string[] }[];
+}
+
 export interface Policy {
   id: string;
   policyNumber: string;
@@ -23,6 +33,7 @@ export interface Policy {
   expiryDate?: string;
   insuranceType?: string;
   coverage?: string;
+  mingya?: MingyaPolicyData;
 }
 
 export interface Category {

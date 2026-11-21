@@ -11,3 +11,8 @@ pnpm-debug.log*
 
 .oil-ui
 design-review
+
+output
+.playwright-cli
+tests
+tools

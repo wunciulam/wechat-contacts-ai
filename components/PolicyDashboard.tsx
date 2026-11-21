@@ -89,7 +89,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
 
   const getTotals = (policies: Policy[]) => {
     const count = policies.length;
-    let totalPremium = 0;
+    const totals: Record<string, number> = {};
     policies.forEach(p => {
       // 只计算生效的保单（status 包含"有效"或"正式"，排除"终止"、"退保"、"撤单"）
       const status = p.status || '';
@@ -101,10 +101,10 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
       if (isActive) {
         const premiumStr = String(p.premium || '0');
         const val = parseFloat(premiumStr.replace(/[^0-9.]/g, ''));
-        if (!isNaN(val)) totalPremium += val;
+        if (!isNaN(val)) { const currency=p.mingya?.currency||'CNY'; totals[currency]=(totals[currency]||0)+val; }
       }
     });
-    return { count, totalPremium: totalPremium.toFixed(2) };
+    return { count, totalPremium: Object.entries(totals).map(([currency,amount])=>formatMoney(amount,currency)).join(' / ') || formatMoney(0) };
   };
 
   return (
@@ -161,7 +161,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                   </div>
                   <div className="flex items-center gap-6 md:justify-end border-t md:border-t-0 border-gray-100 pt-3 md:pt-0">
                     <div className="text-right"><div className="text-xs text-gray-500 font-medium">保单数量</div><div className="text-lg font-medium text-gray-700">{count} <span className="text-xs font-normal text-gray-500">份</span></div></div>
-                    <div className="text-right pr-4 border-r border-gray-100"><div className="text-xs text-gray-500 font-medium">总保费</div><div className="text-lg font-medium text-gray-900 tabular-nums">{formatMoney(totalPremium)}</div></div>
+                    <div className="text-right pr-4 border-r border-gray-100"><div className="text-xs text-gray-500 font-medium">总保费</div><div className="text-lg font-medium text-gray-900 tabular-nums">{totalPremium}</div></div>
                     <ChevronDown size={20} className={`text-gray-500 transition-transform ${isExpanded ? 'rotate-180 text-gray-900' : ''}`} />
                   </div>
                 </div>
@@ -186,7 +186,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                             <tr key={policy.id} className="hover:bg-gray-50 transition-colors">
                               <td className="px-4 py-3 font-medium text-gray-700"><button className="text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)}>{policy.productName}</button></td>
                               <td className="px-4 py-3 tabular-nums text-gray-500 text-xs">{policy.policyNumber}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums font-medium text-gray-900">{formatMoney(policy.premium)}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums font-medium text-gray-900">{formatMoney(policy.premium, policy.mingya?.currency)}</td>
                               <td className="px-4 py-3 text-gray-500 text-xs">{policy.paymentFrequency || '待补充'} / {policy.paymentYears || '待补充'}</td><td className="px-4 py-3 text-xs"><PolicyPaymentSummary policy={managed}/></td>
                               <td className="px-4 py-3 text-gray-600">{policy.applicant} / {policy.insured}</td>
                               <td className="px-4 py-3 whitespace-nowrap text-gray-500 text-xs">{policy.effectiveDate}</td>

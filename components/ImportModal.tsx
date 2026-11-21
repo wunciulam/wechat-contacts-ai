@@ -7,6 +7,7 @@ import { key as policyKey } from '../services/renewal';
 
 interface ImportModalProps {
   isOpen: boolean;
+  onMingyaImport?: () => void;
   onPolicyImport?: (files: FileList) => void;
   relatedPolicies?: Policy[];
   onPolicyDetail?: (p: Policy) => void;
@@ -17,7 +18,7 @@ interface ImportModalProps {
   allTags?: string[];
 }
 
-const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onPolicyImport, onClose, onSave, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail }) => {
+const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPolicyImport, onClose, onSave, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail }) => {
   const displayedPolicies = () => Array.from(new Map([...(formData.policies || []), ...relatedPolicies].map(p => [policyKey(p), p])).values());
   const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'table' | 'policies'>('ai');
   const [loading, setLoading] = useState(false);
@@ -382,13 +383,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onPolicyImport, onClo
 
           {activeTab === 'policies' && (
             <section className="space-y-4">
-              <h3 className="text-sm font-semibold text-gray-900">导入保单与缴费表格</h3>
               <p className="text-sm text-gray-600">支持推广业务保单导出表、经代业务保单导出表、应缴保单明细报表（.xlsx、.xls），可同时选择多份。</p>
               <p className="text-sm text-gray-600">保单表更新客户与保单资料；应缴明细更新每期应缴日期、金额和缴费状态。相同保单合并更新，撤单保留历史并退出提醒。上传后先预览，确认后保存。</p>
               <label className="btn btn-primary text-sm cursor-pointer">
                 <Upload size={16} />选择表格
                 <input type="file" className="hidden" accept=".xlsx,.xls" multiple onChange={e => { if (e.target.files?.length) onPolicyImport?.(e.target.files); }} />
               </label>
+              {onMingyaImport && <button className="btn btn-secondary text-sm" onClick={onMingyaImport}>明亚采集文件</button>}
             </section>
           )}
           {activeTab === 'manual' && (

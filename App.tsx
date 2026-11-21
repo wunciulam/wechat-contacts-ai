@@ -1,12 +1,14 @@
 import { migrate, projectContacts } from './services/renewal';
 import RenewalWorkspace from './components/RenewalWorkspace';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import { Menu, Users, ClipboardList, FileText, Cloud, CloudOff } from 'lucide-react';
 import { ContactList } from './components/ContactList';
 import FollowUpDashboard from './components/FollowUpDashboard';
 import PolicyDashboard from './components/PolicyDashboard'; // New Component
 import ImportModal from './components/ImportModal';
+import MingyaImportModal from './components/MingyaImportModal';
+import { parseMingyaPayload, canonicalContactData, type ImportPlan, type MingyaPayload } from './services/mingyaImport';
 import BatchTagModal from './components/BatchTagModal';
 import ConfirmModal from './components/ConfirmModal';
 import QuickFollowUpModal from './components/QuickFollowUpModal';
@@ -14,7 +16,7 @@ import ManualPolicyModal from './components/ManualPolicyModal';
 import CategoryBoard from './components/CategoryBoard';
 import CategoryManager from './components/CategoryManager';
 import { Contact, NewContact, ProgressRecord, ExtractedTableData, Policy, Category } from './types';
-import { saveToCloud, loadFromCloud, isSupabaseConfigured, loadLegacyContactsTable, subscribeToDataChanges, broadcastDataChange } from './services/supabaseService';
+import { saveToCloud, loadFromCloud, isSupabaseConfigured, loadLegacyContactsTable, subscribeToDataChanges, broadcastDataChange, readContactImportSnapshot, commitContactImport, archiveMingyaCapture, type ContactImportSnapshot } from './services/supabaseService';
 
 const CATEGORIES_STORAGE_KEY = 'wechat-categories';
 
@@ -72,6 +74,13 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 const App: React.FC = () => {
   const [policyImportFiles, setPolicyImportFiles] = useState<FileList | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const contactsRef = useRef(contacts); contactsRef.current = contacts;
+  const contactsWriteRef = useRef<Promise<unknown>>(Promise.resolve());
+  const skipImportSyncRef = useRef<Contact[] | null>(null);
+  const importSavingRef = useRef(false);
+  const [isMingyaImportOpen, setIsMingyaImportOpen] = useState(false);
+  const [mingyaPayload, setMingyaPayload] = useState<unknown>(null);
+
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentView, setCurrentView] = useState<'contacts' | 'followups' | 'policies'>('contacts');
@@ -145,6 +154,51 @@ const App: React.FC = () => {
   useEffect(() => {
     console.log('Navigation state:', { currentView, selectedTagsCount: selectedTags.size, contactsCount: contacts.length, selectedContactIdsCount: selectedContactIds.size, isLoaded });
   }, [currentView, selectedTags, contacts.length, selectedContactIds, isLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    document.documentElement.dataset.mingyaImport = '1';
+    const receive = (event: MessageEvent) => {
+      if (importSavingRef.current) return;
+      if (event.source !== window || event.origin !== window.location.origin || event.data?.type !== 'MINGYA_IMPORT_PREVIEW') return;
+      try {
+        const payload = parseMingyaPayload(event.data.payload);
+        setMingyaPayload(payload); setIsMingyaImportOpen(true);
+      } catch { /* Invalid messages cannot change customer data. */ }
+    };
+    window.addEventListener('message', receive);
+    return () => { delete document.documentElement.dataset.mingyaImport; window.removeEventListener('message', receive); };
+  }, [isLoaded]);
+
+  const loadMingyaSnapshot = async (): Promise<ContactImportSnapshot> => {
+    await contactsWriteRef.current;
+    const localVersion = JSON.stringify(contactsRef.current);
+    const snapshot = await readContactImportSnapshot();
+    if (canonicalContactData(snapshot.contacts) !== canonicalContactData(contactsRef.current)) {
+      throw new Error('云端与当前页面的客户资料不同，请先完成同步或刷新后再导入。');
+    }
+    return { ...snapshot, localVersion };
+  };
+
+  const applyMingyaImport = async (snapshot: ContactImportSnapshot, plan: ImportPlan, payload: MingyaPayload) => {
+    if (importSavingRef.current) throw new Error('正在保存，请稍候。');
+    if (JSON.stringify(contactsRef.current) !== snapshot.localVersion) throw new Error('客户资料已变化，请关闭后重新预览导入。');
+    importSavingRef.current = true;
+    try {
+      try { localStorage.setItem('wechat-contacts-before-mingya', JSON.stringify(snapshot.contacts)); }
+      catch { throw new Error('导入前备份未成功，请释放浏览器存储空间后重试。'); }
+      const captureId = await archiveMingyaCapture(snapshot, payload);
+      const importedKeys = new Set(plan.rows.filter(row => row.action === '新增保单' || row.action === '补充 / 更新').map(row => row.key));
+      for (const contact of plan.contacts) for (const policy of contact.policies || []) {
+        if (policy.mingya && importedKeys.has(policy.mingya.key) && !policy.mingya.captureId) policy.mingya.captureId = captureId;
+      }
+      if (JSON.stringify(contactsRef.current) !== snapshot.localVersion) throw new Error('客户资料已变化，请重新预览后导入。');
+      await commitContactImport(snapshot, plan.contacts);
+      skipImportSyncRef.current = plan.contacts;
+      setContacts(plan.contacts);
+      setCurrentView('policies');
+    } finally { importSavingRef.current = false; }
+  };
 
   // 1. Load Data - 优先从云端加载
   useEffect(() => {
@@ -284,10 +338,11 @@ const App: React.FC = () => {
       localStorage.setItem('wechat-contacts', JSON.stringify(contacts));
       localStorage.setItem('wechat-contacts-backup', JSON.stringify(contacts));
       
+      if (skipImportSyncRef.current === contacts) { skipImportSyncRef.current = null; return; }
       // 强制保存到云端
       if (isSupabaseConfigured()) {
         console.log('正在强制保存到云端，联系人数量:', contacts.length);
-        saveToCloud('contacts', contacts).then(success => {
+        contactsWriteRef.current = saveToCloud('contacts', contacts).then(success => {
           console.log('云端保存结果:', success ? '成功' : '失败');
         }).catch(e => console.log('云端同步失败:', e));
       }
@@ -1120,7 +1175,15 @@ const App: React.FC = () => {
       </div>
 
       {policyContactId && detailPolicyId && <RenewalWorkspace contacts={contacts} onContacts={setContacts} customerId={policyContactId} initialPolicyId={detailPolicyId} onCloseDetail={() => { setPolicyContactId(null); setDetailPolicyId(undefined); }} />}
+      <MingyaImportModal
+        open={isMingyaImportOpen}
+        initialPayload={mingyaPayload}
+        onClose={() => { setIsMingyaImportOpen(false); setMingyaPayload(null); }}
+        onLoad={loadMingyaSnapshot}
+        onApply={applyMingyaImport}
+      />
       <ImportModal 
+        onMingyaImport={() => { setIsModalOpen(false); setMingyaPayload(null); setIsMingyaImportOpen(true); }}
         onPolicyImport={files => { setPolicyImportFiles(files); setIsModalOpen(false); setCurrentView('policies'); }}
         relatedPolicies={editingContact ? projectContacts(contacts, migrate(contacts), true).find(c => c.id === editingContact.id)?.policies : []}
         onPolicyDetail={p=>{if(editingContact){setDetailPolicyId(p.id);setPolicyContactId(editingContact.id);}}}

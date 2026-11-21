@@ -36,10 +36,11 @@ export const normalizedPolicyNumber = (value: unknown) => {
   const clean = String(value ?? "").trim().replace(/[^0-9A-Za-z]/g, "").toUpperCase();
   return clean.replace(/^0+(?=[0-9A-Z])/, "");
 };
-export const key = (p: Partial<ManagedPolicy>) =>
+const legacyKey = (p: Partial<ManagedPolicy>) =>
   normalizedPolicyNumber(p.policyNumber)
     ? `${p.company?.trim()}|${normalizedPolicyNumber(p.policyNumber)}`
     : `manual:${p.id}`;
+export const key = (p: Partial<ManagedPolicy>) => p.mingya?.key ? `mingya:${p.mingya.key}` : legacyKey(p);
 const text = (v: unknown) => String(v ?? "").trim();
 export function date(v: unknown) {
   if (typeof v === "number") {
@@ -145,7 +146,13 @@ export function candidates(
 export function mergePolicies(old: ManagedPolicy[], incoming: ManagedPolicy[]) {
   const map = new Map(old.map((p) => [key(p), structuredClone(p)]));
   for (const p of incoming) {
-    const prev = map.get(key(p));
+    let prev = map.get(key(p)) || [...map.values()].find(old => old.id === p.id);
+    if (!prev && !p.mingya) {
+      const related=[...map.values()].filter(old=>old.mingya && legacyKey(old)===legacyKey(p));
+      prev=related.find(old=>date(old.effectiveDate)===date(p.effectiveDate)) || (related.length===1?related[0]:undefined);
+    }
+    const targetKey=prev?.mingya && !p.mingya ? key(prev) : key(p);
+    if (prev && key(prev)!==targetKey) map.delete(key(prev));
     if (!prev) {
       map.set(key(p), structuredClone(p));
       continue;
@@ -178,7 +185,7 @@ export function mergePolicies(old: ManagedPolicy[], incoming: ManagedPolicy[]) {
           v !== "" && v !== undefined && !["id", "payments"].includes(k),
       ),
     );
-    map.set(key(p), {
+    map.set(targetKey, {
       ...prev,
       ...nonempty,
       id: prev.id,
@@ -212,7 +219,7 @@ export function dueItems(policies: ManagedPolicy[], now = today()) {
   end.setUTCDate(end.getUTCDate() + 30);
   const limit = end.toISOString().slice(0, 10);
   return policies
-    .filter((p) => !inactive(p.status))
+    .filter((p) => !inactive(p.status) && !p.status.includes('明亚状态'))
     .flatMap((p) => {
       const pay = nextPayment(p);
       const items: {
@@ -264,7 +271,7 @@ export function addMonths(anchor: string, months: number): string {
   return target.toISOString().slice(0, 10);
 }
 export function nextPayment(p: ManagedPolicy): Payment | undefined {
-  if (inactive(p.status)) return;
+  if (inactive(p.status) || p.status.includes('明亚状态')) return;
   const latest = [...(p.payments || [])].sort((a, b) =>
     b.date.localeCompare(a.date),
   )[0];

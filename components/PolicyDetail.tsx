@@ -1,3 +1,4 @@
+import MingyaPolicyDetailModal from './MingyaPolicyDetailModal';
 import { createPortal } from 'react-dom';
 import { DialogFooterContext } from './WorkspaceDialog';
 import PolicyPaymentSummary, { formatMoney } from './PolicyPaymentSummary';
@@ -21,6 +22,7 @@ export default function PolicyDetail({
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const footer = React.useContext(DialogFooterContext);
+  const [sourceOpen,setSourceOpen]=useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(policy),
     [saved, setSaved] = useState(false);
@@ -52,6 +54,8 @@ export default function PolicyDetail({
         <div><h3 className="text-sm font-semibold">{policy.productName || '保单信息'}</h3><p className="mt-1 text-xs text-gray-500">{policy.policyNumber}</p></div>
         {!editing && <button className="btn btn-secondary text-sm" onClick={() => setEditing(true)}><Edit2 size={16}/>编辑资料</button>}
       </div>
+      {policy.mingya && <button className="btn btn-secondary text-sm mb-4" onClick={() => setSourceOpen(true)}>明亚采集详情</button>}
+      <MingyaPolicyDetailModal policy={sourceOpen ? policy : null} onClose={() => setSourceOpen(false)} />
       <section className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
         <h4 className="mb-2 text-xs font-medium text-gray-500">下一次缴费</h4>
         <PolicyPaymentSummary policy={policy}/>
@@ -59,7 +63,7 @@ export default function PolicyDetail({
       {!editing && <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
         {fields.filter(([key]) => !['productName','policyNumber'].includes(key)).map(([key,label]) => <div key={key}>
           <dt className="text-xs text-gray-500">{label}</dt>
-          <dd className="mt-1 break-words text-sm">{key === 'premium' ? formatMoney(policy[key]) : String(policy[key] ?? '') || '待补充'}</dd>
+          <dd className="mt-1 break-words text-sm">{key === 'premium' ? formatMoney(policy[key], policy.mingya?.currency) : String(policy[key] ?? '') || '待补充'}</dd>
         </div>)}
       </dl>}
       {editing && <>
@@ -161,7 +165,7 @@ export default function PolicyDetail({
                   <React.Fragment key={q.date}>
                     <tr className="border-b border-gray-100">
                       <td className="p-3 whitespace-nowrap">{q.date}</td>
-                      <td className="p-3 whitespace-nowrap text-right tabular-nums">{formatMoney(q.amount)}</td>
+                      <td className="p-3 whitespace-nowrap text-right tabular-nums">{formatMoney(q.amount, policy.mingya?.currency)}</td>
                       <td className="p-3">{q.status}</td>
                       <td className="p-3 text-right">
                         <button
