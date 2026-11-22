@@ -1,3 +1,4 @@
+import PolicyFieldsForm, {policyFields} from './PolicyFieldsForm';
 import MingyaPolicyDetailModal from './MingyaPolicyDetailModal';
 import { createPortal } from 'react-dom';
 import { DialogFooterContext } from './WorkspaceDialog';
@@ -28,25 +29,7 @@ export default function PolicyDetail({
     [saved, setSaved] = useState(false);
   React.useEffect(() => setDraft(policy), [policy]);
   React.useEffect(() => { onDirtyChange?.(editing && JSON.stringify(draft) !== JSON.stringify(policy)); }, [draft, policy, editing, onDirtyChange]);
-  const fields: [keyof ManagedPolicy, string, string?][] = [
-    ["productName", "产品名称"],
-    ["applicant", "投保人"],
-    ["insured", "被保人"],
-    ["company", "保险公司"],
-    ["policyNumber", "保单号"],
-    ["applicationNumber", "投保单号"],
-    ["status", "保单状态"],
-    ["premium", "单期保费"],
-
-    ["effectiveDate", "生效日期", "date"],
-    ["paymentFrequency", "缴费方式"],
-    ["paymentYears", "缴费期间"],
-    ["paymentEndDate", "缴费结束日期（不含当天）", "date"],
-    ["coveragePeriod", "保障期间"],
-    ["expiryDate", "保障到期日", "date"],
-    ["coverage", "保额"],
-    ["insuranceType", "险种类型"],
-  ];
+  const fields = policyFields;
   return (
     <>
 
@@ -67,68 +50,7 @@ export default function PolicyDetail({
         </div>)}
       </dl>}
       {editing && <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-        {fields.map(([k, label, type]) => (
-          <label key={k} className="text-xs text-gray-600">
-            {label}
-            {k === "applicant" || k === "insured" ? (
-              <select className="input mt-1.5" value={draft[k === "applicant" ? "applicantId" : "insuredId"] || ""}
-                onChange={e => {
-                  const c = contacts.find(c => c.id === e.target.value);
-                  setSaved(false);
-                  setDraft({ ...draft, [k]: c ? c.remarkName || c.nickname : draft[k], [k === "applicant" ? "applicantId" : "insuredId"]: c?.id });
-                }}>
-                <option value="">{draft[k] || "选择关联客户"}</option>
-                {contacts.map(c => <option key={c.id} value={c.id}>{c.remarkName || c.nickname}{c.phoneNumber ? ` · 尾号${String(c.phoneNumber).slice(-4)}` : ""}</option>)}
-              </select>
-            ) : k === "paymentFrequency" ? (
-              <select
-                className="input mt-1.5"
-                value={draft.paymentFrequency || ""}
-                onChange={(e) => {
-                  setSaved(false);
-                  setDraft({ ...draft, paymentFrequency: e.target.value });
-                }}
-              >
-                {["", "期交-年", "期交-半年", "期交-季", "期交-月", "趸交"].map(
-                  (x) => (
-                    <option key={x} value={x}>
-                      {x || "待补充"}
-                    </option>
-                  ),
-                )}
-              </select>
-            ) : (
-              <input
-                readOnly={[
-                  "policyNumber",
-                  "company",
-                  "applicant",
-                  "insured",
-                ].includes(k) && Boolean(policy[k])}
-                className="input mt-1.5 read-only:bg-gray-50"
-                type={type || "text"}
-                value={k === 'premium' && draft[k] === policy[k] && String(draft[k] ?? '').trim() !== '' && Number.isFinite(Number(draft[k])) ? Number(draft[k]).toFixed(2) : String(draft[k] ?? "")}
-                placeholder={
-                  k === "paymentYears"
-                    ? "例如：20年"
-                    : k === "coveragePeriod"
-                      ? "例如：终身、至70周岁"
-                      : "待补充"
-                }
-                onChange={(e) => {
-                  setSaved(false);
-                  setDraft({
-                    ...draft,
-                    [k]: e.target.value,
-                    ...(k === "expiryDate" ? { renewed: false } : {}),
-                  });
-                }}
-              />
-            )}
-          </label>
-        ))}
-      </div>
+      <PolicyFieldsForm value={draft} onChange={p=>{setSaved(false);setDraft(p);}} contacts={contacts} identityReadonly disabled={busy}/>
       {footer && createPortal(<div className="flex justify-end gap-3 border-t border-gray-100 bg-white px-5 py-4 items-center">
         <span className="text-xs text-gray-500">{saved ? "已保存" : ""}</span>
         <button className="btn btn-secondary text-sm" disabled={busy} onClick={() => { setDraft(policy); setEditing(false); }}>取消</button>

@@ -27,8 +27,23 @@ const uuid = () => crypto.randomUUID();
 const has = (v: unknown) => v !== undefined && v !== null && text(v) !== '';
 const person = (input: Json = {}): MingyaPerson => { const p=input||{};return ({ name:text(p.name),idCard:readable(p.cardNo),phone:readable(p.mobile),birthday:text(p.birthday).slice(0,10),sex:text(p.sex),address:text(p.homeAddress||p.postAddress),share:text(p.bnfRate),order:text(p.bnfOrder) }); };
 const period = (n: unknown, unit: unknown) => {const s=text(n),u=text(unit);return s ? `${u==='A'?'至':''}${s}${u==='Y'?'年':u==='M'?'月':u==='D'?'天':u==='A'?'周岁':u?`（单位代码 ${u}）`:''}` : '';};
+// Coverage uses insurance periods and explicit end dates, never payment terms.
+export function coverageFromDetail(source: Json) {
+  const risks: Json[] = Array.isArray(source.riskList) ? source.riskList : [];
+  const mains = risks.filter(r => r.mainRiskFlag === true || ['01','1','Y'].includes(text(r.mainRiskFlag)));
+  const readablePeriod = (r: Json) => /[\u4e00-\u9fff]/.test(text(r.insurancePeriodText)) ? text(r.insurancePeriodText)
+    : ['A','Y','M','D'].includes(text(r.insurancePeriodUnit)) ? period(r.insurancePeriod,r.insurancePeriodUnit) : '';
+  const periods = [...new Set((mains.length ? mains : risks).map(readablePeriod).filter(Boolean))];
+  const ends = [...new Set(risks.map(r=>text(r.endDate).slice(0,10)).filter(Boolean))];
+  const validDate = (value: unknown) => { const d=text(value).slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(d)&&!isNaN(Date.parse(d))&&new Date(d+'T00:00:00Z').toISOString().slice(0,10)===d?d:''; };
+  return {
+    coveragePeriod: readablePeriod(source) || (periods.length===1 ? periods[0] : ''),
+    expiryDate: validDate(source.guaranteeEndDate) || validDate(source.endDate) || (ends.length===1 ? validDate(ends[0]) : ''),
+    insuranceType: [...new Set((mains.length ? mains : risks).map(r=>text(r.risk?.riskFlag)).filter(v=>/[\u4e00-\u9fff]/.test(v)))].join('、'),
+  };
+}
 function compact(source: Json, capturedAt: string, key: string): MingyaPolicyData {
-  return { ...financialFromDetail(source),key,capturedAt,policyId:text(source.policyId),policyIndexId:text(source.policyIndexId),companyId:text(source.insComId),
+  return { ...financialFromDetail(source),...coverageFromDetail(source),key,capturedAt,policyId:text(source.policyId),policyIndexId:text(source.policyIndexId),companyId:text(source.insComId),
     currency:text(source.currency),rawStatus:text(source.policyState),endDate:text(source.guaranteeEndDate||source.endDate).slice(0,10),
     applicant:person(source.appnt),
     insureds:(source.insureds||[]).map(person),beneficiaries:(source.beneficiaries||[]).map(person),
@@ -59,7 +74,7 @@ export function normalizeMingya(payload: MingyaPayload): {items: IncomingPolicy[
       premium:source.periodicPremium||'',effectiveDate:dateKey(p.validDate||p.effectDate),
       status:({'16':'正式保单','17':'终止保单'} as Record<string,string>)[text(p.policyState)]||`明亚状态（${text(p.policyState)||'未知'}）`,
       applicant:applicant.name,insured:text(p.insuredName)||source.insureds.map(x=>x.name).join('、'),
-      coverage:+p.amount===-1?'详见条款':text(p.amount),paymentYears:[...new Set(source.risks.map(x=>x.paymentPeriod).filter(Boolean))].join('、'),paymentFrequency:source.paymentFrequency||'',paymentEndDate:source.paymentEndDate||'',mingya:source};
+      coverage:+p.amount===-1?'详见条款':text(p.amount),paymentYears:[...new Set(source.risks.map(x=>x.paymentPeriod).filter(Boolean))].join('、'),paymentFrequency:source.paymentFrequency||'',paymentEndDate:source.paymentEndDate||'',coveragePeriod:source.coveragePeriod||'',expiryDate:source.expiryDate||'',insuranceType:source.insuranceType||'',mingya:source};
     const personKey=identity(applicant.idCard)?`id:${identity(applicant.idCard)}`:phoneKey(applicant.phone)?`phone:${phoneKey(applicant.phone)}:${nameKey(applicant.name)}`:`name:${nameKey(applicant.name)}`;
     items.push({key,personKey,policy,applicant,hasDetail:!!r.detail});
   }
@@ -131,10 +146,10 @@ export function planMingyaImport(existing: Contact[], payload:MingyaPayload, res
     }
     if(matches.length===1){
       const old=matches[0].policy;const merged={...old};
-      for(const key of ['policyNumber','productName','company','premium','effectiveDate','status','applicant','insured','paymentYears','paymentFrequency','paymentEndDate','insuranceType','coverage'] as const){
+      for(const key of ['policyNumber','productName','company','premium','effectiveDate','status','applicant','insured','paymentYears','paymentFrequency','paymentEndDate','coveragePeriod','expiryDate','insuranceType','coverage'] as const){
         const value=p[key];if(has(old[key])&&has(value)&&text(old[key])!==text(value)){plan.fieldConflicts++;plan.conflicts.push({number:p.policyNumber,field:key,existing:text(old[key]),incoming:text(value)});}
         const fixOldPremium=key==='premium'&&old.mingya&&old.mingya.mappingVersion!==2&&money(old.premium)!==''&&money(old.premium)===p.mingya?.termTotalPremium;
-        const sourceField=({premium:'periodicPremium',paymentFrequency:'paymentFrequency',paymentEndDate:'paymentEndDate'} as Record<string,string>)[key];
+        const sourceField=({premium:'periodicPremium',paymentFrequency:'paymentFrequency',paymentEndDate:'paymentEndDate',coveragePeriod:'coveragePeriod',expiryDate:'expiryDate',insuranceType:'insuranceType'} as Record<string,string>)[key];
         const sourceOwned=old.mingya?.mappingVersion===2&&sourceField&&text(old[key])===text((old.mingya as any)[sourceField]);
         if(has(value)&&(mode==='source'||!has(old[key])||fixOldPremium||sourceOwned))merged[key]=value;
       }

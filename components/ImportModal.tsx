@@ -363,33 +363,29 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="bg-white shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh] rounded-2xl border border-gray-200">
+      <div className={`bg-white shadow-2xl w-full ${!initialData&&activeTab==='policies'?'max-w-3xl':'max-w-5xl'} overflow-hidden flex flex-col max-h-[90vh] rounded-2xl border border-gray-200`}>
         <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-          <h2 className="text-base font-semibold text-gray-800">{initialData ? '编辑联系人资料' : '添加联系人'}</h2>
+          <h2 className="text-base font-semibold text-gray-800">{initialData ? '编辑联系人资料' : '添加 / 导入'}</h2>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
             <X size={20} />
           </button>
         </div>
         {!initialData && (
           <div className="px-5 pt-4 pb-0 flex gap-2 overflow-x-auto">
-            <button onClick={() => setActiveTab('policies')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors whitespace-nowrap ${activeTab === 'policies' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}>保单与缴费导入</button>
-            <button onClick={() => setActiveTab('ai')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'ai' ? 'border-gray-900 bg-white text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>Excel导入</button>
-            <button onClick={() => setActiveTab('table')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'table' ? 'border-gray-900 bg-white text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>截图识别</button>
-            <button onClick={() => setActiveTab('manual')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'manual' ? 'border-gray-900 bg-white text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>手动录入</button>
+            <button onClick={() => setActiveTab('policies')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors whitespace-nowrap ${activeTab === 'policies' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}>明亚采集</button>
+            <button onClick={() => setActiveTab('ai')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'ai' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>Excel导入</button>
+            <button onClick={() => setActiveTab('table')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'table' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>截图识别</button>
+            <button onClick={() => setActiveTab('manual')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'manual' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>手动录入</button>
           </div>
         )}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {error && <div className="p-4 bg-red-50 text-red-700 rounded-xl flex gap-2 text-sm border border-red-100"><AlertCircle size={18} />{error}</div>}
 
-          {activeTab === 'policies' && (
-            <section className="space-y-4">
-              <p className="text-sm text-gray-600">支持推广业务保单导出表、经代业务保单导出表、应缴保单明细报表（.xlsx、.xls），可同时选择多份。</p>
-              <p className="text-sm text-gray-600">保单表更新客户与保单资料；应缴明细更新每期应缴日期、金额和缴费状态。相同保单合并更新，撤单保留历史并退出提醒。上传后先预览，确认后保存。</p>
-              <label className="btn btn-primary text-sm cursor-pointer">
-                <Upload size={16} />选择表格
-                <input type="file" className="hidden" accept=".xlsx,.xls" multiple onChange={e => { if (e.target.files?.length) onPolicyImport?.(e.target.files); }} />
-              </label>
-              {onMingyaImport && <button className="btn btn-secondary text-sm" onClick={onMingyaImport}>明亚采集文件</button>}
+          {activeTab === 'policies' && onMingyaImport && (
+            <section>
+              <button type="button" className="btn btn-primary text-sm" onClick={onMingyaImport}>
+                <Upload size={16} />导入采集文件
+              </button>
             </section>
           )}
           {activeTab === 'manual' && (

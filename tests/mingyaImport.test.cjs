@@ -58,3 +58,15 @@ test('data repair changes only source-linked financial data in both stores, and 
  const result=fix(customers,renewal,source,'original');assert.equal(result.contacts[0].policies[0].premium,'12000');assert.equal(result.renewal.policies[0].payments[0].status,'已缴费');assert.equal(result.contacts[0].wxid,customers[0].wxid);assert.equal(result.contacts[0].remarkInfo,customers[0].remarkInfo);assert.equal(JSON.stringify(result.renewal.imports),JSON.stringify(renewal.imports));assert.equal(customers[0].policies[0].premium,'120000');
  const repeat=fix(result.contacts,result.renewal,source,'original');assert.equal(repeat.counts.metadata,0);assert.equal(exportsObject.canonicalContactData(repeat.contacts),exportsObject.canonicalContactData(result.contacts));
 });
+test('trusteeship coverage comes from main risk, not payment period, and fills existing blanks',()=>{
+ const r=record({dataSource:'trusteeship',validDate:'2009-05-19',guaranteeEndDate:'2073-05-18',insurancePeriod:'',insurancePeriodUnit:'A',riskList:[{mainRiskFlag:'01',insurancePeriod:80,insurancePeriodUnit:'A',payPeriod:15,payPeriodUnit:'Y',risk:{riskFlag:'两全'}},{mainRiskFlag:'02',insurancePeriod:80,insurancePeriodUnit:'A',risk:{riskFlag:'重疾'}}]});
+ const source=payload([r]);const first=planMingyaImport([],source);const p=first.contacts[0].policies[0];
+ assert.equal(p.coveragePeriod,'至80周岁');assert.equal(p.expiryDate,'2073-05-18');assert.equal(p.insuranceType,'两全');assert.equal(p.paymentYears,'15年');
+ delete p.coveragePeriod;delete p.expiryDate;delete p.insuranceType;const refreshed=planMingyaImport(first.contacts,source).contacts[0].policies[0];
+ assert.equal(refreshed.coveragePeriod,'至80周岁');assert.equal(refreshed.expiryDate,'2073-05-18');assert.equal(refreshed.insuranceType,'两全');
+ p.coveragePeriod='人工核对期间';assert.equal(planMingyaImport(first.contacts,source).contacts[0].policies[0].coveragePeriod,'人工核对期间');
+});
+test('coverage does not infer expiry from payment end or unknown risk codes',()=>{
+ const p=planMingyaImport([],payload([record({payEndDate:'2023-05-19',riskList:[{mainRiskFlag:'01',payPeriod:15,payPeriodUnit:'Y',insurancePeriod:108,insurancePeriodUnit:'UNKNOWN',risk:{riskType:'01'}}]})])).contacts[0].policies[0];
+ assert.equal(p.coveragePeriod,'');assert.equal(p.expiryDate,'');assert.equal(p.insuranceType,'');
+});
