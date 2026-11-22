@@ -1,3 +1,4 @@
+import PolicyStatus from './PolicyStatus';
 import CustomerTags from './CustomerTags';
 import PolicyPaymentSummary, { formatMoney } from './PolicyPaymentSummary';
 import {ManagedPolicy, dueItems, nextPayment, today} from '../services/renewal';
@@ -167,35 +168,34 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                 </div>
                 {isExpanded && (
                   <div className="border-t border-gray-100 bg-gray-50 p-4 animate-in slide-in-from-top-2">
-                    <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto no-scrollbar">
-                      <table className="w-full text-left text-sm min-w-[1120px]">
+                    <div className="max-w-full bg-white rounded-lg border border-gray-200 overflow-x-auto">
+                      <table className="w-full min-w-[1660px] table-fixed text-left text-sm">
+                        <colgroup>{[280,240,140,160,260,180,130,120,128].map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup>
                         <thead className="bg-gray-50 text-gray-500 font-medium text-xs  border-b border-gray-200">
                           <tr className="divide-x divide-gray-100">
                             <th className="px-4 py-3">险种名称</th>
                             <th className="px-4 py-3">保单号</th>
                             <th className="px-4 py-3 text-right">保费</th>
-                            <th className="px-4 py-3">缴费方式 / 期间</th><th className="px-4 py-3">下次缴费 / 应缴金额</th>
+                            <th className="px-4 py-3 whitespace-nowrap">缴费方式 / 期间</th><th className="px-4 py-3">下次缴费 / 应缴金额</th>
                             <th className="px-4 py-3">投保人/被保人</th>
                             <th className="px-4 py-3">生效日期</th>
                             <th className="px-4 py-3">状态</th>
-                            <th className="px-4 py-3 text-right">操作</th>
+                            <th className="sticky right-0 z-20 border-l border-gray-200 bg-gray-50 px-4 py-3 text-right whitespace-nowrap">操作</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {contact.policies?.map(policy => { const managed={...policy,payments:(policy as ManagedPolicy).payments||[]}; const next=nextPayment(managed);const reminders=dueItems([managed]);return (
-                            <tr key={policy.id} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-4 py-3 font-medium text-gray-700"><button className="text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)}>{policy.productName}</button></td>
-                              <td className="px-4 py-3 tabular-nums text-gray-500 text-xs">{policy.policyNumber}</td>
+                            <tr key={policy.id} className="group hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 font-medium text-gray-700"><button className="max-w-full break-words text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)}>{policy.productName}</button></td>
+                              <td title={policy.policyNumber} className="overflow-hidden text-ellipsis px-4 py-3 whitespace-nowrap tabular-nums text-gray-500 text-xs">{policy.policyNumber}</td>
                               <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums font-medium text-gray-900">{formatMoney(policy.premium, policy.mingya?.currency)}</td>
-                              <td className="px-4 py-3 text-gray-500 text-xs">{policy.paymentFrequency || '待补充'} / {policy.paymentYears || '待补充'}</td><td className="px-4 py-3 text-xs"><PolicyPaymentSummary policy={managed}/></td>
-                              <td className="px-4 py-3 text-gray-600">{policy.applicant} / {policy.insured}</td>
+                              <td className="px-4 py-3 text-gray-500 text-xs"><span className="block whitespace-nowrap">{policy.paymentFrequency || '待补充'}</span><span className="mt-1 block whitespace-nowrap">{policy.paymentYears || '待补充'}</span></td><td className="px-4 py-3 text-xs"><PolicyPaymentSummary policy={managed}/></td>
+                              <td className="px-4 py-3 text-gray-600"><span className="block break-words">{policy.applicant}</span><span className="mt-1 block break-words text-gray-500">{policy.insured}</span></td>
                               <td className="px-4 py-3 whitespace-nowrap text-gray-500 text-xs">{policy.effectiveDate}</td>
                               <td className="px-4 py-3">
-                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${policy.status.includes('有效') ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'}`}>
-                                  {policy.status}
-                                </span>
+                                <PolicyStatus status={policy.status}/>
                               </td>
-                              <td className="px-4 py-3 text-right">
+                              <td className="sticky right-0 z-10 border-l border-gray-200 bg-white px-4 py-3 text-right whitespace-nowrap group-hover:bg-gray-50">
                                 <button className="btn btn-ghost btn-sm" onClick={()=>onPolicyDetail?.(policy)}>详情</button><button
                                   onClick={(e) => {
                                     e.stopPropagation();

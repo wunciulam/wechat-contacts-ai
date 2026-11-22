@@ -6,7 +6,7 @@ const appId = import.meta.env.VITE_APP_ID;
 // One PostgREST insert statement commits both rows together; rejected on any constraint failure.
 export async function saveImport(data: RenewalData, contacts: Contact[]) {
   if (!appId) throw new Error("缺少固定数据标识，已阻止导入");
-  const { error } = await supabase.from("app_data").upsert(
+  const { data: savedRows, error } = await supabase.from("app_data").upsert(
     [
       {
         app_id: appId,
@@ -22,8 +22,11 @@ export async function saveImport(data: RenewalData, contacts: Contact[]) {
       },
     ],
     { onConflict: "app_id,data_type" },
-  );
+  ).select("data_type,data");
   if (error) throw error;
+  const saved=savedRows?.find(row=>row.data_type==='contacts')?.data;
+  if(!Array.isArray(saved))throw new Error('未收到客户保存确认，请刷新核对。');
+  return saved as Contact[];
 }
 
 export interface PolicyMarkResult { payments: import('./renewal').Payment[]; renewed?: boolean }

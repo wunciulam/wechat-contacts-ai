@@ -1,20 +1,26 @@
+import type {FollowUpSave} from '../types';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import {WorkspaceDialogFooter} from './WorkspaceDialog';
 import { Calendar, Search, Check, UserPlus, Plus, User, ChevronUp, ChevronDown, X, Trash2, CheckSquare, Square } from 'lucide-react';
 import { Contact, ProgressRecord } from '../types';
 
 interface QuickFollowUpFormProps {
   contacts: Contact[];
-  onSave: (contactId: string | null, date: string, content: string, status: 'following' | 'contacted', newContactName?: string, existingRecordId?: string, completed?: boolean) => void;
+  onSave: FollowUpSave;
   initialContactId?: string;
   initialRecord?: ProgressRecord;
   onCancel?: () => void;
+  onSaved?: () => void;
+  onSavingChange?: (saving:boolean)=>void;
   className?: string;
   variant?: 'default' | 'compact';
 }
 
 export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({ 
-  contacts, onSave, initialContactId, initialRecord, onCancel, className = '', variant = 'default'
+  contacts, onSave, initialContactId, initialRecord, onCancel, onSaved, onSavingChange, className = '', variant = 'default'
 }) => {
+  const [saving,setSaving]=useState(false),[saveError,setSaveError]=useState('');
+  const savingRef=useRef(false),requestIds=useRef(new Map<string,string>()),newCustomerId=useRef(crypto.randomUUID());
   const [selectedContactId, setSelectedContactId] = useState<string>(initialContactId || '');
   const [date, setDate] = useState(initialRecord?.date || new Date().toISOString().split('T')[0]);
   
@@ -30,7 +36,7 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
   const [newContactName, setNewContactName] = useState('');
   const [isExpanded, setIsExpanded] = useState(!!initialRecord);
   
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLFieldSetElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -88,32 +94,22 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
     }
   };
 
-  const handleSave = () => {
-    if ((selectedContactId || (isCreatingNew && newContactName.trim())) && todoItems.some(t => t.text.trim())) {
-      todoItems.filter(t => t.text.trim()).forEach(todo => {
-        onSave(
-          isCreatingNew ? null : selectedContactId, 
-          date, 
-          todo.text.trim(), 
-          selectedContact?.followUpStatus || 'following',
-          isCreatingNew ? newContactName.trim() : undefined,
-          initialRecord ? todo.id : undefined,
-          todo.completed
-        );
-      });
-      
-      if (!initialRecord) {
-        setTodoItems([{ id: '1', text: '', completed: false }]);
-        if (!initialContactId) {
-            setSelectedContactId('');
-            setSearchTerm('');
-            setIsCreatingNew(false);
-            setNewContactName('');
-            if (variant === 'compact') setIsExpanded(false);
-        }
+  const handleSave = async () => {
+    if(savingRef.current||!((selectedContactId||(isCreatingNew&&newContactName.trim()))&&todoItems.some(t=>t.text.trim())))return;
+    savingRef.current=true;setSaving(true);onSavingChange?.(true);setSaveError('');
+    try {
+      let target=isCreatingNew?newCustomerId.current:selectedContactId;
+      for(const todo of todoItems.filter(t=>t.text.trim())) {
+        if(!requestIds.current.has(todo.id))requestIds.current.set(todo.id,crypto.randomUUID());
+        target=await onSave(isCreatingNew?null:target,date,todo.text.trim(),selectedContact?.followUpStatus||'following',isCreatingNew?newContactName.trim():undefined,initialRecord?todo.id:undefined,todo.completed,requestIds.current.get(todo.id),target);
       }
-    }
+      requestIds.current.clear();newCustomerId.current=crypto.randomUUID();
+      if(!initialRecord){setTodoItems([{id:'1',text:'',completed:false}]);if(!initialContactId){setSelectedContactId('');setSearchTerm('');setIsCreatingNew(false);setNewContactName('');if(variant==='compact')setIsExpanded(false);}}
+      onSaved?.();
+    } catch(e){setSaveError(e instanceof Error?e.message:String(e));}
+    finally{savingRef.current=false;setSaving(false);onSavingChange?.(false);}
   };
+  const feedback=saveError?<p role="alert" className="text-sm text-danger-600">{saveError}</p>:saving?<p role="status" className="text-sm text-gray-500">正在保存到数据库…</p>:null;
 
   const renderTodoItems = () => (
     <div className="space-y-1.5 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
@@ -169,7 +165,8 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
 
   if (variant === 'compact') {
       return (
-          <div ref={containerRef} className={`bg-white border shadow-md rounded-lg transition-all duration-300 w-full overflow-visible ${isExpanded ? 'p-3 md:p-3.5 border-gray-300' : 'p-2 border-gray-200'}`}>
+          <fieldset disabled={saving} ref={containerRef} className={`min-w-0 bg-white border shadow-md rounded-lg transition-all duration-300 w-full overflow-visible ${isExpanded ? 'p-3 md:p-3.5 border-gray-300' : 'p-2 border-gray-200'}`}>
+            {feedback}
               <div className="flex flex-col gap-2.5 md:gap-3">
                   <div className={`flex items-center gap-1.5 md:gap-2 ${!isExpanded && !selectedContactId ? 'hidden' : 'flex animate-in fade-in slide-in-from-bottom-2 duration-300'}`}>
                        <div className="relative">
@@ -222,10 +219,10 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
                             </div>
                             <button 
                               onClick={handleSave} 
-                              disabled={(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim())} 
+                              disabled={saving || (!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim())}
                               className={`shrink-0 px-4 md:px-8 py-2 md:py-2.5 rounded-md text-xs md:text-sm font-medium transition-all ${(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim()) ? 'bg-gray-200 text-gray-400' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
                             >
-                              立即录入
+                              {saving?'正在保存…':'立即录入'}
                             </button>
                           </div>
                        )}
@@ -235,20 +232,21 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
                            )}
                            <button 
                              onClick={handleSave} 
-                             disabled={(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim())} 
+                             disabled={saving || (!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim())}
                              className={`shrink-0 px-6 md:px-10 py-2 md:py-2.5 rounded-md text-xs md:text-sm font-medium transition-all ${(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim()) ? 'bg-gray-200 text-gray-400' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
                            >
-                            {initialRecord ? '保存修改' : '立即录入'}
+                            {saving?'正在保存…':initialRecord?'保存修改':'立即录入'}
                           </button>
                        </div>
                   </div>
               </div>
-          </div>
+          </fieldset>
       );
   }
 
   return (
-    <div className={`space-y-4 ${className}`}>
+    <fieldset disabled={saving} className={`min-w-0 space-y-4 ${className}`}>
+      {feedback}
            <div className="space-y-2 relative">
               <label className="text-xs font-medium text-gray-700 block ml-1">关联客户对象</label>
               {isCreatingNew ? (
@@ -307,12 +305,12 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
                  {renderTodoItems()}
                </div>
             </div>
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                {onCancel && <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all">取消</button>}
-                <button onClick={handleSave} disabled={(!selectedContactId && !newContactName) || !todoItems.some(t => t.text.trim())} className="px-6 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-md font-medium transition-all disabled:opacity-50 flex items-center gap-2">
-                  <Check size={18} strokeWidth={3} /><span>{initialRecord ? '保存修改' : '保存记录'}</span>
+            <WorkspaceDialogFooter>
+                {onCancel && <button disabled={saving} onClick={onCancel} className="btn btn-secondary text-sm">取消</button>}
+                <button onClick={handleSave} disabled={saving || (!selectedContactId && !newContactName) || !todoItems.some(t => t.text.trim())} className="btn btn-primary text-sm">
+                  <Check size={18} strokeWidth={3} /><span>{saving?'正在保存…':initialRecord?'保存修改':'保存记录'}</span>
                 </button>
-            </div>
-    </div>
+            </WorkspaceDialogFooter>
+    </fieldset>
   );
 };

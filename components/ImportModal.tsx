@@ -1,3 +1,5 @@
+import PolicyStatus from './PolicyStatus';
+import {formatMoney} from './PolicyPaymentSummary';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { X, Upload, Check, AlertCircle, Plus, FileSpreadsheet, ShoppingBag, Trash2, Sparkles, Shield, Clock, Tag, Edit2, FileText, UserCheck } from 'lucide-react';
 import { extractContactsFromMedia, extractTableFromMedia } from '../services/geminiService';
@@ -12,13 +14,16 @@ interface ImportModalProps {
   relatedPolicies?: Policy[];
   onPolicyDetail?: (p: Policy) => void;
   onClose: () => void;
-  onSave: (contacts: NewContact[]) => void;
+  onSave: (contacts: NewContact[],requestId?:string) => Promise<void>;
+  onPersistFollowup?: (contactId:string,kind:'add'|'edit'|'delete',record:ProgressRecord,expected?:ProgressRecord)=>Promise<Contact>;
   onTableSave?: (data: ExtractedTableData) => void;
   initialData?: Contact | null;
   allTags?: string[];
 }
 
-const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPolicyImport, onClose, onSave, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail }) => {
+const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPolicyImport, onClose, onSave, onPersistFollowup, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail }) => {
+  const [historyBusy,setHistoryBusy]=useState(false),[profileBusy,setProfileBusy]=useState(false),[historyError,setHistoryError]=useState(''),[historySaved,setHistorySaved]=useState('');
+  const historyBusyRef=useRef(false),historyRequestId=useRef(crypto.randomUUID()),profileRequestId=useRef(crypto.randomUUID());
   const displayedPolicies = () => Array.from(new Map([...(formData.policies || []), ...relatedPolicies].map(p => [policyKey(p), p])).values());
   const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'table' | 'policies'>('ai');
   const [loading, setLoading] = useState(false);
@@ -54,6 +59,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
 
   useEffect(() => {
     if (isOpen) {
+      profileRequestId.current=crypto.randomUUID();historyRequestId.current=crypto.randomUUID();setHistoryError('');setHistorySaved('');
       if (initialData) {
         setFormData({
           ...initialData,
@@ -213,9 +219,17 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
     return String(dateValue);
   };
 
-  const handleManualSave = () => {
+  const handleManualSave = async () => {
+    if(profileBusy||historyBusy)return;
     if (!formData.remarkName && !formData.nickname) { setError("请填写姓名或昵称"); return; }
-    onSave([formData]); onClose();
+    if(historyForm.content?.trim()){setError('还有未保存的跟进内容，请先保存或取消该条记录。');return;}
+    setProfileBusy(true);setError(null);
+    try{await onSave([formData],profileRequestId.current);onClose();}catch(e){setError(e instanceof Error?e.message:'客户资料未保存，请重试。');}finally{setProfileBusy(false);}
+  };
+  const requestClose = () => {
+    if(historyBusy||profileBusy)return;
+    if(historyForm.content?.trim()&&!window.confirm('跟进内容尚未保存，确认放弃？'))return;
+    onClose();
   };
 
   const addTag = (tag: string) => {
@@ -227,51 +241,34 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
     setShowTagSuggestions(false);
   };
 
-  const handleAddHistory = () => {
-    if (historyForm.content?.trim()) {
-      const newRecord: ProgressRecord = {
-        id: Math.random().toString(36).substr(2, 9),
-        date: historyForm.date || new Date().toISOString().split('T')[0],
-        content: historyForm.content.trim(),
-        completed: false
-      };
-      setFormData(prev => ({
-        ...prev,
-        progressHistory: [newRecord, ...(prev.progressHistory || [])],
-        lastDate: newRecord.date
-      }));
-      setHistoryForm({ date: new Date().toISOString().split('T')[0], content: '' });
-      setShowHistoryAdd(false);
-    }
+  const persistHistory = async (kind:'add'|'edit'|'delete',record:ProgressRecord,expected?:ProgressRecord) => {
+    if(historyBusyRef.current)return false;
+    historyBusyRef.current=true;setHistoryBusy(true);setHistoryError('');setHistorySaved('');
+    try{
+      if(initialData&&onPersistFollowup){
+        const saved=await onPersistFollowup(initialData.id,kind,record,expected);
+        setFormData(prev=>({...prev,progressHistory:saved.progressHistory,lastDate:saved.lastDate,followUpStatus:saved.followUpStatus}));
+      }else{
+        setFormData(prev=>({...prev,progressHistory:kind==='add'?[record,...(prev.progressHistory||[])]:kind==='delete'?(prev.progressHistory||[]).filter(r=>r.id!==record.id):(prev.progressHistory||[]).map(r=>r.id===record.id?record:r),lastDate:record.date}));
+      }
+      setHistorySaved(initialData?'跟进记录已保存到数据库。':'记录已加入草稿，保存客户后写入数据库。');
+      return true;
+    }catch(e){setHistoryError(e instanceof Error?e.message:'跟进记录未保存，请重试。');return false;}
+    finally{historyBusyRef.current=false;setHistoryBusy(false);}
   };
-
-  const handleEditHistory = (id: string) => {
-    const record = formData.progressHistory?.find(r => r.id === id);
-    if (record) {
-      setEditingHistoryId(id);
-      setHistoryForm({ date: record.date, content: record.content });
-    }
+  const handleAddHistory = async () => {
+    if(!historyForm.content?.trim())return;
+    const record:ProgressRecord={id:historyRequestId.current,date:historyForm.date||new Date().toISOString().slice(0,10),content:historyForm.content.trim(),completed:false};
+    if(await persistHistory('add',record)){historyRequestId.current=crypto.randomUUID();setHistoryForm({date:new Date().toISOString().slice(0,10),content:''});setShowHistoryAdd(false);}
   };
-
-  const handleSaveEditHistory = () => {
-    if (editingHistoryId && historyForm.content?.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        progressHistory: (prev.progressHistory || []).map(r =>
-          r.id === editingHistoryId ? { ...r, date: historyForm.date!, content: historyForm.content! } : r
-        )
-      }));
-      setEditingHistoryId(null);
-      setHistoryForm({ date: new Date().toISOString().split('T')[0], content: '' });
-    }
+  const handleEditHistory = (id:string) => {
+    const record=formData.progressHistory?.find(r=>r.id===id);if(record){setEditingHistoryId(id);setHistoryForm({...record});}
   };
-
-  const handleDeleteHistory = (id: string) => {
-    setFormData(prev => ({
-      ...prev,
-      progressHistory: (prev.progressHistory || []).filter(r => r.id !== id)
-    }));
+  const handleSaveEditHistory = async () => {
+    const previous=formData.progressHistory?.find(r=>r.id===editingHistoryId);if(!previous||!historyForm.content?.trim())return;
+    if(await persistHistory('edit',{...previous,date:historyForm.date!,content:historyForm.content.trim()},previous)){setEditingHistoryId(null);setHistoryForm({date:new Date().toISOString().slice(0,10),content:''});}
   };
+  const handleDeleteHistory = async (id:string) => {const record=formData.progressHistory?.find(r=>r.id===id);if(record)await persistHistory('delete',record,record);};
 
   // 保单管理
   const handleAddPolicy = () => {
@@ -366,7 +363,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
       <div className={`bg-white shadow-2xl w-full ${!initialData&&activeTab==='policies'?'max-w-3xl':'max-w-5xl'} overflow-hidden flex flex-col max-h-[90vh] rounded-2xl border border-gray-200`}>
         <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
           <h2 className="text-base font-semibold text-gray-800">{initialData ? '编辑联系人资料' : '添加 / 导入'}</h2>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
+          <button disabled={profileBusy||historyBusy} onClick={requestClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
             <X size={20} />
           </button>
         </div>
@@ -378,8 +375,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
             <button onClick={() => setActiveTab('manual')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'manual' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>手动录入</button>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {error && <div className="p-4 bg-red-50 text-red-700 rounded-xl flex gap-2 text-sm border border-red-100"><AlertCircle size={18} />{error}</div>}
+        <fieldset disabled={profileBusy} className="min-w-0 flex-1 overflow-y-auto p-5 space-y-4">
+          {error && activeTab!=='manual' && <div className="p-4 bg-red-50 text-red-700 rounded-xl flex gap-2 text-sm border border-red-100"><AlertCircle size={18} />{error}</div>}
 
           {activeTab === 'policies' && onMingyaImport && (
             <section>
@@ -558,8 +555,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
 
                   {/* 保单列表 */}
                   {displayedPolicies().length > 0 ? (
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                      <table className="w-full text-xs">
+                    <div className="max-w-full border border-gray-200 rounded-lg overflow-x-auto">
+                      <table className="w-full min-w-[904px] table-fixed text-sm">
+                        <colgroup>{[260,160,120,112,130,120].map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup>
                         <thead className="bg-gray-50 border-b border-gray-200">
                           <tr>
                             <th className="text-left px-3 py-2 font-medium text-gray-600">产品名称</th>
@@ -567,7 +565,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                             <th className="text-left px-3 py-2 font-medium text-gray-600">保费</th>
                             <th className="text-left px-3 py-2 font-medium text-gray-600">状态</th>
                             <th className="text-left px-3 py-2 font-medium text-gray-600">生效日期</th>
-                            <th className="text-right px-3 py-2 font-medium text-gray-600">操作</th>
+                            <th className="sticky right-0 z-20 border-l border-gray-200 bg-gray-50 text-right px-3 py-2 font-medium text-gray-600 whitespace-nowrap">操作</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -587,7 +585,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                                     </select>
                                   </td>
                                   <td className="px-3 py-2"><input type="date" className="input text-xs py-1 w-28" value={policyForm.effectiveDate} onChange={e => setPolicyForm({...policyForm, effectiveDate: e.target.value})} /></td>
-                                  <td className="px-3 py-2 text-right">
+                                  <td className="sticky right-0 z-10 border-l border-gray-200 bg-white px-3 py-2 text-right whitespace-nowrap">
                                     <button onClick={handleSaveEditPolicy} className="text-primary-600 hover:bg-primary-50 px-2 py-1 rounded text-xs">保存</button>
                                     <button onClick={() => { setEditingPolicyId(null); }} className="text-gray-500 hover:bg-gray-100 px-2 py-1 rounded text-xs ml-1">取消</button>
                                   </td>
@@ -598,14 +596,10 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                                   <td className="px-3 py-2 text-gray-600">{policy.company || '-'}</td>
                                   <td className="px-3 py-2 text-gray-600">{policy.premium ? `¥${policy.premium}` : '-'}</td>
                                   <td className="px-3 py-2">
-                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                      policy.status === '正式保单' ? 'bg-green-100 text-green-700' :
-                                      policy.status === '待生效' ? 'bg-amber-100 text-amber-700' :
-                                      'bg-gray-100 text-gray-600'
-                                    }`}>{policy.status || '正式保单'}</span>
+                                    <PolicyStatus status={policy.status}/>
                                   </td>
                                   <td className="px-3 py-2 text-gray-500">{policy.effectiveDate || '-'}</td>
-                                  <td className="px-3 py-2 text-right">
+                                  <td className="sticky right-0 z-10 border-l border-gray-200 bg-white px-3 py-2 text-right whitespace-nowrap">
                                     <button onClick={() => onPolicyDetail && initialData ? onPolicyDetail(policy) : handleEditPolicy(policy.id)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded"><Edit2 size={12} /></button>
                                     {!(onPolicyDetail && initialData) && <button onClick={() => handleDeletePolicy(policy.id)} className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1 rounded ml-1"><Trash2 size={12} /></button>}
                                   </td>
@@ -685,30 +679,32 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-medium text-gray-700"><Clock size={16} strokeWidth={2}/> 跟进历史</div>
                   <button
-                    onClick={() => setShowHistoryAdd(!showHistoryAdd)}
+                    disabled={historyBusy||profileBusy} onClick={() => setShowHistoryAdd(!showHistoryAdd)}
                     className="text-xs font-medium text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
                   >
                     <Plus size={14} /> 新增记录
                   </button>
                 </div>
 
+                {historyError&&<p role="alert" className="text-sm text-danger-600">{historyError}</p>}
+                {historySaved&&!historyError&&!historyBusy&&<p role="status" className="text-xs text-gray-500">{historySaved}</p>}
                 {showHistoryAdd && (
                   <div className="p-4 bg-gray-50 rounded-lg space-y-3 animate-fade-in">
                     <input
                       type="date"
                       className="input"
-                      value={historyForm.date}
+                      readOnly={historyBusy} value={historyForm.date}
                       onChange={e => setHistoryForm({...historyForm, date: e.target.value})}
                     />
                     <textarea
-                      placeholder="记录本次沟通..."
+                      disabled={historyBusy} aria-label="跟进内容" placeholder="记录本次沟通..."
                       className="input min-h-[80px] resize-none"
-                      value={historyForm.content}
+                      readOnly={historyBusy} value={historyForm.content}
                       onChange={e => setHistoryForm({...historyForm, content: e.target.value})}
                     />
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => setShowHistoryAdd(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">取消</button>
-                      <button onClick={handleAddHistory} className="btn btn-primary text-sm">确认保存</button>
+                      <button disabled={historyBusy} onClick={() => {setShowHistoryAdd(false);setHistoryForm({date:new Date().toISOString().slice(0,10),content:''});}} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">取消</button>
+                      <button disabled={historyBusy||profileBusy} onClick={handleAddHistory} className="btn btn-primary text-sm">{historyBusy?'正在保存…':initialData?'保存到数据库':'添加到客户草稿'}</button>
                     </div>
                   </div>
                 )}
@@ -721,17 +717,17 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                            <input
                             type="date"
                             className="input"
-                            value={historyForm.date}
+                            readOnly={historyBusy} value={historyForm.date}
                             onChange={e => setHistoryForm({...historyForm, date: e.target.value})}
                           />
                           <textarea
                             className="input min-h-[70px] resize-none"
-                            value={historyForm.content}
+                            readOnly={historyBusy} value={historyForm.content}
                             onChange={e => setHistoryForm({...historyForm, content: e.target.value})}
                           />
                           <div className="flex justify-end gap-2">
-                             <button onClick={() => setEditingHistoryId(null)} className="text-sm text-gray-500">取消</button>
-                             <button onClick={handleSaveEditHistory} className="btn btn-primary text-sm">保存修改</button>
+                             <button disabled={historyBusy} onClick={() => {setEditingHistoryId(null);setHistoryForm({date:new Date().toISOString().slice(0,10),content:''});}} className="text-sm text-gray-500">取消</button>
+                             <button disabled={historyBusy||profileBusy} onClick={handleSaveEditHistory} className="btn btn-primary text-sm">{historyBusy?'正在保存…':'保存修改'}</button>
                           </div>
                         </div>
                       ) : (
@@ -741,8 +737,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                           </div>
                           <p className="text-sm text-gray-800 mt-2 leading-relaxed pr-8">{record.content}</p>
                           <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                             <button onClick={() => handleEditHistory(record.id)} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors cursor-pointer"><Edit2 size={14}/></button>
-                             <button onClick={() => handleDeleteHistory(record.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"><Trash2 size={14}/></button>
+                             <button disabled={historyBusy||profileBusy} aria-label="编辑跟进记录" onClick={() => handleEditHistory(record.id)} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors cursor-pointer"><Edit2 size={14}/></button>
+                             <button disabled={historyBusy||profileBusy} aria-label="删除跟进记录" onClick={() => handleDeleteHistory(record.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"><Trash2 size={14}/></button>
                           </div>
                         </>
                       )}
@@ -778,7 +774,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
             <div className="space-y-4 animate-fade-in">
               <div className="flex items-center justify-between"><div className="font-medium text-gray-900">成功识别 {extractedList.length} 位联系人</div><button onClick={() => setExtractedList([])} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">取消</button></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{extractedList.map((c, i) => <div key={i} className="p-4 bg-gray-50 rounded-lg flex gap-3 items-center border border-gray-100"><div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center font-medium text-primary-700 text-lg">{c.remarkName?.[0]}</div><div className="flex-1 min-w-0"><div className="font-medium text-gray-900 truncate">{c.remarkName}</div><div className="text-xs text-gray-500 font-mono mt-0.5">{c.wxid || '无微信号'}</div></div></div>)}</div>
-              <button onClick={() => (onSave(extractedList), onClose())} className="w-full btn btn-primary">确认并立即导入</button>
+              <button disabled={profileBusy} onClick={async()=>{setProfileBusy(true);setError(null);try{await onSave(extractedList,profileRequestId.current);onClose();}catch(e){setError(e instanceof Error?e.message:'导入未保存，请重试。');}finally{setProfileBusy(false);}}} className="w-full btn btn-primary">{profileBusy?'正在保存…':'确认并立即导入'}</button>
             </div>
           )}
 
@@ -819,13 +815,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                 </button>
              </div>
            )}
-         </div>
+         </fieldset>
 
          {/* 底部操作区 - 仅在手动录入时显示 */}
          {(activeTab === 'manual' || initialData) && (
-           <div className="px-5 py-4 border-t border-gray-100 bg-white flex justify-end gap-2 shrink-0">
-             <button onClick={onClose} className="btn btn-secondary text-xs py-2">取消</button>
-             <button onClick={handleManualSave} className="btn btn-primary text-xs py-2">保存</button>
+           <div className="px-5 py-4 border-t border-gray-100 bg-white flex flex-wrap items-center justify-end gap-2 shrink-0">
+             {error&&<p role="alert" className="mr-auto text-sm text-danger-600">{error}</p>}
+             <button disabled={profileBusy||historyBusy} onClick={requestClose} className="btn btn-secondary text-xs py-2">取消</button>
+             <button disabled={profileBusy||historyBusy} onClick={handleManualSave} className="btn btn-primary text-sm">{profileBusy?'正在保存…':'保存'}</button>
            </div>
          )}
        </div>

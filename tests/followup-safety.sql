@@ -1,0 +1,30 @@
+begin;
+insert into app_data(app_id,data_type,data) values('test_followup_safety','contacts','[{"id":"c1","remarkName":"客户","remarkInfo":"preserve","policies":[{"id":"p1","premium":"12000"}],"progressHistory":[]}]');
+set local role anon;
+do $$
+declare c jsonb;edited jsonb;r jsonb;original jsonb:='{"id":"r1","date":"2026-11-21","content":"new note","completed":false}';begin
+ c:=save_followup_v1('test_followup_safety','c1','add',original);
+ perform save_followup_v1('test_followup_safety','c1','add',original);
+ if jsonb_array_length(c->'progressHistory')<>1 then raise exception 'duplicate';end if;
+ update app_data set data='[{"id":"c1","remarkName":"客户","remarkInfo":"policy edit","policies":[{"id":"p1","premium":"900"}],"progressHistory":[]}]' where app_id='test_followup_safety' and data_type='contacts';
+ select data->0 into c from app_data where app_id='test_followup_safety'and data_type='contacts';
+ if jsonb_array_length(c->'progressHistory')<>1 or c->'policies'->0->>'premium'<>'900' then raise exception 'stale overwrite protection failed';end if;
+ r:=c->'progressHistory'->0;
+ c:=save_followup_v1('test_followup_safety','c1','edit',r||'{"content":"edited note"}',r);
+ edited:=c->'progressHistory'->0;
+ update app_data set data=jsonb_set(data,'{0,progressHistory}',jsonb_build_array(original)) where app_id='test_followup_safety' and data_type='contacts';
+ select data->0 into c from app_data where app_id='test_followup_safety'and data_type='contacts';
+ if c->'progressHistory'->0->>'content'<>'edited note' then raise exception 'stale edit won';end if;
+ begin perform save_followup_v1('test_followup_safety','c1','edit',r,r);raise exception 'stale edit accepted';exception when sqlstate 'PT409' then null;end;
+ c:=save_followup_v1('test_followup_safety','c1','delete',edited,edited);
+ update app_data set data=jsonb_set(data,'{0,progressHistory}',jsonb_build_array(original)) where app_id='test_followup_safety' and data_type='contacts';
+ select data->0 into c from app_data where app_id='test_followup_safety'and data_type='contacts';
+ if jsonb_array_length(c->'progressHistory')<>0 then raise exception 'deleted note resurrected';end if;
+ c:=save_followup_v1('test_followup_safety','c1','add','{"id":"r2","date":"2026-11-21","content":"client A","completed":false}');
+ c:=save_followup_v1('test_followup_safety','c1','add','{"id":"r3","date":"2026-11-21","content":"client B","completed":false}');
+ if jsonb_array_length(c->'progressHistory')<>2 then raise exception 'independent adds lost';end if;
+ if c->>'remarkInfo'<>'policy edit' or c->'policies'->0->>'premium'<>'900' then raise exception 'unrelated fields changed';end if;
+ if (select count(*)from app_data where app_id='test_followup_safety'and data_type like 'followup_event:%')<5 then raise exception 'audit missing';end if;
+end $$;
+reset role;
+rollback;

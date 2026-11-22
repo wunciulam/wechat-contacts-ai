@@ -1,3 +1,4 @@
+import type {FollowUpSave} from '../types';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Contact, ProgressRecord } from '../types';
 import { Plus, Calendar, Clock, CheckCircle2, CircleDashed, Edit2, Trash2, ArrowRight, CheckSquare, Square, ChevronDown, ChevronUp } from 'lucide-react';
@@ -13,7 +14,7 @@ interface FollowUpDashboardProps {
   onDeleteProgress: (contactId: string, progressId: string) => void;
   onToggleProgress: (contactId: string, progressId: string) => void;
   onUpdateStatus: (contactId: string, newStatus: 'following' | 'contacted' | 'idle') => void;
-  onSaveQuickFollowUp: (contactId: string | null, date: string, content: string, status: 'following' | 'contacted', newContactName?: string, existingRecordId?: string, completed?: boolean) => void;
+  onSaveQuickFollowUp: FollowUpSave;
   onEditProgressRecord?: (contactId: string, record: ProgressRecord) => void;
 }
 

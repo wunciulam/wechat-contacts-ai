@@ -33,6 +33,6 @@ export default function PolicyPaymentSummary({ policy, amount = true }: { policy
   return <div className="space-y-2">
     <PaymentDate date={next.date} estimated={next.estimated} />
     {next.amountReference&&<span className="text-xs text-gray-500">应缴金额尚未生成</span>}
-    {amount && <div className="flex items-baseline gap-2 text-sm tabular-nums"><span className="text-xs text-gray-500">{next.amountReference?'下期参考金额':'本期应缴'}</span>{formatMoney(next.amount, policy.mingya?.currency)}</div>}
+    {amount && <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm tabular-nums"><span className="shrink-0 whitespace-nowrap text-xs text-gray-500">{next.amountReference?'下期参考金额':'本期应缴'}</span><span className="whitespace-nowrap">{formatMoney(next.amount, policy.mingya?.currency)}</span></div>}
   </div>;
 }

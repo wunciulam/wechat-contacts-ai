@@ -5,7 +5,10 @@ export interface ProgressRecord {
   date: string;
   content: string;
   completed?: boolean;
+  updatedAt?: string;
 }
+
+export type FollowUpSave = (contactId:string|null,date:string,content:string,status:'following'|'contacted',newContactName?:string,existingRecordId?:string,completed?:boolean,requestId?:string,newContactId?:string)=>Promise<string>;
 
 export interface MingyaPerson {
   name: string; idCard: string; phone: string; birthday: string; sex: string; address: string; share: string; order: string;

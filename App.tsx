@@ -1,3 +1,4 @@
+import {saveFollowup,saveCustomerProfile} from './services/followupStorage';
 import { rememberRenewalSnapshot } from './services/renewalCache';
 import { migrate, projectContacts, mergePolicies } from './services/renewal';
 import RenewalWorkspace from './components/RenewalWorkspace';
@@ -72,10 +73,17 @@ const applyAutoTags = (contact: Contact): Contact => {
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
+const cacheContactsLocally = (value:Contact[]) => {
+  try {const raw=JSON.stringify(value);localStorage.setItem('wechat-contacts',raw);localStorage.setItem('wechat-contacts-backup',raw);}
+  catch { console.warn('本地备份不可写，继续使用数据库数据'); }
+};
+
 const App: React.FC = () => {
   const [policyImportFiles, setPolicyImportFiles] = useState<FileList | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const contactsRef = useRef(contacts); contactsRef.current = contacts;
+  const [contactsSyncError,setContactsSyncError]=useState('');
+  const contactsWriteFailedRef=useRef(false);
   const contactsWriteRef = useRef<Promise<unknown>>(Promise.resolve());
   const skipImportSyncRef = useRef<Contact[] | null>(null);
   const importSavingRef = useRef(false);
@@ -175,7 +183,7 @@ const App: React.FC = () => {
     skipImportSyncRef.current = saved;
     setContacts(saved);
   };
-  const beforePolicySave = () => contactsWriteRef.current;
+  const beforePolicySave = async () => { await contactsWriteRef.current;if(contactsWriteFailedRef.current)throw new Error("客户资料尚未同步成功，请先重试保存。"); };
 
   const loadMingyaSnapshot = async (): Promise<ContactImportSnapshot> => {
     await contactsWriteRef.current;
@@ -233,8 +241,7 @@ const App: React.FC = () => {
             });
             skipImportSyncRef.current = migratedData;
             setContacts(migratedData);
-            localStorage.setItem('wechat-contacts', JSON.stringify(migratedData));
-            localStorage.setItem('wechat-contacts-backup', JSON.stringify(migratedData));
+            cacheContactsLocally(migratedData);
             setIsLoaded(true);
             console.log('从云端加载成功，联系人数量:', cloudData.length);
             return;
@@ -269,8 +276,7 @@ const App: React.FC = () => {
 
             console.log('旧版 contacts 表恢复成功，联系人数量:', migratedData.length);
             setContacts(migratedData);
-            localStorage.setItem('wechat-contacts', JSON.stringify(migratedData));
-            localStorage.setItem('wechat-contacts-backup', JSON.stringify(migratedData));
+            cacheContactsLocally(migratedData);
 
             // 写回新同步表，避免下次再丢
             await saveToCloud('contacts', migratedData);
@@ -325,7 +331,7 @@ const App: React.FC = () => {
           if (Array.isArray(parsedData) && parsedData.length > 0) {
             console.log('从备份恢复数据...');
             setContacts(parsedData);
-            localStorage.setItem('wechat-contacts', JSON.stringify(parsedData));
+            cacheContactsLocally(parsedData);
             setIsLoaded(true);
             console.log('从备份恢复数据...');
             return;
@@ -345,17 +351,14 @@ const App: React.FC = () => {
   // 2. Save Data - 强制保存到云端
   useEffect(() => {
     if (isLoaded && contacts.length > 0) {
-      // 保存到本地
-      localStorage.setItem('wechat-contacts', JSON.stringify(contacts));
-      localStorage.setItem('wechat-contacts-backup', JSON.stringify(contacts));
-      
+      cacheContactsLocally(contacts);
       if (skipImportSyncRef.current === contacts) { skipImportSyncRef.current = null; return; }
-      // 强制保存到云端
       if (isSupabaseConfigured()) {
-        console.log('正在强制保存到云端，联系人数量:', contacts.length);
-        contactsWriteRef.current = saveToCloud('contacts', contacts).then(success => {
-          console.log('云端保存结果:', success ? '成功' : '失败');
-        }).catch(e => console.log('云端同步失败:', e));
+        contactsWriteRef.current=contactsWriteRef.current.catch(()=>{}).then(async()=>{
+          const success=await saveToCloud('contacts',contacts);
+          contactsWriteFailedRef.current=!success;
+          setContactsSyncError(success?'':'客户资料未保存到数据库，请重试。');
+        }).catch(()=>{contactsWriteFailedRef.current=true;setContactsSyncError('客户资料未保存到数据库，请重试。');});
       }
     }
   }, [contacts, isLoaded]);
@@ -444,33 +447,14 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveContact = (newContactDataArray: NewContact[]) => {
-    if (editingContact && newContactDataArray.length === 1) {
-      const newContactData = newContactDataArray[0];
-      setContacts(prev => prev.map(c => {
-        if (c.id === editingContact.id) {
-            const updated = { ...c, ...newContactData, policies:[...(c.policies||[]),...(newContactData.policies||[]).filter(p=>!c.policies?.some(x=>x.id===p.id))], dealProducts:Array.from(new Set([...(c.dealProducts||[]),...(newContactData.dealProducts||[])])) };
-            return applyAutoTags(updated);
-        }
-        return c;
-      }));
-      setEditingContact(null);
-    } else {
-      const newContacts: Contact[] = newContactDataArray.map(data => {
-        // 手动录入新客户时，如果没有其他标签，自动添加"潜在客户"
-        const tags = data.tags && data.tags.length > 0 ? data.tags : ['潜在客户'];
-        const c: Contact = {
-          ...data,
-          tags,
-          id: generateId(),
-          addedAt: Date.now(),
-          followUpStatus: 'following',
-          policies: data.policies || []
-        };
-        return applyAutoTags(c);
-      });
-      setContacts(prev => [...newContacts, ...prev]);
+  const handleSaveContact = async (newContactDataArray:NewContact[],requestId?:string) => {
+    for(const [index,data] of newContactDataArray.entries()){
+      const previous=editingContact&&newContactDataArray.length===1?editingContact:undefined;
+      const input:Contact=previous?{...previous,...data,id:previous.id}:applyAutoTags({...data,id:requestId?`${requestId}-${index}`:crypto.randomUUID(),addedAt:Date.now(),tags:data.tags?.length?data.tags:['潜在客户'],followUpStatus:'following',policies:data.policies||[]});
+      const saved=await saveCustomerProfile(input,previous);
+      acceptSavedFollowup(saved);
     }
+    setEditingContact(null);
   };
 
   const handleManualAddPolicy = (contactId: string, policy: Policy) => {
@@ -681,103 +665,31 @@ const App: React.FC = () => {
       alert(`导入完成！\n新增联系人: ${newContactsCount}\n更新联系人: ${updatedContactsCount}\n新增保单: ${newPoliciesCount}`);
   };
 
-  const handleQuickAddProgress = (
-    contactId: string | null, 
-    date: string, 
-    content: string, 
-    newStatus: 'following' | 'contacted',
-    newContactName?: string,
-    existingRecordId?: string,
-    completed?: boolean
-  ) => {
-    if (contactId) {
-      setContacts(prev => prev.map(c => {
-        if (c.id === contactId) {
-           let updatedHistory;
-           if (existingRecordId) {
-              // 编辑现有记录：保持当前状态不变
-              updatedHistory = (c.progressHistory || []).map(r => 
-                 r.id === existingRecordId ? { ...r, date, content, completed: completed ?? r.completed } : r
-              );
-              const updated = {
-                ...c,
-                progressHistory: updatedHistory,
-                lastDate: date
-              };
-              return updated;
-           } else {
-              // 添加新记录：自动设为跟进中
-              const newRecord: ProgressRecord = {
-                id: generateId(),
-                date: date,
-                content: content,
-                completed: completed ?? false
-              };
-              updatedHistory = [newRecord, ...(c.progressHistory || [])];
-              const updated = {
-                ...c,
-                progressHistory: updatedHistory,
-                lastDate: date,
-                followUpStatus: 'following'  // 自动设为跟进中
-              };
-              return updated;
-           }
-        }
-        return c;
-      }));
-    } else if (newContactName) {
-      // 创建新联系人并添加跟进记录
-      const newRecord: ProgressRecord = {
-         id: generateId(),
-         date: date,
-         content: content,
-         completed: completed ?? false
-      };
-      const newContact: Contact = {
-        id: generateId(),
-        addedAt: Date.now(),
-        wxid: '',
-        nickname: newContactName,
-        remarkName: newContactName,
-        remarkInfo: '快速创建',
-        tags: [],
-        dealProducts: [],
-        intentProducts: [],
-        progressHistory: [newRecord],
-        lastDate: date,
-        followUpStatus: 'following',  // 自动设为跟进中
-        policies: []
-      };
-      setContacts(prev => [newContact, ...prev]);
-    }
+  const acceptSavedFollowup = (contact: Contact) => {
+    setContacts(current=>{
+      const next=current.some(c=>c.id===contact.id)?current.map(c=>c.id===contact.id?contact:c):[contact,...current];
+      skipImportSyncRef.current=next;return next;
+    });
+  };
+  const handleQuickAddProgress: import('./types').FollowUpSave = async (contactId,date,content,newStatus,newContactName,existingRecordId,completed,requestId,newContactId) => {
+    const id=contactId||newContactId||crypto.randomUUID();
+    const current=contactsRef.current.find(c=>c.id===id);
+    const expected=existingRecordId?current?.progressHistory?.find(r=>r.id===existingRecordId):undefined;
+    if(existingRecordId&&!expected)throw new Error('原记录已变化，请刷新后重试。');
+    const record:ProgressRecord={...expected,id:existingRecordId||requestId||crypto.randomUUID(),date,content,completed:completed??expected?.completed??false};
+    const newContact:Contact|undefined=!current&&newContactName?{id,addedAt:Date.now(),wxid:'',nickname:newContactName,remarkName:newContactName,remarkInfo:'快速创建',tags:[],dealProducts:[],intentProducts:[],policies:[],progressHistory:[],followUpStatus:'following'}:undefined;
+    const saved=await saveFollowup(id,existingRecordId?'edit':'add',record,expected,newContact);
+    acceptSavedFollowup(saved);return saved.id;
   };
 
-  const handleToggleProgress = (contactId: string, progressId: string) => {
-      setContacts(prev => prev.map(c => {
-          if (c.id === contactId) {
-              const updatedHistory = (c.progressHistory || []).map(p => 
-                  p.id === progressId ? { ...p, completed: !p.completed } : p
-              );
-              return { ...c, progressHistory: updatedHistory };
-          }
-          return c;
-      }));
+  const changeProgress = async (contactId:string,progressId:string,remove:boolean) => {
+    const record=contactsRef.current.find(c=>c.id===contactId)?.progressHistory?.find(r=>r.id===progressId);
+    if(!record)return;
+    try {const saved=await saveFollowup(contactId,remove?'delete':'edit',remove?record:{...record,completed:!record.completed},record);acceptSavedFollowup(saved);}
+    catch(e){window.alert(e instanceof Error?e.message:'跟进记录未保存，请重试。');}
   };
-
-  const handleDeleteProgress = (contactId: string, progressId: string) => {
-      setContacts(prev => prev.map(c => {
-          if (c.id === contactId) {
-              const newProgressHistory = c.progressHistory?.filter(p => p.id !== progressId);
-              const hasRemainingRecords = (newProgressHistory && newProgressHistory.length > 0) || c.progress;
-              const updatedContact = {
-                  ...c,
-                  progressHistory: newProgressHistory
-              };
-              return applyAutoTags(updatedContact);
-          }
-          return c;
-      }));
-  };
+  const handleToggleProgress=(contactId:string,progressId:string)=>{void changeProgress(contactId,progressId,false);};
+  const handleDeleteProgress=(contactId:string,progressId:string)=>{void changeProgress(contactId,progressId,true);};
 
   const handleDeleteContact = (id: string) => {
     setConfirmModal({
@@ -791,7 +703,7 @@ const App: React.FC = () => {
         localStorage.setItem('wechat-contacts', JSON.stringify(updatedContacts));
         localStorage.setItem('wechat-contacts-backup', JSON.stringify(updatedContacts));
         if (isSupabaseConfigured() && updatedContacts.length > 0) {
-          saveToCloud('contacts', updatedContacts);
+
         }
         if (selectedContactIds.has(id)) {
             const newSet = new Set(selectedContactIds);
@@ -918,7 +830,7 @@ const App: React.FC = () => {
             localStorage.setItem('wechat-contacts', JSON.stringify(updatedContacts));
             localStorage.setItem('wechat-contacts-backup', JSON.stringify(updatedContacts));
             if (isSupabaseConfigured() && updatedContacts.length > 0) {
-              saveToCloud('contacts', updatedContacts);
+
             }
             handleDeselectAll();
             setConfirmModal(prev => ({ ...prev, isOpen: false }));
@@ -1149,6 +1061,7 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex-1 h-full overflow-hidden relative">
+          {contactsSyncError&&<div role="alert" className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-3 text-sm text-danger-600"><span>{contactsSyncError}</span><button className="btn btn-secondary btn-sm" onClick={()=>setContacts([...contactsRef.current])}>重试保存</button></div>}
           {renderContent()}
         </div>
 
@@ -1201,6 +1114,7 @@ const App: React.FC = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveContact}
+        onPersistFollowup={async(contactId,kind,record,expected)=>{const saved=await saveFollowup(contactId,kind,record,expected);acceptSavedFollowup(saved);return saved;}}
         onTableSave={handleTableDataSave}
         initialData={editingContact}
         allTags={allTags}

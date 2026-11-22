@@ -128,11 +128,11 @@ export default function RenewalWorkspace({
     try {
       const projected = projectContacts(baseContacts, next.policies);
       await beforeSave?.();
-      await saveImport(next, projected);
+      const savedContacts=await saveImport(next, projected);
       ownSnapshot.current = next;
-      skipContactsMerge.current = projected;
+      skipContactsMerge.current = savedContacts;
       rememberRenewalSnapshot(next);
-      onContacts(projected);
+      onContacts(savedContacts);
       setData(next);
       return true;
     } catch (e) {
@@ -293,10 +293,10 @@ export default function RenewalWorkspace({
     setBusy(true);
     try {
       if (!cloudReady) throw new Error("请先完成续期数据同步，再确认导入。");
-      await saveImport(next, cs);
+      const savedContacts=await saveImport(next, cs);
       rememberRenewalSnapshot(next);
       setData(next);
-      onContacts(cs);
+      onContacts(savedContacts);
       setModal("done");
     } catch (e) {
       setError("导入未保存：" + String(e));
