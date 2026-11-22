@@ -1,3 +1,4 @@
+import WorkspaceDialog, {WorkspaceDialogFooter} from './WorkspaceDialog';
 import PolicyStatus from './PolicyStatus';
 import CustomerTags from './CustomerTags';
 import PolicyPaymentSummary, { formatMoney } from './PolicyPaymentSummary';
@@ -20,12 +21,37 @@ interface PolicyDashboardProps {
   onAddPolicy: () => void;
   onBatchDeleteContacts?: (ids: string[]) => void;
   onDeletePolicy?: (contactId: string, policyId: string) => void;
+  onDeletePolicies?: (contactId:string,policyIds:string[],requestId:string)=>Promise<void>;
 }
 
-const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags, followUpFilter, onEditContact, onAddPolicy, onBatchDeleteContacts, onDeletePolicy, onPolicyDetail, onReminders, onImport, reminderCount = 0 }) => {
+const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags, followUpFilter, onEditContact, onAddPolicy, onBatchDeleteContacts, onDeletePolicy, onDeletePolicies, onPolicyDetail, onReminders, onImport, reminderCount = 0 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedContactIds, setExpandedContactIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const [selectedPolicies,setSelectedPolicies]=useState<Record<string,Set<string>>>({});
+  const [deleteTarget,setDeleteTarget]=useState<{contactId:string;policies:Policy[];requestId:string}|null>(null);
+  const [deleting,setDeleting]=useState(false),[deleteError,setDeleteError]=useState('');
+  const [compactTable,setCompactTable]=useState(()=>window.innerWidth<640);
+  React.useEffect(()=>{const update=()=>setCompactTable(window.innerWidth<640);window.addEventListener('resize',update);return()=>window.removeEventListener('resize',update);},[]);
+  const widthKey='insurance-policy-actions-width';
+  const clampWidth=(value:number,max=360)=>Math.min(max,Math.max(112,value));
+  const [actionWidth,setActionWidth]=useState(()=>{try{const n=Number(localStorage.getItem(widthKey));return Number.isFinite(n)&&n>=112?clampWidth(n):128;}catch{return 128;}});
+  const widthRef=React.useRef(actionWidth),drag=React.useRef<{x:number;width:number}|null>(null);
+  const resize=(width:number,save=false)=>{const n=clampWidth(width,compactTable?160:360);widthRef.current=n;setActionWidth(n);if(save)try{localStorage.setItem(widthKey,String(n));}catch{}};
+  const visibleActionWidth=compactTable?Math.min(actionWidth,160):actionWidth;
+  const columns=[44,280,240,140,160,260,180,130,120,visibleActionWidth];
+  const togglePolicy=(contactId:string,id:string)=>setSelectedPolicies(prev=>{const ids=new Set(prev[contactId]||[]);if(ids.has(id))ids.delete(id);else ids.add(id);return {...prev,[contactId]:ids};});
+  const askDelete=(contactId:string,policies:Policy[])=>{if(!policies.length||deleting)return;setDeleteError('');setDeleteTarget({contactId,policies,requestId:crypto.randomUUID()});};
+  const confirmDelete=async()=>{
+    if(!deleteTarget||!onDeletePolicies||deleting)return;
+    setDeleting(true);setDeleteError('');
+    try{
+      const ids=deleteTarget.policies.map(p=>p.id);await onDeletePolicies(deleteTarget.contactId,ids,deleteTarget.requestId);
+      const removed=new Set(ids);setSelectedPolicies(prev=>Object.fromEntries((Object.entries(prev) as [string,Set<string>][]).map(([contactId,selected])=>[contactId,new Set([...selected].filter(id=>!removed.has(id)))])));setDeleteTarget(null);
+    }catch(e){setDeleteError(e instanceof Error?e.message:'删除未保存，请重试。');}
+    finally{setDeleting(false);}
+  };
 
   const toggleExpand = (id: string) => {
     setExpandedContactIds(prev => {
@@ -141,6 +167,9 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
         ) : (
           filteredContactsWithPolicies.map(contact => {
             const { count, totalPremium } = getTotals(contact.policies || []);
+            const policyIds=new Set((contact.policies||[]).map(p=>p.id));
+            const checkedPolicies=new Set([...(selectedPolicies[contact.id]||[])].filter(id=>policyIds.has(id)));
+            const policyAllSelected=policyIds.size>0&&checkedPolicies.size===policyIds.size;
             const isExpanded = expandedContactIds.has(contact.id);
             const contactReminders = new Set(dueItems((contact.policies || []).map(p => ({...p,payments:(p as ManagedPolicy).payments || []}))).map(t=>t.policy.id)).size;
             const isSelected = selectedIds.has(contact.id);
@@ -168,11 +197,17 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                 </div>
                 {isExpanded && (
                   <div className="border-t border-gray-100 bg-gray-50 p-4 animate-in slide-in-from-top-2">
+                    {onDeletePolicies&&checkedPolicies.size>0&&<div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+                      <span className="mr-auto text-gray-600">已选 {checkedPolicies.size} 份保单</span>
+                      <button disabled={deleting} className="btn btn-secondary text-sm" onClick={()=>setSelectedPolicies(prev=>({...prev,[contact.id]:new Set()}))}>取消选择</button>
+                      <button disabled={deleting} className="btn btn-primary text-sm" onClick={()=>askDelete(contact.id,(contact.policies||[]).filter(p=>checkedPolicies.has(p.id)))}>删除所选</button>
+                    </div>}
                     <div className="max-w-full bg-white rounded-lg border border-gray-200 overflow-x-auto">
-                      <table className="w-full min-w-[1660px] table-fixed text-left text-sm">
-                        <colgroup>{[280,240,140,160,260,180,130,120,128].map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup>
+                      <table className="w-full table-fixed text-left text-sm" style={{minWidth:columns.slice(onDeletePolicies?0:1).reduce((a,b)=>a+b,0)}}>
+                        <colgroup>{columns.slice(onDeletePolicies?0:1).map((w,i)=><col key={i} style={i===(onDeletePolicies?1:0)?undefined:{width:w}}/>)}</colgroup>
                         <thead className="bg-gray-50 text-gray-500 font-medium text-xs  border-b border-gray-200">
                           <tr className="divide-x divide-gray-100">
+                            {onDeletePolicies&&<th className="px-3 py-3"><input type="checkbox" aria-label={`全选${contact.remarkName||contact.nickname}的保单`} disabled={deleting} checked={policyAllSelected} ref={e=>{if(e)e.indeterminate=checkedPolicies.size>0&&!policyAllSelected;}} onChange={()=>setSelectedPolicies(prev=>({...prev,[contact.id]:policyAllSelected?new Set():new Set(policyIds)}))}/></th>}
                             <th className="px-4 py-3">险种名称</th>
                             <th className="px-4 py-3">保单号</th>
                             <th className="px-4 py-3 text-right">保费</th>
@@ -180,12 +215,23 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                             <th className="px-4 py-3">投保人/被保人</th>
                             <th className="px-4 py-3">生效日期</th>
                             <th className="px-4 py-3">状态</th>
-                            <th className="sticky right-0 z-20 border-l border-gray-200 bg-gray-50 px-4 py-3 text-right whitespace-nowrap">操作</th>
+                            <th className="sticky right-0 z-20 border-l border-gray-200 bg-gray-50 px-4 py-3 text-right whitespace-nowrap">操作
+                              <span role="separator" tabIndex={0} aria-orientation="vertical" aria-label="调整操作列宽度" aria-valuemin={112} aria-valuemax={compactTable?160:360} aria-valuenow={visibleActionWidth} title="拖动调整操作列宽度；双击恢复默认"
+                                className="absolute inset-y-0 left-0 w-2 cursor-col-resize touch-none select-none hover:bg-gray-200 focus:bg-gray-200"
+                                onPointerDown={e=>{e.preventDefault();drag.current={x:e.clientX,width:visibleActionWidth};e.currentTarget.setPointerCapture(e.pointerId);}}
+                                onPointerMove={e=>{if(drag.current)resize(drag.current.width+drag.current.x-e.clientX);}}
+                                onPointerUp={e=>{if(!drag.current)return;drag.current=null;resize(widthRef.current,true);e.currentTarget.releasePointerCapture(e.pointerId);}}
+                                onPointerCancel={()=>{drag.current=null;resize(widthRef.current,true);}}
+                                onDoubleClick={()=>resize(128,true)}
+                                onKeyDown={e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();resize(e.key==='Home'?112:e.key==='End'?(compactTable?160:360):visibleActionWidth+(e.key==='ArrowLeft'?16:-16),true);}}}
+                              />
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {contact.policies?.map(policy => { const managed={...policy,payments:(policy as ManagedPolicy).payments||[]}; const next=nextPayment(managed);const reminders=dueItems([managed]);return (
                             <tr key={policy.id} className="group hover:bg-gray-50 transition-colors">
+                              {onDeletePolicies&&<td className="px-3 py-3"><input type="checkbox" aria-label={`选择保单${policy.policyNumber||policy.productName}`} checked={checkedPolicies.has(policy.id)} disabled={deleting} onChange={()=>togglePolicy(contact.id,policy.id)}/></td>}
                               <td className="px-4 py-3 font-medium text-gray-700"><button className="max-w-full break-words text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)}>{policy.productName}</button></td>
                               <td title={policy.policyNumber} className="overflow-hidden text-ellipsis px-4 py-3 whitespace-nowrap tabular-nums text-gray-500 text-xs">{policy.policyNumber}</td>
                               <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums font-medium text-gray-900">{formatMoney(policy.premium, policy.mingya?.currency)}</td>
@@ -199,7 +245,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                                 <button className="btn btn-ghost btn-sm" onClick={()=>onPolicyDetail?.(policy)}>详情</button><button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (onDeletePolicy) onDeletePolicy(contact.id, policy.id);
+                                    if(onDeletePolicies)askDelete(contact.id,[policy]);else onDeletePolicy?.(contact.id,policy.id);
                                   }}
                                   className="text-gray-500 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md transition-colors"
                                   title="删除保单"
@@ -220,6 +266,15 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
         )}
       </div>
 
+      {deleteTarget&&<WorkspaceDialog title={`删除 ${deleteTarget.policies.length} 份保单`} size="confirm" onClose={()=>{if(!deleting)setDeleteTarget(null);}}>
+        <p className="text-sm leading-relaxed text-gray-600">所选保单及缴费记录将从关联客户中移除。</p>
+        <ul className="mt-4 space-y-3">{deleteTarget.policies.map(p=><li key={p.id} className="border-b border-gray-100 pb-3"><p className="text-sm break-words">{p.productName}</p><p className="mt-1 text-xs text-gray-500 break-all">{p.policyNumber||'未填写保单号'}</p></li>)}</ul>
+        {deleteError&&<p role="alert" className="mt-3 text-sm text-danger-600">{deleteError}</p>}
+        <WorkspaceDialogFooter>
+          <button className="btn btn-secondary text-sm" disabled={deleting} onClick={()=>setDeleteTarget(null)}>取消</button>
+          <button className="btn btn-primary text-sm" disabled={deleting} onClick={confirmDelete}>{deleting?'正在删除…':'确认删除'}</button>
+        </WorkspaceDialogFooter>
+      </WorkspaceDialog>}
       {selectedIds.size > 0 && (
         <div className="fixed sm:absolute bottom-4 sm:bottom-8 left-4 sm:left-1/2 right-4 sm:right-auto sm:-translate-x-1/2 bg-white shadow-lg border border-gray-200 rounded-lg px-2 py-2 flex items-center gap-2 animate-in slide-in-from-bottom-4 z-50 overflow-x-auto no-scrollbar">
             <div className="px-3 sm:px-4 py-2 bg-gray-900 rounded text-xs sm:text-sm font-medium text-white whitespace-nowrap">{selectedIds.size} 位客户</div>

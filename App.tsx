@@ -1,3 +1,4 @@
+import {excludedPolicyImport} from './services/policyImportRules';
 import {saveFollowup,saveCustomerProfile} from './services/followupStorage';
 import { rememberRenewalSnapshot } from './services/renewalCache';
 import { migrate, projectContacts, mergePolicies } from './services/renewal';
@@ -559,6 +560,7 @@ const App: React.FC = () => {
       };
 
       const processPolicyItem = (item: any) => {
+          if(excludedPolicyImport(item.status))return;
           if (!item.policyNumber && !item.applicantName) return;
            
           // 按证件号或手机号匹配客户

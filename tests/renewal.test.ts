@@ -230,3 +230,17 @@ test('merging a detail-paid installment preserves its source audit rather than t
  const detail:any={...old,mingya:{mappingVersion:2,key:'sample',capturedAt:'2026-11-21T03:35:47Z'},payments:[{date:'2026-11-18',amount:'12000',status:'已缴费',source:'明亚保单详情',history:[{at:'2026-11-21T03:35:47Z',from:'未缴费',to:'已缴费',source:'明亚保单详情·上期实缴'}]}]};
  const result=mergePolicies([old],[detail]);assert.equal(result[0].payments[0].history!.length,1);assert.match(result[0].payments[0].history![0].source,/^明亚/);
 });
+
+test('policy workbook filters terminal and cancellation rows before checking identifiers',()=>{
+ const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([
+  ['保单号','保单状态'],['A','正式保单'],['','撤单'],['END','终止保单'],['PENDING','撤单中'],['SUSPEND','中止保单'],
+ ]),'保单');
+ const result=parseWorkbook(XLSX.write(book,{type:'array',bookType:'xlsx'}),'filter.xlsx');
+ assert.deepEqual(result.map(p=>p.policyNumber),['A','PENDING','SUSPEND']);
+});
+test('Mingya workbook status codes use the verified cancellation mapping',()=>{
+ const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([
+  ['保单号','保单状态代码'],['A',16],['END',17],['CANCEL',22],['PENDING',21],
+ ]),'保单');
+ assert.deepEqual(parseWorkbook(XLSX.write(book,{type:'array',bookType:'xlsx'}),'codes.xlsx').map(p=>p.policyNumber),['A','PENDING']);
+});

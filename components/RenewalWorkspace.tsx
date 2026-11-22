@@ -4,7 +4,7 @@ import { ArrowLeft, Settings } from 'lucide-react';
 import PolicyDashboard from "./PolicyDashboard";
 import { PageHeader } from "./PageHeader";
 import PolicyDetail from "./PolicyDetail";
-import { saveImport, savePolicyMark } from "../services/renewalStorage";
+import { saveImport, savePolicyMark, deleteSelectedPolicies } from "../services/renewalStorage";
 import React, { useEffect, useState } from "react";
 import { Contact } from "../types";
 import { getRenewalSnapshot, hasFreshRenewalSnapshot, loadRenewalSnapshot, rememberRenewalSnapshot, subscribeRenewalSnapshot } from "../services/renewalCache";
@@ -331,6 +331,18 @@ export default function RenewalWorkspace({
       return false;
     } finally { markPending.current = false; setBusy(false); }
   }
+  async function deletePolicies(contactId:string,policyIds:string[],requestId:string) {
+    if(!cloudReady||busy)throw new Error('请等待数据同步完成后重试。');
+    setBusy(true);
+    try {
+      await beforeSave?.();
+      const removed=new Set(await deleteSelectedPolicies(contactId,policyIds,requestId));
+      const next={...data,policies:data.policies.filter(p=>!removed.has(p.id))};
+      const projected=contactsRef.current.map(c=>({...c,policies:c.policies?.filter(p=>!removed.has(p.id))}));
+      ownSnapshot.current=next;skipContactsMerge.current=projected;
+      rememberRenewalSnapshot(next);onContacts(projected);setData(next);
+    } finally {setBusy(false);}
+  }
   const syncStatus = syncing || syncError ? (
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-5 py-3 text-sm text-gray-600" role="status">
       <span>{syncing ? "正在同步续期数据…" : syncError}</span>
@@ -405,6 +417,7 @@ export default function RenewalWorkspace({
             setRemindersOpen(true);
           }}
           onImport={() => fileRef.current?.click()}
+          onDeletePolicies={deletePolicies}
           onDeletePolicy={async (_contactId, policyId) => {
             if (!confirm("确定删除这份保单及其缴费记录吗？所有关联客户中的这份保单将同步移除。")) return;
             await persist({ ...data, policies: data.policies.filter(p => p.id !== policyId) },

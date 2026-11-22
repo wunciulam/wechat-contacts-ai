@@ -1,3 +1,4 @@
+import {excludedPolicyImport,mingyaStatusLabel} from './policyImportRules.ts';
 import { detailNextPayment, reconcileMingyaPayments } from './mingyaPayments.ts';
 import * as XLSX from "xlsx";
 import type { Contact, Policy } from "../types";
@@ -68,6 +69,7 @@ export function parseWorkbook(
 ): ManagedPolicy[] {
   const w = XLSX.read(buffer, { type: "array" });
   const output: ManagedPolicy[] = [];
+  let filtered=0;
   for (const sheet of w.SheetNames) {
     const rows = XLSX.utils.sheet_to_json<any[]>(w.Sheets[sheet], {
       header: 1,
@@ -84,6 +86,8 @@ export function parseWorkbook(
         }
         return "";
       };
+      const status=text(get("保单状态"))||(text(get("保单状态代码"))?mingyaStatusLabel(get("保单状态代码")):"");
+      if(excludedPolicyImport(status)){filtered++;continue;}
       const num = text(get("保单号"));
       if (!num) {
         if (text(get("保单状态")) === "撤单") continue;
@@ -99,7 +103,7 @@ export function parseWorkbook(
         productName: text(get("产品名称")),
         premium: text(get("保费", "应缴保费")),
         effectiveDate: date(get("生效日期", "承保日期")),
-        status: text(get("保单状态")),
+        status,
         applicant: text(get("投保人姓名", "投保人")),
         insured: text(get("被保人")),
         phone: text(get("手机号", "投保人手机")),
@@ -124,7 +128,7 @@ export function parseWorkbook(
       });
     }
   }
-  if (!output.length) throw new Error(`${source}：未找到含保单号的有效记录`);
+  if (!output.length) throw new Error(filtered?`${source}：没有可导入保单，终止和撤单记录已过滤`:`${source}：未找到含保单号的有效记录`);
   return output;
 }
 const suffix = (s?: string) => text(s).replace(/\s/g, "").slice(-4);

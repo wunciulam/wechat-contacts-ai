@@ -1,5 +1,5 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const ts=require('typescript');const crypto=require('node:crypto').webcrypto;
-const moduleCache={};function localRequire(name){name=name.replace(/\.ts$/,'');if(moduleCache[name])return moduleCache[name];if(!['./mingyaFinancial','./mingyaPayments','./mingyaImport','./mingyaRepair'].includes(name))throw Error(name);const exp={};moduleCache[name]=exp;vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/'+name.slice(2)+'.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exp,require:localRequire,structuredClone});return exp;}
+const moduleCache={};function localRequire(name){name=name.replace(/\.ts$/,'');if(moduleCache[name])return moduleCache[name];if(!['./mingyaFinancial','./mingyaPayments','./mingyaImport','./mingyaRepair','./policyImportRules'].includes(name))throw Error(name);const exp={};moduleCache[name]=exp;vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/'+name.slice(2)+'.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exp,require:localRequire,structuredClone});return exp;}
 const exportsObject={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/mingyaImport.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsObject,crypto,structuredClone,console,require:localRequire});
 const {planMingyaImport,parseMingyaPayload}=exportsObject;
 const contact=(extra={})=>({id:'c1',wxid:'wechat',nickname:'客户甲',remarkName:'客户甲',remarkInfo:'手动备注',tags:['重点'],addedAt:1,dealProducts:[],intentProducts:['养老'],progressHistory:[{id:'h',date:'2026-01-01',content:'保留跟进'}],policies:[],...extra});
@@ -31,7 +31,7 @@ test('input duplicates are collapsed, unknown states stay explicit, encrypted su
  assert.throws(()=>parseMingyaPayload({records:[]}));
 });
 test('renewal terms sharing a policy number remain separate; repeat import stays idempotent',()=>{
- const p=payload([record({policyIndexId:'term2026',effectDate:'2026-01-01'}),record({policyIndexId:'term2025',effectDate:'2025-01-01',policyState:'17'})]);
+ const p=payload([record({policyIndexId:'term2026',effectDate:'2026-01-01'}),record({policyIndexId:'term2025',effectDate:'2025-01-01',policyState:'16'})]);
  const first=planMingyaImport([],p);assert.equal(first.addedContacts,1);assert.equal(first.addedPolicies,2);assert.equal(first.duplicateRows,0);
  const again=planMingyaImport(first.contacts,p);assert.equal(again.addedPolicies,0);assert.equal(again.unchangedPolicies,2);
 });
@@ -69,4 +69,15 @@ test('trusteeship coverage comes from main risk, not payment period, and fills e
 test('coverage does not infer expiry from payment end or unknown risk codes',()=>{
  const p=planMingyaImport([],payload([record({payEndDate:'2023-05-19',riskList:[{mainRiskFlag:'01',payPeriod:15,payPeriodUnit:'Y',insurancePeriod:108,insurancePeriodUnit:'UNKNOWN',risk:{riskType:'01'}}]})])).contacts[0].policies[0];
  assert.equal(p.coveragePeriod,'');assert.equal(p.expiryDate,'');assert.equal(p.insuranceType,'');
+});
+
+test('filters ended and cancelled policies before customer matching, retaining the existing database',()=>{
+ const r=record({policyState:'17'}),cancel=record({policyIndexId:'cancel',policyCode:'CANCEL',policyState:'22'});
+ const old={id:'old',policyNumber:'000001',company:'公司甲',productName:'旧保单',premium:'90',status:'正式保单'};
+ const before=contact({policies:[old]});const plan=planMingyaImport([before],payload([r,cancel]));
+ assert.equal(plan.filteredPolicies,2);assert.equal(plan.issues.length,0);assert.equal(plan.addedContacts,0);assert.equal(plan.updatedContacts,0);assert.equal(plan.addedPolicies,0);assert.equal(JSON.stringify(plan.contacts),JSON.stringify([before]));
+ const mixed=planMingyaImport([],payload([r,cancel,record({policyIndexId:'active',policyCode:'ACTIVE'})]));assert.equal(mixed.filteredPolicies,2);assert.equal(mixed.addedPolicies,1);assert.equal(mixed.contacts[0].policies[0].policyNumber,'ACTIVE');
+});
+test('does not confuse suspended or cancellation-in-progress with final cancellation',()=>{
+ const plan=planMingyaImport([],payload([record({policyState:'18'}),record({policyIndexId:'pending',policyCode:'PENDING',policyState:'21'})]));assert.equal(plan.filteredPolicies,0);assert.equal(plan.addedPolicies,2);
 });

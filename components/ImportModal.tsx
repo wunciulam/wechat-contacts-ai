@@ -1,3 +1,4 @@
+import {excludedPolicyImport,mingyaStatusLabel} from '../services/policyImportRules';
 import PolicyStatus from './PolicyStatus';
 import {formatMoney} from './PolicyPaymentSummary';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -160,7 +161,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
             company: getRowValue(row, '保险公司', '保险公司') || '',
             premium: String(getRowValue(row, '保费', '保费') || '0'),
             effectiveDate: getRowValue(row, '生效日期', '生效日期') ? formatDate(getRowValue(row, '生效日期', '生效日期')) : '',
-            status: getRowValue(row, '保单状态', '保单状态') || '有效',
+            status: getRowValue(row, '保单状态', '状态') || (getRowValue(row,'保单状态代码')?mingyaStatusLabel(getRowValue(row,'保单状态代码')):'有效'),
             applicantName: getRowValue(row, '投保人姓名', '投保人姓名') || '',
             insuredName: getRowValue(row, '被保人', '被保人') || '',
             phoneNumber: getRowValue(row, '手机号', '手机号') || '',
@@ -168,7 +169,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
             paymentYears: getRowValue(row, '缴费年限', '缴费年限') || '',
             insuranceType: getRowValue(row, '险种类型', '险种类型') || '',
             coverage: getRowValue(row, '保额', '保额') || '',
-          }))
+          })).filter(item=>!excludedPolicyImport(item.status))
         };
       } else if (isCustomerTable || columns.includes('客户姓名')) {
         const getRowValue = (row: any, ...keys: string[]) => {

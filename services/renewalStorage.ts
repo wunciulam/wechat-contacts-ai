@@ -51,3 +51,14 @@ export async function savePolicyMark(policy: import('./renewal').ManagedPolicy, 
     throw e;
   } finally { clearTimeout(timeout); }
 }
+
+export async function deleteSelectedPolicies(contactId:string,policyIds:string[],requestId:string):Promise<string[]> {
+ const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);
+ try {
+  const {data,error}=await supabase.rpc('delete_selected_policies_v1',{p_app_id:appId,p_contact_id:contactId,p_policy_ids:policyIds,p_request_id:requestId}).abortSignal(controller.signal);
+  if(error)throw new Error(error.message||'删除未保存，请重试。');
+  if(!Array.isArray(data?.deletedIds))throw new Error('未收到删除确认，请刷新核对。');
+  return data.deletedIds;
+ }catch(e){if(controller.signal.aborted)throw new Error('删除超时，请核对或重试本次请求。');throw e;}
+ finally{clearTimeout(timer);}
+}

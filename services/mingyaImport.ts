@@ -1,3 +1,4 @@
+import {excludedPolicyImport,mingyaStatusLabel} from './policyImportRules';
 import { financialFromDetail, money } from './mingyaFinancial';
 import { reconcileMingyaPayments } from './mingyaPayments';
 import type { Contact, Policy, MingyaPolicyData, MingyaPerson } from '../types';
@@ -8,7 +9,7 @@ export interface IncomingPolicy { key: string; personKey: string; policy: Policy
 export interface ImportIssue { key: string; name: string; reason: string; candidates: {id:string;name:string;phone:string}[]; allowNew: boolean; }
 export interface ImportPlan {
   contacts: Contact[]; addedContacts: number; updatedContacts: number; addedPolicies: number; updatedPolicies: number;
-  unchangedPolicies: number; skippedPolicies: number; duplicateRows: number; fieldConflicts: number;
+  unchangedPolicies: number; skippedPolicies: number; filteredPolicies: number; duplicateRows: number; fieldConflicts: number;
   conflicts: {number:string;field:string;existing:string;incoming:string}[];
   issues: ImportIssue[]; rows: {key:string;name:string;number:string;product:string;action:string;contact:string}[];
 }
@@ -72,7 +73,7 @@ export function normalizeMingya(payload: MingyaPayload): {items: IncomingPolicy[
     const source=compact(r.detail||{},text(payload.status.finishedAt),key);
     const policy:Policy={id:`mingya-${encodeURIComponent(key)}`,policyNumber:number,productName:text(p.productName),company,
       premium:source.periodicPremium||'',effectiveDate:dateKey(p.validDate||p.effectDate),
-      status:({'16':'正式保单','17':'终止保单'} as Record<string,string>)[text(p.policyState)]||`明亚状态（${text(p.policyState)||'未知'}）`,
+      status:mingyaStatusLabel(p.policyState),
       applicant:applicant.name,insured:text(p.insuredName)||source.insureds.map(x=>x.name).join('、'),
       coverage:+p.amount===-1?'详见条款':text(p.amount),paymentYears:[...new Set(source.risks.map(x=>x.paymentPeriod).filter(Boolean))].join('、'),paymentFrequency:source.paymentFrequency||'',paymentEndDate:source.paymentEndDate||'',coveragePeriod:source.coveragePeriod||'',expiryDate:source.expiryDate||'',insuranceType:source.insuranceType||'',mingya:source};
     const personKey=identity(applicant.idCard)?`id:${identity(applicant.idCard)}`:phoneKey(applicant.phone)?`phone:${phoneKey(applicant.phone)}:${nameKey(applicant.name)}`:`name:${nameKey(applicant.name)}`;
@@ -87,9 +88,12 @@ function policyMatches(p:Policy,incoming:IncomingPolicy){
   return !!normalizeId(p.policyNumber)&&!!companyKey(p.company)&&policyKey(p)===policyKey(incoming.policy)&&(!dateKey(p.effectiveDate)||!dateKey(incoming.policy.effectiveDate)||dateKey(p.effectiveDate)===dateKey(incoming.policy.effectiveDate));
 }
 export function planMingyaImport(existing: Contact[], payload:MingyaPayload, resolutions:Resolutions={},mode:MergeMode='fill'):ImportPlan {
-  const {items,duplicates}=normalizeMingya(payload);
+  const normalized=normalizeMingya(payload);
+  const filtered=normalized.items.filter(x=>excludedPolicyImport(x.policy.status));
+  const items=normalized.items.filter(x=>!excludedPolicyImport(x.policy.status)),duplicates=normalized.duplicates;
   const contacts=structuredClone(existing), touched=new Set<string>(),created=new Set<string>();
-  const plan:ImportPlan={contacts,addedContacts:0,updatedContacts:0,addedPolicies:0,updatedPolicies:0,unchangedPolicies:0,skippedPolicies:0,duplicateRows:duplicates,fieldConflicts:0,conflicts:[],issues:[],rows:[]};
+  const plan:ImportPlan={contacts,addedContacts:0,updatedContacts:0,addedPolicies:0,updatedPolicies:0,unchangedPolicies:0,skippedPolicies:0,filteredPolicies:filtered.length,duplicateRows:duplicates,fieldConflicts:0,conflicts:[],issues:[],rows:[]};
+  plan.rows.push(...filtered.map(x=>({key:x.key,name:x.applicant.name||'未提供投保人',number:x.policy.policyNumber,product:x.policy.productName,action:`已过滤（${x.policy.status}）`,contact:''})));
   const anchors=new Map<string,Set<string>>();
   const multipleTerms=new Set(items.filter((x,_,arr)=>arr.filter(y=>policyKey(x.policy)===policyKey(y.policy)).length>1).map(x=>policyKey(x.policy)));
   const ambiguousTerm=(p:Policy,incoming:IncomingPolicy)=>!dateKey(p.effectiveDate)&&multipleTerms.has(policyKey(incoming.policy));

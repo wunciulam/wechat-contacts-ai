@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 export const DialogFooterContext = React.createContext<HTMLDivElement | null>(null);
 
 export default function WorkspaceDialog({ title, onClose, children, compact = false, size, className = "" }: {
-  title: string; onClose: () => void; children: React.ReactNode; compact?: boolean; size?: "import"; className?: string;
+  title: string; onClose: () => void; children: React.ReactNode; compact?: boolean; size?: "import" | "confirm"; className?: string;
 }) {
   const titleId = useId();
   const [footer, setFooter] = useState<HTMLDivElement | null>(null);
@@ -16,7 +16,7 @@ export default function WorkspaceDialog({ title, onClose, children, compact = fa
     return () => { ref.current?.close(); trigger?.focus(); };
   }, []);
   return <dialog aria-labelledby={titleId} ref={ref} onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}
-    className={`workspace-dialog m-auto w-[calc(100%-2rem)] ${compact ? 'max-w-lg' : size === 'import' ? 'max-w-3xl' : 'max-w-4xl'} ${className} rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-2xl`}>
+    className={`workspace-dialog m-auto w-[calc(100%-2rem)] ${compact ? 'max-w-lg' : size === 'import' ? 'max-w-3xl' : size === 'confirm' ? 'max-w-sm' : 'max-w-4xl'} ${className} rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-2xl`}>
     <div className="flex max-h-[90dvh] flex-col">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
         <h2 id={titleId} className="text-base font-semibold">{title}</h2>

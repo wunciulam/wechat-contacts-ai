@@ -44,6 +44,7 @@ export default function MingyaImportModal({open,initialPayload,onClose,onLoad,on
           <button className="btn btn-primary text-sm" disabled={busy||!snapshot} onClick={()=>input.current?.click()}><Upload size={16}/>选择文件</button>
         </div> : plan&&<>
           <p className="text-xs text-gray-500">预览，尚未保存。</p>
+          {plan.filteredPolicies>0&&<p className="text-xs text-gray-500">已过滤 {plan.filteredPolicies} 份终止或撤单保单。</p>}
           {!payload.status.complete&&<p className="text-sm text-gray-600">这是部分采集结果，仅合并已取得的信息。</p>}
           <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
             {([['新增客户',plan.addedContacts],['补充客户',plan.updatedContacts],['新增保单',plan.addedPolicies],['更新保单',plan.updatedPolicies]] as const).map(([label,value])=><div key={label}><dt className="text-xs text-gray-500">{label}</dt><dd className="mt-1.5 text-sm font-semibold tabular-nums">{value}</dd></div>)}
