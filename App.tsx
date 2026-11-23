@@ -1,3 +1,4 @@
+import Button, {IconButton} from './components/ui/Button';
 import {categoryIds,contactKey,contactNameKey} from './services/contactIdentity';
 import {excludedPolicyImport} from './services/policyImportRules';
 import {saveFollowup,saveCustomerProfile,saveContactCategory} from './services/followupStorage';
@@ -55,7 +56,7 @@ const getPolicyCategory = (name: string): string | null => {
 const applyAutoTags = (contact: Contact): Contact => {
   let newTagsSet = new Set(contact.tags);
   let changed = false;
-  
+
   // Only auto-apply "成交客户" tag for policy records
   const hasPolicies = contact.policies && contact.policies.length > 0;
   if (hasPolicies && !newTagsSet.has(CLOSED_CUSTOMER_TAG)) {
@@ -69,7 +70,7 @@ const applyAutoTags = (contact: Contact): Contact => {
       tags: Array.from(newTagsSet)
     };
   }
-  
+
   return contact;
 };
 
@@ -100,7 +101,7 @@ const App: React.FC = () => {
   const changeView=(view:typeof currentView)=>{setPolicyScopeId(null);setCurrentView(view);};
   const [policyContactId, setPolicyContactId] = useState<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  
+
   // 跟进状态筛选
   const [followUpFilter, setFollowUpFilter] = useState<'idle' | 'following' | 'contacted' | null>(null);
 
@@ -108,11 +109,11 @@ const App: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
-  
+
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  
+
   // Quick Follow Up Modal
   const [isQuickFollowUpOpen, setIsQuickFollowUpOpen] = useState(false);
   const [quickFollowUpContactId, setQuickFollowUpContactId] = useState<string | undefined>(undefined);
@@ -226,7 +227,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       console.log('Supabase配置状态:', isSupabaseConfigured());
-      
+
       // 优先从云端加载
       if (isSupabaseConfigured()) {
         try {
@@ -312,7 +313,7 @@ const App: React.FC = () => {
               return applyAutoTags(baseContact);
             });
             setContacts(migratedData);
-            
+
             // 同步到云端备份
             if (isSupabaseConfigured() && migratedData.length > 0) {
               console.log('正在同步到云端...');
@@ -431,7 +432,7 @@ const App: React.FC = () => {
       setSelectedTags(new Set());
       return;
     }
-    
+
     setSelectedTags(prev => {
       const newSet = new Set(prev);
       if (newSet.has(tag)) {
@@ -480,27 +481,27 @@ const App: React.FC = () => {
                 tags: Array.from(currentTags),
                 dealProducts: Array.from(currentDealProducts)
             };
-            
+
             return applyAutoTags(updatedContact);
         }
         return c;
     }));
   };
-  
+
   const handleDeletePolicy = (contactId: string, policyId: string) => {
     setContacts(prev => prev.map(c => {
         if (c.id === contactId) {
             const deletedPolicy = (c.policies || []).find(p => p.id === policyId);
             const updatedPolicies = (c.policies || []).filter(p => p.id !== policyId);
-            
+
             // 同步更新 dealProducts - 检查删除的保单产品是否还有其他保单在使用
-            const updatedDealProducts = deletedPolicy?.productName 
+            const updatedDealProducts = deletedPolicy?.productName
                 ? c.dealProducts?.filter(product => {
                     // 如果还有其他保单使用这个产品名称，保留它
                     return updatedPolicies.some(p => p.productName === product);
                   })
                 : c.dealProducts;
-            
+
             const updatedContact: Contact = {
                 ...c,
                 policies: updatedPolicies,
@@ -511,7 +512,7 @@ const App: React.FC = () => {
         return c;
     }));
   };
-  
+
   const handleTableDataSave = (data: ExtractedTableData) => {
       let updatedContacts = [...contacts];
       let newContactsCount = 0;
@@ -522,7 +523,7 @@ const App: React.FC = () => {
           if (!item.customerName && !item.idCard) return;
 
           // 按证件号优先匹配，其次手机号，最后姓名
-          const existingIndex = updatedContacts.findIndex(c => 
+          const existingIndex = updatedContacts.findIndex(c =>
               (item.idCard && c.idCard === item.idCard) ||
               (item.phoneNumber && c.phoneNumber === item.phoneNumber) ||
               (item.customerName && (c.remarkName === item.customerName || c.nickname === item.customerName))
@@ -566,9 +567,9 @@ const App: React.FC = () => {
       const processPolicyItem = (item: any) => {
           if(excludedPolicyImport(item.status))return;
           if (!item.policyNumber && !item.applicantName) return;
-           
+
           // 按证件号或手机号匹配客户
-          let ownerIndex = updatedContacts.findIndex(c => 
+          let ownerIndex = updatedContacts.findIndex(c =>
                (item.phoneNumber && c.phoneNumber === item.phoneNumber) ||
                (c.idCard && item.idCard && c.idCard === item.idCard) ||
                (c.remarkName === item.applicantName || c.nickname === item.applicantName)
@@ -594,10 +595,10 @@ const App: React.FC = () => {
                const policies = contact.policies || [];
                // 按保单号去重
                const policyExists = policies.some(p => p.policyNumber === newPolicy.policyNumber);
-               
+
                const currentTags = new Set(contact.tags);
                const currentDealProducts = new Set(contact.dealProducts);
-               
+
                if (newPolicy.productName && newPolicy.productName !== '未知产品') {
                    const category = getPolicyCategory(newPolicy.productName);
                    if (category) currentTags.add(category);
@@ -770,7 +771,7 @@ const App: React.FC = () => {
           ...contact,
           tags: contact.tags.filter(t => !tagsSet.has(t))
         })));
-        
+
         setSelectedTags(prev => {
             const newSet = new Set(prev);
             tagsToDelete.forEach(t => newSet.delete(t));
@@ -784,7 +785,7 @@ const App: React.FC = () => {
   };
 
   const handleRemoveTagFromContact = (contactId: string, tag: string) => {
-      setContacts(prev => prev.map(c => 
+      setContacts(prev => prev.map(c =>
           c.id === contactId ? { ...c, tags: c.tags.filter(t => t !== tag) } : c
       ));
   };
@@ -916,8 +917,8 @@ const App: React.FC = () => {
 
           case 'contacts':
               return (
-                  <ContactList 
-                    contacts={contacts} 
+                  <ContactList
+                    contacts={contacts}
                     onEdit={(contact) => {
                       setEditingContact(contact);
                       setIsModalOpen(true);
@@ -962,7 +963,7 @@ const App: React.FC = () => {
               );
           case 'policies':
               return (
-                  <RenewalWorkspace 
+                  <RenewalWorkspace
                      scopeContactId={policyScopeId} onClearScope={()=>setPolicyScopeId(null)}
                      importFiles={policyImportFiles}
                      onImportConsumed={() => setPolicyImportFiles(null)}
@@ -988,7 +989,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-white overflow-hidden font-sans">
-      <Sidebar 
+      <Sidebar
         tags={allTags}
         selectedTags={selectedTags}
         onSelectTag={handleToggleTag}
@@ -1014,12 +1015,12 @@ const App: React.FC = () => {
       <div className="flex-1 h-full overflow-hidden relative flex flex-col">
         {/* Mobile Header */}
         <div className="md:hidden h-14 bg-white border-b border-gray-100 flex items-center px-4 shrink-0 z-20">
-          <button
+          <IconButton
             onClick={() => setIsMobileSidebarOpen(true)}
-            className="p-2 -ml-2 text-gray-500 hover:text-gray-900"
+            className="-ml-2 text-gray-500 hover:text-gray-900" aria-label="打开菜单"
           >
             <Menu size={24} />
-          </button>
+          </IconButton>
           <span className="ml-2 font-semibold text-gray-900">
             {currentView === 'contacts'
               ? `客户管理 (${contacts.length})`
@@ -1030,40 +1031,40 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex-1 h-full overflow-hidden relative">
-          {contactsSyncError&&<div role="alert" className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-3 text-sm text-danger-600"><span>{contactsSyncError}</span><button className="btn btn-secondary btn-sm" onClick={()=>setContacts([...contactsRef.current])}>重试保存</button></div>}
+          {contactsSyncError&&<div role="alert" className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-3 text-sm text-danger-600"><span>{contactsSyncError}</span><Button className="" onClick={()=>setContacts([...contactsRef.current])} variant="secondary" size="sm">重试保存</Button></div>}
           {renderContent()}
         </div>
 
         {/* Mobile Bottom Navigation */}
         <div className="md:hidden h-16 bg-white border-t border-gray-100 flex items-center justify-around px-2 shrink-0 z-20 pb-safe">
-          <button
+          <Button
             onClick={() => changeView('contacts')}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all ${currentView === 'contacts' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-colors ${currentView === 'contacts' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`} variant="plain"
           >
             <Users size={18} />
-            <span className="text-[9px] font-medium">联系人</span>
-          </button>
-          <button 
+            <span className="text-xs font-medium">联系人</span>
+          </Button>
+          <Button
             onClick={() => changeView('followups')}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all ${currentView === 'followups' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-colors ${currentView === 'followups' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`} variant="plain"
           >
             <ClipboardList size={18} />
-            <span className="text-[9px] font-medium">工作台</span>
-          </button>
-          <button 
+            <span className="text-xs font-medium">工作台</span>
+          </Button>
+          <Button
             onClick={() => changeView('policies')}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all ${currentView === 'policies' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-colors ${currentView === 'policies' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`} variant="plain"
           >
             <FileText size={18} />
-            <span className="text-[9px] font-medium">保单</span>
-          </button>
-          <button 
+            <span className="text-xs font-medium">保单</span>
+          </Button>
+          <Button
             onClick={() => setIsMobileSidebarOpen(true)}
-            className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all text-gray-400"
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-colors text-gray-400" variant="plain"
           >
             <Menu size={18} />
-            <span className="text-[9px] font-medium">更多</span>
-          </button>
+            <span className="text-xs font-medium">更多</span>
+          </Button>
         </div>
       </div>
 
@@ -1075,7 +1076,7 @@ const App: React.FC = () => {
         onLoad={loadMingyaSnapshot}
         onApply={applyMingyaImport}
       />
-      <ImportModal 
+      <ImportModal
         onMingyaImport={() => { setIsModalOpen(false); setMingyaPayload(null); setIsMingyaImportOpen(true); }}
         onPolicyImport={files => { setPolicyImportFiles(files); setIsModalOpen(false); changeView('policies'); }}
         onManagePolicies={id=>{setIsModalOpen(false);setEditingContact(null);setPolicyScopeId(id);setSelectedTags(new Set());setFollowUpFilter(null);setCurrentView('policies');}}
@@ -1089,7 +1090,7 @@ const App: React.FC = () => {
         initialData={editingContact}
         allTags={allTags}
       />
-      
+
       <BatchTagModal
         isOpen={batchModalState.isOpen}
         mode={batchModalState.mode}
@@ -1099,10 +1100,10 @@ const App: React.FC = () => {
         selectedCount={selectedContactIds.size}
       />
 
-      <ConfirmModal 
+      <ConfirmModal
         {...confirmModal}
       />
-      
+
       <QuickFollowUpModal
          isOpen={isQuickFollowUpOpen}
          onClose={() => {

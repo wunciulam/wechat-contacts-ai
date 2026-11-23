@@ -1,11 +1,3 @@
-.acceptance-page .acceptance-search-input {
-  padding-left: 36px;
-}
-
-.acceptance-page .acceptance-select-trigger {
-  padding-right: 14px;
-}
-
 .acceptance-page .acceptance-error-text {
   color: var(--acceptance-rose-700);
 }

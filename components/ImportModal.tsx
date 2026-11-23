@@ -1,3 +1,8 @@
+import Button, {IconButton} from './ui/Button';
+import WorkspaceDialog,{WorkspaceDialogFooter} from './WorkspaceDialog';
+import Field from './ui/Field';
+import Input, {Textarea} from './ui/Input';
+import Select from './ui/Select';
 import {readPolicyNumber} from '../services/policyIdentity';
 import {excludedPolicyImport,mingyaStatusLabel} from '../services/policyImportRules';
 import PolicyStatus from './PolicyStatus';
@@ -368,20 +373,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
   if (!isOpen) return null;
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={initialData?'编辑联系人资料':'添加 / 导入'} className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
-      <div className={`bg-white shadow-2xl w-full ${!initialData&&activeTab==='policies'?'max-w-3xl':'max-w-5xl'} overflow-hidden flex flex-col max-h-[90dvh] rounded-2xl border border-gray-200`}>
-        <div className="px-5 py-4 border-b border-gray-100 flex shrink-0 justify-between items-center">
-          <h2 className="text-base font-semibold text-gray-800">{initialData ? '编辑联系人资料' : '添加 / 导入'}</h2>
-          <button disabled={profileBusy||historyBusy} onClick={requestClose} aria-label="关闭" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
-            <X size={20} />
-          </button>
-        </div>
+    <WorkspaceDialog title={initialData?'编辑联系人资料':'添加 / 导入'} size={!initialData&&activeTab==='policies'?'import':'contact'} onClose={requestClose} closeDisabled={profileBusy||historyBusy} bodyClassName="min-h-0 flex flex-1 flex-col overflow-hidden">
         {!initialData && (
           <div className="px-5 pt-4 pb-0 flex shrink-0 gap-2 overflow-x-auto">
-            <button onClick={() => setActiveTab('policies')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors whitespace-nowrap ${activeTab === 'policies' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}>明亚采集</button>
-            <button onClick={() => setActiveTab('ai')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'ai' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>Excel导入</button>
-            <button onClick={() => setActiveTab('table')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'table' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>截图识别</button>
-            <button onClick={() => setActiveTab('manual')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'manual' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>手动录入</button>
+            <Button onClick={() => setActiveTab('policies')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors whitespace-nowrap ${activeTab === 'policies' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'}`} variant="plain">明亚采集</Button>
+            <Button onClick={() => setActiveTab('ai')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'ai' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`} variant="plain">Excel导入</Button>
+            <Button onClick={() => setActiveTab('table')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'table' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`} variant="plain">截图识别</Button>
+            <Button onClick={() => setActiveTab('manual')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'manual' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`} variant="plain">手动录入</Button>
           </div>
         )}
         <div data-contact-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -390,32 +388,32 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
 
           {activeTab === 'policies' && onMingyaImport && (
             <section>
-              <button type="button" className="btn btn-primary text-sm" onClick={onMingyaImport}>
+              <Button type="button" className="" onClick={onMingyaImport} variant="primary">
                 <Upload size={16} />导入采集文件
-              </button>
+              </Button>
             </section>
           )}
           {activeTab === 'manual' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* 左侧：基础信息 */}
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-gray-700">备注名<span className="text-danger-600"> *</span></label>
-                    <input type="text" className="input" value={formData.remarkName} onChange={e => setFormData({...formData, remarkName: e.target.value})} placeholder="请输入备注名" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-gray-700">昵称</label>
-                    <input type="text" className="input" value={formData.nickname} onChange={e => setFormData({...formData, nickname: e.target.value})} placeholder="请输入昵称" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-gray-700">微信号</label>
-                    <input type="text" className="input font-mono" value={formData.wxid} onChange={e => setFormData({...formData, wxid: e.target.value})} placeholder="请输入微信号" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-gray-700">手机号</label>
-                    <input type="text" className="input font-mono" value={formData.phoneNumber || ''} onChange={e => setFormData({...formData, phoneNumber: e.target.value})} placeholder="请输入手机号" />
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                  <Field className="" label={<>备注名<span className="text-danger-600"> *</span></>}>
+
+                    <Input type="text" className="" value={formData.remarkName} onChange={e => setFormData({...formData, remarkName: e.target.value})} placeholder="请输入备注名" />
+                  </Field>
+                  <Field className="" label={<>昵称</>}>
+
+                    <Input type="text" className="" value={formData.nickname} onChange={e => setFormData({...formData, nickname: e.target.value})} placeholder="请输入昵称" />
+                  </Field>
+                  <Field className="" label={<>微信号</>}>
+
+                    <Input type="text" className="" value={formData.wxid} onChange={e => setFormData({...formData, wxid: e.target.value})} placeholder="请输入微信号" />
+                  </Field>
+                  <Field className="" label={<>手机号</>}>
+
+                    <Input type="text" className="" value={formData.phoneNumber || ''} onChange={e => setFormData({...formData, phoneNumber: e.target.value})} placeholder="请输入手机号" />
+                  </Field>
                 </div>
 
                 <div className="space-y-1.5 relative" ref={tagInputContainerRef}>
@@ -424,11 +422,11 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                     className={`flex flex-wrap gap-2 p-3 min-h-[50px] border rounded-lg transition-colors ${showTagSuggestions ? 'border-gray-900 ring-1 ring-gray-900/10' : 'border-gray-200'}`}
                     onClick={() => setShowTagSuggestions(true)}
                   >
-                    {formData.tags.map(t => <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700">{t}<button onClick={(e) => { e.stopPropagation(); setFormData({...formData, tags: formData.tags.filter(x => x !== t)}); }} className="hover:text-gray-900 transition-colors"><X size={10} strokeWidth={3}/></button></span>)}
-                    <input
+                    {formData.tags.map(t => <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700">{t}<IconButton onClick={(e) => { e.stopPropagation(); setFormData({...formData, tags: formData.tags.filter(x => x !== t)}); }} className="hover:text-gray-900 transition-colors" aria-label="关闭"><X size={10} strokeWidth={3}/></IconButton></span>)}
+                    <Input
                       type="text"
-                      placeholder="输入标签..."
-                      className="bg-transparent outline-none text-sm flex-1 min-w-[120px] text-gray-900 placeholder:text-gray-400"
+                      placeholder="输入标签…"
+                      className="flex-1 min-w-[120px]"
                       value={tagInput}
                       onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
                       onFocus={() => setShowTagSuggestions(true)}
@@ -438,128 +436,128 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                   {showTagSuggestions && (tagSuggestions.length > 0 || tagInput.trim()) && (
                     <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden max-h-48 overflow-y-auto">
                       {tagSuggestions.map(tag => (
-                        <button key={tag} onClick={() => addTag(tag)} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors cursor-pointer flex items-center justify-between">
+                        <Button key={tag} onClick={() => addTag(tag)} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors cursor-pointer flex items-center justify-between" variant="plain">
                           <span>{tag}</span>
                           <Tag size={14} className="text-gray-300" />
-                        </button>
+                        </Button>
                       ))}
                       {tagInput.trim() && !tagSuggestions.includes(tagInput.trim()) && !formData.tags.includes(tagInput.trim()) && (
-                         <button onClick={() => addTag(tagInput)} className="w-full text-left px-4 py-2 text-sm text-gray-900 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center gap-2 cursor-pointer">
+                         <Button onClick={() => addTag(tagInput)} className="w-full text-left px-4 py-2 text-sm text-gray-900 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center gap-2 cursor-pointer" variant="plain">
                            <Plus size={14} />
                            <span>新增标签："{tagInput}"</span>
-                         </button>
+                         </Button>
                       )}
                     </div>
                   )}
                 </div>
 
-                <div className="space-y-1.5">
-                  <label htmlFor="contact-description" className="block text-xs font-medium text-gray-700">详细描述</label>
-                  <textarea id="contact-description" rows={5} className="input min-h-[120px] resize-y" placeholder="输入相关业务描述..." value={formData.remarkInfo} onChange={e => setFormData({...formData, remarkInfo: e.target.value})} />
-                </div>
+                <Field className="" label={<>详细描述</>}>
+
+                  <Textarea id="contact-description" rows={5} className="min-h-[120px] resize-y" placeholder="输入相关业务描述…" value={formData.remarkInfo} onChange={e => setFormData({...formData, remarkInfo: e.target.value})} />
+                </Field>
 
                 {/* 成交产品 - 保单表格 */}
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label className="mr-auto block text-xs font-medium text-gray-700">成交产品</label>
-                    {initialData&&onManagePolicies&&<button type="button" className="btn btn-secondary btn-sm" disabled={historyBusy||profileBusy} onClick={managePolicies}>管理保单</button>}
-                    <button
+                    {initialData&&onManagePolicies&&<Button type="button" className="" disabled={historyBusy||profileBusy} onClick={managePolicies} variant="secondary" size="sm">管理保单</Button>}
+                    <Button
                       onClick={() => setShowPolicyAdd(!showPolicyAdd)}
-                      className="btn btn-ghost btn-sm"
+                      className="" variant="ghost" size="sm"
                     >
                       <Plus size={14} /> 添加保单
-                    </button>
+                    </Button>
                   </div>
 
                   {showPolicyAdd && (
                     <div className="p-4 bg-gray-50 rounded-lg space-y-3 border border-gray-200">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="block text-xs text-gray-500">产品名称*</label>
-                          <input
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                        <Field className="" label={<>产品名称*</>}>
+
+                          <Input
                             type="text"
-                            className="input text-xs py-1.5"
+                            className=""
                             value={policyForm.productName || ''}
                             onChange={e => setPolicyForm({...policyForm, productName: e.target.value})}
                             placeholder="产品名称"
                           />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="block text-xs text-gray-500">保险公司</label>
-                          <input
+                        </Field>
+                        <Field className="" label={<>保险公司</>}>
+
+                          <Input
                             type="text"
-                            className="input text-xs py-1.5"
+                            className=""
                             value={policyForm.company || ''}
                             onChange={e => setPolicyForm({...policyForm, company: e.target.value})}
                             placeholder="保险公司"
                           />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="block text-xs text-gray-500">保单号</label>
-                          <input
+                        </Field>
+                        <Field className="" label={<>保单号</>}>
+
+                          <Input
                             type="text"
-                            className="input text-xs py-1.5 font-mono"
+                            className=""
                             value={policyForm.policyNumber || ''}
                             onChange={e => setPolicyForm({...policyForm, policyNumber: e.target.value})}
                             placeholder="保单号"
                           />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="block text-xs text-gray-500">保费</label>
-                          <input
+                        </Field>
+                        <Field className="" label={<>保费</>}>
+
+                          <Input
                             type="text"
-                            className="input text-xs py-1.5"
+                            className=""
                             value={policyForm.premium || ''}
                             onChange={e => setPolicyForm({...policyForm, premium: e.target.value})}
                             placeholder="保费金额"
                           />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="block text-xs text-gray-500">生效日期</label>
-                          <input
+                        </Field>
+                        <Field className="" label={<>生效日期</>}>
+
+                          <Input
                             type="date"
-                            className="input text-xs py-1.5"
+                            className=""
                             value={policyForm.effectiveDate || ''}
                             onChange={e => setPolicyForm({...policyForm, effectiveDate: e.target.value})}
                           />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="block text-xs text-gray-500">状态</label>
-                          <select
-                            className="input text-xs py-1.5"
+                        </Field>
+                        <Field className="" label={<>状态</>}>
+
+                          <Select
+                            className=""
                             value={policyForm.status || '正式保单'}
-                            onChange={e => setPolicyForm({...policyForm, status: e.target.value})}
+                            onValueChange={selectedValue => setPolicyForm({...policyForm, status: selectedValue})}
                           >
                             <option value="正式保单">正式保单</option>
                             <option value="待生效">待生效</option>
                             <option value="已失效">已失效</option>
                             <option value="已退保">已退保</option>
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="block text-xs text-gray-500">投保人</label>
-                          <input
+                          </Select>
+                        </Field>
+                        <Field className="" label={<>投保人</>}>
+
+                          <Input
                             type="text"
-                            className="input text-xs py-1.5"
+                            className=""
                             value={policyForm.applicant || ''}
                             onChange={e => setPolicyForm({...policyForm, applicant: e.target.value})}
                             placeholder="投保人"
                           />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="block text-xs text-gray-500">被保人</label>
-                          <input
+                        </Field>
+                        <Field className="" label={<>被保人</>}>
+
+                          <Input
                             type="text"
-                            className="input text-xs py-1.5"
+                            className=""
                             value={policyForm.insured || ''}
                             onChange={e => setPolicyForm({...policyForm, insured: e.target.value})}
                             placeholder="被保人"
                           />
-                        </div>
+                        </Field>
                       </div>
                       <div className="flex justify-end gap-2">
-                        <button onClick={() => { setShowPolicyAdd(false); setPolicyForm({ policyNumber: '', productName: '', company: '', premium: '', effectiveDate: '', status: '正式保单', applicant: '', insured: '', paymentYears: '', insuranceType: '', coverage: '' }); }} className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700">取消</button>
-                        <button onClick={handleAddPolicy} disabled={!policyForm.productName?.trim()} className="btn btn-primary text-xs py-1.5 disabled:opacity-50">确认添加</button>
+                        <Button onClick={() => { setShowPolicyAdd(false); setPolicyForm({ policyNumber: '', productName: '', company: '', premium: '', effectiveDate: '', status: '正式保单', applicant: '', insured: '', paymentYears: '', insuranceType: '', coverage: '' }); }} className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700" variant="plain">取消</Button>
+                        <Button onClick={handleAddPolicy} disabled={!policyForm.productName?.trim()} className="disabled:opacity-50" variant="primary" validate>确认添加</Button>
                       </div>
                     </div>
                   )}
@@ -584,26 +582,26 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                             <tr key={policy.id} className="hover:bg-gray-50">
                               {editingPolicyId === policy.id ? (
                                 <>
-                                  <td className="px-3 py-2"><input className="input text-xs py-1 w-full" value={policyForm.productName} onChange={e => setPolicyForm({...policyForm, productName: e.target.value})} /></td>
-                                  <td className="px-3 py-2"><input className="input text-xs py-1 w-full" value={policyForm.company} onChange={e => setPolicyForm({...policyForm, company: e.target.value})} /></td>
-                                  <td className="px-3 py-2"><input className="input text-xs py-1 w-20" value={policyForm.premium} onChange={e => setPolicyForm({...policyForm, premium: e.target.value})} /></td>
+                                  <td className="px-3 py-2"><Input className="input-sm w-full" value={policyForm.productName} onChange={e => setPolicyForm({...policyForm, productName: e.target.value})} /></td>
+                                  <td className="px-3 py-2"><Input className="input-sm w-full" value={policyForm.company} onChange={e => setPolicyForm({...policyForm, company: e.target.value})} /></td>
+                                  <td className="px-3 py-2"><Input className="input-sm w-20" value={policyForm.premium} onChange={e => setPolicyForm({...policyForm, premium: e.target.value})} /></td>
                                   <td className="px-3 py-2">
-                                    <select className="input text-xs py-1 w-24" value={policyForm.status} onChange={e => setPolicyForm({...policyForm, status: e.target.value})}>
+                                    <Select className="w-24 input-sm" value={policyForm.status} onValueChange={selectedValue => setPolicyForm({...policyForm, status: selectedValue})}>
                                       <option value="正式保单">正式保单</option>
                                       <option value="待生效">待生效</option>
                                       <option value="已失效">已失效</option>
                                       <option value="已退保">已退保</option>
-                                    </select>
+                                    </Select>
                                   </td>
-                                  <td className="px-3 py-2"><input type="date" className="input text-xs py-1 w-28" value={policyForm.effectiveDate} onChange={e => setPolicyForm({...policyForm, effectiveDate: e.target.value})} /></td>
+                                  <td className="px-3 py-2"><Input type="date" className="input-sm w-28" value={policyForm.effectiveDate} onChange={e => setPolicyForm({...policyForm, effectiveDate: e.target.value})} /></td>
                                   <td className="sticky right-0 z-10 border-l border-gray-200 bg-white px-3 py-2 text-right whitespace-nowrap">
-                                    <button onClick={handleSaveEditPolicy} className="text-primary-600 hover:bg-primary-50 px-2 py-1 rounded text-xs">保存</button>
-                                    <button onClick={() => { setEditingPolicyId(null); }} className="text-gray-500 hover:bg-gray-100 px-2 py-1 rounded text-xs ml-1">取消</button>
+                                    <Button onClick={handleSaveEditPolicy} className="text-primary-600 hover:bg-primary-50 px-2 py-1 rounded text-xs" variant="plain">保存</Button>
+                                    <Button onClick={() => { setEditingPolicyId(null); }} className="text-gray-500 hover:bg-gray-100 px-2 py-1 rounded text-xs ml-1" variant="plain">取消</Button>
                                   </td>
                                 </>
                               ) : (
                                 <>
-                                  <td className="px-3 py-2 font-medium text-gray-800"><button type="button" className="text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)}>{policy.productName}</button></td>
+                                  <td className="px-3 py-2 font-medium text-gray-800"><Button type="button" className="text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)} variant="plain">{policy.productName}</Button></td>
                                   <td className="px-3 py-2 text-gray-600">{policy.company || '-'}</td>
                                   <td className="px-3 py-2 text-gray-600">{formatMoney(policy.premium,policy.mingya?.currency)}</td>
                                   <td className="px-3 py-2">
@@ -611,8 +609,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                                   </td>
                                   <td className="px-3 py-2 text-gray-500">{policy.effectiveDate || '-'}</td>
                                   <td className="sticky right-0 z-10 border-l border-gray-200 bg-white px-3 py-2 text-right whitespace-nowrap">
-                                    <button type="button" aria-label={onPolicyDetail&&initialData?'保单详情':'编辑保单'} onClick={() => onPolicyDetail && initialData ? onPolicyDetail(policy) : handleEditPolicy(policy.id)} className={onPolicyDetail&&initialData?'btn btn-ghost btn-sm':'text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded'}>{onPolicyDetail&&initialData?'详情':<Edit2 size={12}/>}</button>
-                                    {!(onPolicyDetail && initialData) && <button onClick={() => handleDeletePolicy(policy.id)} className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1 rounded ml-1"><Trash2 size={12} /></button>}
+                                    <Button type="button" aria-label={onPolicyDetail&&initialData?'保单详情':'编辑保单'} onClick={() => onPolicyDetail && initialData ? onPolicyDetail(policy) : handleEditPolicy(policy.id)} size="sm" variant="ghost">{onPolicyDetail&&initialData?'详情':<Edit2 size={12}/>}</Button>
+                                    {!(onPolicyDetail && initialData) && <IconButton onClick={() => handleDeletePolicy(policy.id)} className="text-gray-400 hover:text-red-500 hover:bg-red-50 rounded ml-1" aria-label="删除"><Trash2 size={12} /></IconButton>}
                                   </td>
                                 </>
                               )}
@@ -634,13 +632,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                     {(formData.intentProducts || []).map((product, idx) => (
                       <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 border border-blue-100 rounded-full text-xs font-medium text-blue-700">
                         {product}
-                        <button onClick={() => { const newProducts = [...formData.intentProducts]; newProducts.splice(idx, 1); setFormData({...formData, intentProducts: newProducts}); }} className="hover:text-red-600 transition-colors"><X size={10} strokeWidth={3}/></button>
+                        <IconButton onClick={() => { const newProducts = [...formData.intentProducts]; newProducts.splice(idx, 1); setFormData({...formData, intentProducts: newProducts}); }} className="hover:text-red-600 transition-colors" aria-label="关闭"><X size={10} strokeWidth={3}/></IconButton>
                       </span>
                     ))}
-                    <input
+                    <Input
                       type="text"
-                      placeholder="添加意向产品..."
-                      className="bg-transparent outline-none text-sm flex-1 min-w-[120px] text-gray-900 placeholder:text-gray-400"
+                      placeholder="添加意向产品…"
+                      className="flex-1 min-w-[120px]"
                       onKeyDown={e => {
                         if (e.key === 'Enter' && e.currentTarget.value.trim()) {
                           const newProducts = [...(formData.intentProducts || []), e.currentTarget.value.trim()];
@@ -661,61 +659,61 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                     <Clock size={16} strokeWidth={2}/> 跟进状态
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <button
+                    <Button
                       type="button"
                       onClick={() => setFormData({...formData, followUpStatus: 'following'})}
                       className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                         formData.followUpStatus === 'following'
                           ? 'bg-gray-900 text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
+                      }`} variant="plain"
                     >
                       跟进中
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={() => setFormData({...formData, followUpStatus: 'idle'})}
                       className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                         !formData.followUpStatus || formData.followUpStatus === 'idle'
                           ? 'bg-gray-900 text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
+                      }`} variant="plain"
                     >
                       暂未跟进
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
                 {/* 跟进历史 */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-medium text-gray-700"><Clock size={16} strokeWidth={2}/> 跟进历史</div>
-                  <button
+                  <Button
                     disabled={historyBusy||profileBusy} onClick={() => setShowHistoryAdd(!showHistoryAdd)}
-                    className="text-xs font-medium text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                    className="text-xs font-medium text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1" variant="plain"
                   >
                     <Plus size={14} /> 新增记录
-                  </button>
+                  </Button>
                 </div>
 
                 {historyError&&<p role="alert" className="text-sm text-danger-600">{historyError}</p>}
                 {historySaved&&!historyError&&!historyBusy&&<p role="status" className="text-xs text-gray-500">{historySaved}</p>}
                 {showHistoryAdd && (
                   <div className="p-4 bg-gray-50 rounded-lg space-y-3 animate-fade-in">
-                    <input
+                    <Input
                       type="date"
-                      className="input"
-                      readOnly={historyBusy} value={historyForm.date}
+                      className=""
+                      aria-label="跟进日期" readOnly={historyBusy} value={historyForm.date}
                       onChange={e => setHistoryForm({...historyForm, date: e.target.value})}
                     />
-                    <textarea
-                      disabled={historyBusy} aria-label="跟进内容" placeholder="记录本次沟通..."
-                      className="input min-h-[80px] resize-none"
+                    <Textarea
+                      disabled={historyBusy} aria-label="跟进内容" placeholder="记录本次沟通…"
+                      className="min-h-[80px] resize-none"
                       readOnly={historyBusy} value={historyForm.content}
                       onChange={e => setHistoryForm({...historyForm, content: e.target.value})}
                     />
                     <div className="flex justify-end gap-2">
-                      <button disabled={historyBusy} onClick={() => {setShowHistoryAdd(false);setHistoryForm({date:new Date().toISOString().slice(0,10),content:''});}} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">取消</button>
-                      <button disabled={historyBusy||profileBusy} onClick={handleAddHistory} className="btn btn-primary text-sm">{historyBusy?'正在保存…':initialData?'保存到数据库':'添加到客户草稿'}</button>
+                      <Button disabled={historyBusy} onClick={() => {setShowHistoryAdd(false);setHistoryForm({date:new Date().toISOString().slice(0,10),content:''});}} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors" variant="plain">取消</Button>
+                      <Button disabled={historyBusy||profileBusy} onClick={handleAddHistory} className="" variant="primary" validate>{historyBusy?'正在保存…':initialData?'保存到数据库':'添加到客户草稿'}</Button>
                     </div>
                   </div>
                 )}
@@ -725,20 +723,20 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                     <div key={record.id} className="p-4 bg-white border border-gray-200 rounded-lg group relative hover:border-gray-300 transition-colors">
                       {editingHistoryId === record.id ? (
                         <div className="space-y-3 py-1">
-                           <input
+                           <Input
                             type="date"
-                            className="input"
-                            readOnly={historyBusy} value={historyForm.date}
+                            className=""
+                            aria-label="跟进日期" readOnly={historyBusy} value={historyForm.date}
                             onChange={e => setHistoryForm({...historyForm, date: e.target.value})}
                           />
-                          <textarea
-                            className="input min-h-[70px] resize-none"
+                          <Textarea
+                            className="min-h-[70px] resize-none"
                             readOnly={historyBusy} value={historyForm.content}
                             onChange={e => setHistoryForm({...historyForm, content: e.target.value})}
                           />
                           <div className="flex justify-end gap-2">
-                             <button disabled={historyBusy} onClick={() => {setEditingHistoryId(null);setHistoryForm({date:new Date().toISOString().slice(0,10),content:''});}} className="text-sm text-gray-500">取消</button>
-                             <button disabled={historyBusy||profileBusy} onClick={handleSaveEditHistory} className="btn btn-primary text-sm">{historyBusy?'正在保存…':'保存修改'}</button>
+                             <Button disabled={historyBusy} onClick={() => {setEditingHistoryId(null);setHistoryForm({date:new Date().toISOString().slice(0,10),content:''});}} className="text-sm text-gray-500" variant="plain">取消</Button>
+                             <Button disabled={historyBusy||profileBusy} onClick={handleSaveEditHistory} className="" variant="primary" validate>{historyBusy?'正在保存…':'保存修改'}</Button>
                           </div>
                         </div>
                       ) : (
@@ -748,8 +746,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                           </div>
                           <p className="text-sm text-gray-800 mt-2 leading-relaxed pr-8">{record.content}</p>
                           <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                             <button disabled={historyBusy||profileBusy} aria-label="编辑跟进记录" onClick={() => handleEditHistory(record.id)} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors cursor-pointer"><Edit2 size={14}/></button>
-                             <button disabled={historyBusy||profileBusy} aria-label="删除跟进记录" onClick={() => handleDeleteHistory(record.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"><Trash2 size={14}/></button>
+                             <IconButton disabled={historyBusy||profileBusy} aria-label="编辑跟进记录" onClick={() => handleEditHistory(record.id)} className="text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors cursor-pointer"><Edit2 size={14}/></IconButton>
+                             <IconButton disabled={historyBusy||profileBusy} aria-label="删除跟进记录" onClick={() => handleDeleteHistory(record.id)} className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"><Trash2 size={14}/></IconButton>
                           </div>
                         </>
                       )}
@@ -783,9 +781,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
 
           {extractedList.length > 0 && activeTab === 'ai' && (
             <div className="space-y-4 animate-fade-in">
-              <div className="flex items-center justify-between"><div className="font-medium text-gray-900">成功识别 {extractedList.length} 位联系人</div><button onClick={() => setExtractedList([])} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">取消</button></div>
+              <div className="flex items-center justify-between"><div className="font-medium text-gray-900">成功识别 {extractedList.length} 位联系人</div><Button onClick={() => setExtractedList([])} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors" variant="plain">取消</Button></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{extractedList.map((c, i) => <div key={i} className="p-4 bg-gray-50 rounded-lg flex gap-3 items-center border border-gray-100"><div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center font-medium text-primary-700 text-lg">{c.remarkName?.[0]}</div><div className="flex-1 min-w-0"><div className="font-medium text-gray-900 truncate">{c.remarkName}</div><div className="text-xs text-gray-500 font-mono mt-0.5">{c.wxid || '无微信号'}</div></div></div>)}</div>
-              <button disabled={profileBusy} onClick={async()=>{setProfileBusy(true);setError(null);try{await onSave(extractedList,profileRequestId.current);onClose();}catch(e){setError(e instanceof Error?e.message:'导入未保存，请重试。');}finally{setProfileBusy(false);}}} className="w-full btn btn-primary">{profileBusy?'正在保存…':'确认并立即导入'}</button>
+              <Button disabled={profileBusy} onClick={async()=>{setProfileBusy(true);setError(null);try{await onSave(extractedList,profileRequestId.current);onClose();}catch(e){setError(e instanceof Error?e.message:'导入未保存，请重试。');}finally{setProfileBusy(false);}}} className="w-full" variant="primary" validate>{profileBusy?'正在保存…':'确认并立即导入'}</Button>
             </div>
           )}
 
@@ -799,7 +797,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                      <div className="font-medium text-gray-900">识别为：{extractedTableData.type === 'policy' ? '保单明细表' : '客户清单表'}</div>
                      <div className="text-sm text-gray-600">成功提取 {extractedTableData.items.length} 行有效数据</div>
                   </div>
-                  <button onClick={() => setExtractedTableData(null)} className="ml-auto text-xs text-gray-400 hover:text-gray-600 cursor-pointer">重新上传</button>
+                  <Button onClick={() => setExtractedTableData(null)} className="ml-auto text-xs text-gray-400 hover:text-gray-600 cursor-pointer" variant="plain">重新上传</Button>
                </div>
 
                <div className="max-h-[280px] overflow-y-auto rounded-lg border border-gray-200 p-2 space-y-2">
@@ -818,12 +816,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                   ))}
                </div>
 
-                <button
+                <Button
                   onClick={handleTableConfirm}
-                  className="w-full btn btn-primary"
+                  className="w-full" variant="primary" validate
                 >
                   确认导入表格数据
-                </button>
+                </Button>
              </div>
            )}
          </fieldset>
@@ -831,14 +829,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
 
          {/* 底部操作区 - 仅在手动录入时显示 */}
          {(activeTab === 'manual' || initialData) && (
-           <div className="px-5 py-4 border-t border-gray-100 bg-white flex flex-wrap items-center justify-end gap-2 shrink-0">
+           <WorkspaceDialogFooter>
              {error&&<p role="alert" className="mr-auto text-sm text-danger-600">{error}</p>}
-             <button disabled={profileBusy||historyBusy} onClick={requestClose} className="btn btn-secondary text-xs py-2">取消</button>
-             <button disabled={profileBusy||historyBusy} onClick={handleManualSave} className="btn btn-primary text-sm">{profileBusy?'正在保存…':'保存'}</button>
-           </div>
+             <Button disabled={profileBusy||historyBusy} onClick={requestClose} className="" variant="secondary">取消</Button>
+             <Button disabled={profileBusy||historyBusy} onClick={handleManualSave} className="" variant="primary" validate>{profileBusy?'正在保存…':'保存'}</Button>
+           </WorkspaceDialogFooter>
          )}
-       </div>
-     </div>
+    </WorkspaceDialog>
    );
  };
 

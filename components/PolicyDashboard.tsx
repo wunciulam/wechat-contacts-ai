@@ -1,3 +1,5 @@
+import Button, {IconButton} from './ui/Button';
+import Input, {SearchInput} from './ui/Input';
 import {excludedPolicyImport} from '../services/policyImportRules';
 import WorkspaceDialog, {WorkspaceDialogFooter} from './WorkspaceDialog';
 import PolicyStatus from './PolicyStatus';
@@ -149,17 +151,15 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, scopeContac
           allSelected={allSelected}
           onSelectAll={handleSelectAll}
           actionButton={
-            <div className="flex gap-2 flex-wrap">{scopeContactId&&onClearScope&&<button className="btn btn-secondary text-sm" onClick={onClearScope}>全部保单</button>}<button onClick={onReminders} className="btn btn-secondary text-sm"><Bell size={16}/>续期提醒（{reminderCount}）</button><button onClick={onAddPolicy} className="btn btn-primary text-sm"><Plus size={16} /><span>录入保单</span></button></div>
+            <div className="flex gap-2 flex-wrap">{scopeContactId&&onClearScope&&<Button className="" onClick={onClearScope} variant="secondary">全部保单</Button>}<Button onClick={onReminders} className="" variant="secondary"><Bell size={16}/>续期提醒（{reminderCount}）</Button><Button onClick={onAddPolicy} className="" variant="primary"><Plus size={16} /><span>录入保单</span></Button></div>
           }
           searchBox={
             <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={17} />
-              <input
+              <SearchInput
                 type="text"
-                placeholder="搜索客户、保单号、险种..."
+                placeholder="搜索客户、保单号、险种…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 text-sm bg-white border border-gray-200 rounded-md placeholder:text-gray-500 focus:bg-white focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-200 transition-colors min-h-[38px]"
               />
             </div>
           }
@@ -182,15 +182,15 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, scopeContac
               <div key={contact.id} className={`bg-white rounded-lg border transition-colors duration-150 overflow-hidden hover:border-gray-200 ${isSelected ? 'border-gray-400' : 'border-gray-100'}`}>
                 <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white cursor-pointer hover:bg-gray-50" onClick={() => toggleExpand(contact.id)}>
                   <div className="flex items-start gap-4">
-                    <button onClick={(e) => toggleSelect(contact.id, e)} className={`w-12 h-12 rounded-lg border flex items-center justify-center transition-colors ${isSelected ? 'bg-gray-900 border-gray-900 text-white' : 'bg-gray-100 border-gray-200 text-gray-600 font-medium text-lg hover:border-gray-300'}`}>
+                    <Button onClick={(e) => toggleSelect(contact.id, e)} className={`w-12 h-12 rounded-lg border flex items-center justify-center transition-colors ${isSelected ? 'bg-gray-900 border-gray-900 text-white' : 'bg-gray-100 border-gray-200 text-gray-600 font-medium text-lg hover:border-gray-300'}`} variant="plain">
                       {isSelected ? <CheckSquare size={20} /> : (contact.remarkName?.[0] || '?')}
-                    </button>
+                    </Button>
                     <div>
                       <div className="flex items-center gap-2"><h3 className="text-sm font-semibold text-gray-900">{contact.remarkName || contact.nickname}</h3><span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full tabular-nums">{contact.phoneNumber || '无手机号'}</span></div>
-                      {contactReminders > 0 && <button onClick={e=>{e.stopPropagation();onReminders?.();}} className="text-xs text-amber-700 mt-2">{contactReminders} 份保单待处理</button>}
+                      {contactReminders > 0 && <Button onClick={e=>{e.stopPropagation();onReminders?.();}} className="text-xs text-amber-700 mt-2" variant="plain">{contactReminders} 份保单待处理</Button>}
                       <div className="flex flex-wrap items-center gap-2 mt-2">
                         <CustomerTags tags={contact.tags}/>
-                        <button onClick={(e) => { e.stopPropagation(); onEditContact(contacts.find(c=>c.id===contact.id)||contact); }} className="text-xs text-gray-500 hover:bg-gray-100 px-2 py-0.5 rounded-md transition-colors flex items-center gap-1 font-medium"><Edit2 size={10} /> 修改标签</button>
+                        <Button onClick={(e) => { e.stopPropagation(); onEditContact(contacts.find(c=>c.id===contact.id)||contact); }} className="text-xs text-gray-500 hover:bg-gray-100 px-2 py-0.5 rounded-md transition-colors flex items-center gap-1 font-medium" variant="plain"><Edit2 size={10} /> 修改标签</Button>
                       </div>
                     </div>
                   </div>
@@ -204,8 +204,8 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, scopeContac
                   <div className="border-t border-gray-100 bg-gray-50 p-4 animate-in slide-in-from-top-2">
                     {onDeletePolicies&&checkedPolicies.size>0&&<div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
                       <span className="mr-auto text-gray-600">已选 {checkedPolicies.size} 份保单</span>
-                      <button disabled={deleting} className="btn btn-secondary text-sm" onClick={()=>setSelectedPolicies(prev=>({...prev,[contact.id]:new Set()}))}>取消选择</button>
-                      <button disabled={deleting} className="btn btn-primary text-sm" onClick={()=>askDelete(contact.id,(contact.policies||[]).filter(p=>checkedPolicies.has(p.id)))}>删除所选</button>
+                      <Button disabled={deleting} className="" onClick={()=>setSelectedPolicies(prev=>({...prev,[contact.id]:new Set()}))} variant="secondary">取消选择</Button>
+                      <Button disabled={deleting} className="" onClick={()=>askDelete(contact.id,(contact.policies||[]).filter(p=>checkedPolicies.has(p.id)))} variant="primary">删除所选</Button>
                     </div>}
                     <div className="max-w-full bg-white rounded-lg border border-gray-200 overflow-x-auto">
                       <table className="w-full table-fixed text-left text-sm" style={{minWidth:columns.slice(onDeletePolicies?0:1).reduce((a,b)=>a+b,0)}}>
@@ -237,7 +237,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, scopeContac
                           {contact.policies?.map(policy => { const managed={...policy,payments:(policy as ManagedPolicy).payments||[]}; const next=nextPayment(managed);const reminders=dueItems([managed]);return (
                             <tr key={policy.id} className="group hover:bg-gray-50 transition-colors">
                               {onDeletePolicies&&<td className="px-3 py-3"><input type="checkbox" aria-label={`选择保单${policy.policyNumber||policy.productName}`} checked={checkedPolicies.has(policy.id)} disabled={deleting} onChange={()=>togglePolicy(contact.id,policy.id)}/></td>}
-                              <td className="px-4 py-3 font-medium text-gray-700"><button className="max-w-full break-words text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)}>{policy.productName}</button></td>
+                              <td className="px-4 py-3 font-medium text-gray-700"><Button className="max-w-full break-words text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)} variant="plain">{policy.productName}</Button></td>
                               <td title={policy.policyNumber} className="overflow-hidden text-ellipsis px-4 py-3 whitespace-nowrap tabular-nums text-gray-500 text-xs">{policy.policyNumber}</td>
                               <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums font-medium text-gray-900">{formatMoney(policy.premium, policy.mingya?.currency)}</td>
                               <td className="px-4 py-3 text-gray-500 text-xs"><span className="block whitespace-nowrap">{policy.paymentFrequency || '待补充'}</span><span className="mt-1 block whitespace-nowrap">{policy.paymentYears || '待补充'}</span></td><td className="px-4 py-3 text-xs"><PolicyPaymentSummary policy={managed}/></td>
@@ -247,16 +247,16 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, scopeContac
                                 <PolicyStatus status={policy.status}/>
                               </td>
                               <td className="sticky right-0 z-10 border-l border-gray-200 bg-white px-4 py-3 text-right whitespace-nowrap group-hover:bg-gray-50">
-                                <button className="btn btn-ghost btn-sm" onClick={()=>onPolicyDetail?.(policy)}>详情</button><button
+                                <Button className="" onClick={()=>onPolicyDetail?.(policy)} variant="ghost" size="sm">详情</Button><IconButton
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if(onDeletePolicies)askDelete(contact.id,[policy]);else onDeletePolicy?.(contact.id,policy.id);
                                   }}
-                                  className="text-gray-500 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md transition-colors"
-                                  title="删除保单"
+                                  className="text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                  title="删除保单" aria-label="删除保单"
                                 >
                                   <Trash2 size={14} />
-                                </button>
+                                </IconButton>
                               </td>
                             </tr>
                           );})}
@@ -276,15 +276,15 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, scopeContac
         <ul className="mt-4 space-y-3">{deleteTarget.policies.map(p=><li key={p.id} className="border-b border-gray-100 pb-3"><p className="text-sm break-words">{p.productName}</p><p className="mt-1 text-xs text-gray-500 break-all">{p.policyNumber||'未填写保单号'}</p></li>)}</ul>
         {deleteError&&<p role="alert" className="mt-3 text-sm text-danger-600">{deleteError}</p>}
         <WorkspaceDialogFooter>
-          <button className="btn btn-secondary text-sm" disabled={deleting} onClick={()=>setDeleteTarget(null)}>取消</button>
-          <button className="btn btn-primary text-sm" disabled={deleting} onClick={confirmDelete}>{deleting?'正在删除…':'确认删除'}</button>
+          <Button className="" disabled={deleting} onClick={()=>setDeleteTarget(null)} variant="secondary">取消</Button>
+          <Button className="" disabled={deleting} onClick={confirmDelete} variant="primary">{deleting?'正在删除…':'确认删除'}</Button>
         </WorkspaceDialogFooter>
       </WorkspaceDialog>}
       {selectedIds.size > 0 && (
         <div className="fixed sm:absolute bottom-4 sm:bottom-8 left-4 sm:left-1/2 right-4 sm:right-auto sm:-translate-x-1/2 bg-white shadow-lg border border-gray-200 rounded-lg px-2 py-2 flex items-center gap-2 animate-in slide-in-from-bottom-4 z-50 overflow-x-auto no-scrollbar">
             <div className="px-3 sm:px-4 py-2 bg-gray-900 rounded text-xs sm:text-sm font-medium text-white whitespace-nowrap">{selectedIds.size} 位客户</div>
-            <button onClick={handleBatchDelete} className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-red-50 rounded-md transition-colors whitespace-nowrap"><Trash2 size={14} className="sm:w-4 sm:h-4" /><span>批量删除</span></button>
-            <button onClick={() => setSelectedIds(new Set())} className="p-2 text-gray-500 hover:text-gray-900 shrink-0"><X size={18} className="sm:w-5 sm:h-5" /></button>
+            <Button onClick={handleBatchDelete} className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-red-50 rounded-md transition-colors whitespace-nowrap" variant="plain"><Trash2 size={14} className="sm:w-4 sm:h-4" /><span>批量删除</span></Button>
+            <IconButton onClick={() => setSelectedIds(new Set())} className="text-gray-500 hover:text-gray-900 shrink-0" aria-label="关闭"><X size={18} className="sm:w-5 sm:h-5" /></IconButton>
         </div>
       )}
     </div>

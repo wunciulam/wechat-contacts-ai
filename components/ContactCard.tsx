@@ -1,3 +1,4 @@
+import {IconButton} from './ui/Button';
 import CustomerTags from './CustomerTags';
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
@@ -72,13 +73,13 @@ const ContactCard: React.FC<ContactCardProps> = ({
       }`}
     >
       {/* 删除按钮 - 右上角 */}
-      <button
+      <IconButton
         onClick={handleRemove}
-        className="absolute top-2 right-2 p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
+        className="absolute top-2 right-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
         title={removalLabel} aria-label={removalLabel}
       >
         <Trash2 size={14} />
-      </button>
+      </IconButton>
 
       <div className="flex items-start gap-3 pr-8">
         {/* Avatar */}

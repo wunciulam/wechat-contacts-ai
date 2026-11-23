@@ -1,3 +1,5 @@
+import Button, {IconButton} from './ui/Button';
+import Input, {SearchInput} from './ui/Input';
 import CustomerTags from './CustomerTags';
 import React, { useState } from 'react';
 import { Contact } from '../types';
@@ -131,56 +133,54 @@ export const ContactList: React.FC<ContactListProps> = ({
           actionButton={
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex bg-gray-100 rounded-md p-0.5">
-                <button
+                <IconButton
                   onClick={() => setViewMode('grid')}
-                  className={`p-1 rounded transition-colors duration-150 ${viewMode === 'grid' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                  className={`p-1 rounded transition-colors duration-150 ${viewMode === 'grid' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-gray-600'}`} aria-label="卡片视图" aria-pressed={viewMode==='grid'}
                 >
                   <LayoutGrid size={13} />
-                </button>
-                <button
+                </IconButton>
+                <IconButton
                   onClick={() => setViewMode('list')}
-                  className={`p-1 rounded transition-colors duration-150 ${viewMode === 'list' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                  className={`p-1 rounded transition-colors duration-150 ${viewMode === 'list' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-gray-600'}`} aria-label="列表视图" aria-pressed={viewMode==='list'}
                 >
                   <List size={13} />
-                </button>
+                </IconButton>
               </div>
               <div className="hidden md:flex items-center gap-1 bg-gray-100 rounded-md p-0.5">
-                <button
+                <Button
                   onClick={() => handleFollowUpFilterChange(null)}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${localFollowUpFilter === null && followUpFilter === null ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${localFollowUpFilter === null && followUpFilter === null ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`} variant="plain"
                 >
                   全部
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handleFollowUpFilterChange('following')}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${localFollowUpFilter === 'following' || followUpFilter === 'following' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${localFollowUpFilter === 'following' || followUpFilter === 'following' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`} variant="plain"
                 >
                   跟进中
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handleFollowUpFilterChange('contacted')}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${localFollowUpFilter === 'contacted' || followUpFilter === 'contacted' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${localFollowUpFilter === 'contacted' || followUpFilter === 'contacted' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`} variant="plain"
                 >
                   已沟通
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => handleFollowUpFilterChange('idle')}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${localFollowUpFilter === 'idle' || followUpFilter === 'idle' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${localFollowUpFilter === 'idle' || followUpFilter === 'idle' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`} variant="plain"
                 >
                   暂未跟进
-                </button>
+                </Button>
               </div>
             </div>
           }
           searchBox={
             <div className="relative w-full sm:w-44">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
-              <input
+              <SearchInput
                 type="text"
-                placeholder="搜索联系人..."
+                placeholder="搜索联系人…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-white focus:bg-white focus:outline-none transition-colors text-xs"
               />
             </div>
           }
@@ -197,12 +197,12 @@ export const ContactList: React.FC<ContactListProps> = ({
             <p className="text-xs mt-1 text-gray-400">添加或导入联系人开始使用</p>
 
             {(searchTerm || filterTags.size > 0) && (
-              <button
+              <Button
                 onClick={handleClearFilters}
-                className="mt-3 px-3 py-1.5 border border-gray-200 text-gray-500 text-xs font-medium rounded-md hover:bg-gray-50 transition-colors cursor-pointer"
+                className="mt-3 px-3 py-1.5 border border-gray-200 text-gray-500 text-xs font-medium rounded-md hover:bg-gray-50 transition-colors cursor-pointer" variant="plain"
               >
                 清除筛选
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -227,23 +227,23 @@ export const ContactList: React.FC<ContactListProps> = ({
                       onClick={() => onEdit(contact)}
                     >
                       <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
-                        <button
+                        <IconButton
                           onClick={(e) => { e.stopPropagation(); onDelete(contact.id); }}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
-                          title="删除"
+                          className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                          title="删除" aria-label="删除"
                         >
                           <Trash2 size={12} />
-                        </button>
-                        <button
+                        </IconButton>
+                        <IconButton
                           onClick={(e) => { e.stopPropagation(); onToggleSelect(contact.id); }}
                           className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
                             isSelected
                               ? 'bg-gray-900 border-gray-900 text-white'
                               : 'bg-white border-gray-300 text-transparent hover:border-gray-400'
-                          }`}
+                          }`} aria-label={`选择${contact.remarkName||contact.nickname}`} aria-pressed={isSelected}
                         >
                           <Check size={12} strokeWidth={3} />
-                        </button>
+                        </IconButton>
                       </div>
                       <div className="p-4 flex items-start gap-3 pr-14">
                         <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 font-semibold text-sm shrink-0">
@@ -334,16 +334,16 @@ export const ContactList: React.FC<ContactListProps> = ({
                               {contact.remarkInfo}
                             </p>
                             {hasLongRemark && (
-                              <button
+                              <Button
                                 onClick={(e) => toggleRemarkExpand(contact.id, e)}
-                                className="mt-1.5 flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors cursor-pointer"
+                                className="mt-1.5 flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors cursor-pointer" variant="plain"
                               >
                                 {isRemarkExpanded ? (
                                   <>收起 <ChevronUp size={10} /></>
                                 ) : (
                                   <>展开 <ChevronDown size={10} /></>
                                 )}
-                              </button>
+                              </Button>
                             )}
                           </div>
                         ) : (
@@ -382,12 +382,12 @@ export const ContactList: React.FC<ContactListProps> = ({
                           onClick={() => onEdit(contact)}
                         >
                           <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                            <button
+                            <Button
                               onClick={() => onToggleSelect(contact.id)}
-                              className={`p-1.5 rounded-md transition-colors ${isSelected ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-300 hover:text-gray-900 hover:border-gray-400'}`}
+                              className={`p-1.5 rounded-md transition-colors ${isSelected ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-300 hover:text-gray-900 hover:border-gray-400'}`} variant="plain"
                             >
                               {isSelected ? <CheckSquare size={17} /> : <Square size={17} />}
-                            </button>
+                            </Button>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
@@ -457,12 +457,12 @@ export const ContactList: React.FC<ContactListProps> = ({
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                              <button
+                              <IconButton
                                 onClick={() => onDelete(contact.id)}
-                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" aria-label="删除"
                               >
                                 <Trash2 size={16} />
-                              </button>
+                              </IconButton>
                             </div>
                           </td>
                         </tr>
@@ -484,71 +484,71 @@ export const ContactList: React.FC<ContactListProps> = ({
 
           <div className="w-px h-4 bg-gray-200" />
 
-          <button
+          <Button
             onClick={onBatchAddTag}
-            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer" variant="plain"
           >
             <Tag size={10} />
             <span>加标签</span>
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onBatchRemoveTag}
-            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer" variant="plain"
           >
             <Tag size={10} />
             <span>减标签</span>
-          </button>
+          </Button>
 
           <div className="w-px h-4 bg-gray-200" />
 
           <div className="relative">
-            <button
+            <Button
               onClick={() => setShowBatchStatusMenu(!showBatchStatusMenu)}
-              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer" variant="plain"
             >
               <Clock size={10} />
               <span>跟进状态</span>
-            </button>
+            </Button>
             {showBatchStatusMenu && (
               <div className="absolute bottom-full left-0 mb-1 bg-white border border-gray-200 rounded-md shadow-lg py-1 z-50">
-                <button
+                <Button
                   onClick={() => { onBatchUpdateStatus?.(Array.from(selectedIds), 'following'); setShowBatchStatusMenu(false); }}
-                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 transition-colors"
+                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 transition-colors" variant="plain"
                 >
                   跟进中
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => { onBatchUpdateStatus?.(Array.from(selectedIds), 'contacted'); setShowBatchStatusMenu(false); }}
-                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 transition-colors"
+                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 transition-colors" variant="plain"
                 >
                   已沟通
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => { onBatchUpdateStatus?.(Array.from(selectedIds), 'idle'); setShowBatchStatusMenu(false); }}
-                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 transition-colors"
+                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 transition-colors" variant="plain"
                 >
                   暂未跟进
-                </button>
+                </Button>
               </div>
             )}
           </div>
 
           <div className="w-px h-4 bg-gray-200" />
 
-          <button
+          <Button
             onClick={onBatchDelete}
-            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors cursor-pointer" variant="plain"
           >
             <Trash2 size={10} />
             <span>删除</span>
-          </button>
+          </Button>
 
-          <button
+          <IconButton
             onClick={onDeselectAll}
-            className="ml-auto w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-400 transition-colors cursor-pointer"
+            className="ml-auto w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-400 transition-colors cursor-pointer" aria-label="关闭"
           >
             <X size={12} />
-          </button>
+          </IconButton>
         </div>
       )}
     </div>

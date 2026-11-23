@@ -5,9 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node node_modules/vite/bin/vite.js build",
     "lint": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:ui": "node scripts/check-ui-contract.cjs --self-test && node scripts/check-ui-contract.cjs",
+    "prebuild": "npm run check:ui",
+    "check:types": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.web.json",
+    "check:business": "node --experimental-strip-types --experimental-specifier-resolution=node --test tests/*.test.ts tests/*.test.cjs tests/*.test.mjs",
+    "check:ui:browser": "node scripts/check-ui-browser.cjs",
+    "check:release": "npm run check:types && npm run check:business && npm run build && npm run check:ui:browser"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -24,9 +30,11 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@playwright/cli": "0.1.25",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "postcss": "8.5.6"
   }
 }

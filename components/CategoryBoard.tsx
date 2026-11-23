@@ -1,3 +1,4 @@
+import {IconButton} from './ui/Button';
 import {PageHeader} from './PageHeader';
 import {categoryIds,parseBoardCardId} from '../services/contactIdentity';
 import React, { useState, useMemo } from 'react';
@@ -249,7 +250,7 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
     <div className="flex-1 h-full min-h-0 flex flex-col overflow-hidden">
       {movePending&&<p role="status" className="px-5 py-3 text-sm text-gray-500">正在保存分类…</p>}
       {moveError&&<p role="alert" className="px-5 py-3 text-sm text-danger-600">{moveError}</p>}
-      <div className="shrink-0 border-b border-gray-100 bg-white"><PageHeader compactActions title="跟进工作台" count={filteredContacts.length} actionButton={<button onClick={onOpenCategoryManager} className="icon-btn" aria-label="管理分类" title="管理分类"><Settings size={20}/></button>}/></div>
+      <div className="shrink-0 border-b border-gray-100 bg-white"><PageHeader compactActions title="跟进工作台" count={filteredContacts.length} actionButton={<IconButton onClick={onOpenCategoryManager} className="" aria-label="管理分类" title="管理分类"><Settings size={20}/></IconButton>}/></div>
 
       <DndContext
         sensors={sensors}

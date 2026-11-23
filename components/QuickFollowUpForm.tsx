@@ -1,3 +1,6 @@
+import ClientPicker from './ui/ClientPicker';
+import Button, {IconButton} from './ui/Button';
+import Input, {SearchInput} from './ui/Input';
 import type {FollowUpSave} from '../types';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {WorkspaceDialogFooter} from './WorkspaceDialog';
@@ -16,38 +19,26 @@ interface QuickFollowUpFormProps {
   variant?: 'default' | 'compact';
 }
 
-export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({ 
+export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
   contacts, onSave, initialContactId, initialRecord, onCancel, onSaved, onSavingChange, className = '', variant = 'default'
 }) => {
   const [saving,setSaving]=useState(false),[saveError,setSaveError]=useState('');
   const savingRef=useRef(false),requestIds=useRef(new Map<string,string>()),newCustomerId=useRef(crypto.randomUUID());
   const [selectedContactId, setSelectedContactId] = useState<string>(initialContactId || '');
   const [date, setDate] = useState(initialRecord?.date || new Date().toISOString().split('T')[0]);
-  
+
   const [todoItems, setTodoItems] = useState<{ id: string, text: string, completed: boolean }[]>(
-    initialRecord 
+    initialRecord
       ? [{ id: initialRecord.id, text: initialRecord.content, completed: !!initialRecord.completed }]
       : [{ id: '1', text: '', completed: false }]
   );
-  
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const [pickerRequest,setPickerRequest]=useState(0);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [newContactName, setNewContactName] = useState('');
   const [isExpanded, setIsExpanded] = useState(!!initialRecord);
-  
+
   const containerRef = useRef<HTMLFieldSetElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-
-  const filteredContacts = useMemo(() => {
-    if (!searchTerm) return contacts.slice(0, 50); 
-    return contacts.filter(c => 
-      (c.remarkName && c.remarkName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (c.nickname && c.nickname.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  }, [contacts, searchTerm]);
-
   const selectedContact = contacts.find(c => c.id === selectedContactId);
 
   useEffect(() => {
@@ -61,16 +52,13 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (isDropdownOpen && dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        if (!triggerRef.current?.contains(event.target as Node)) setIsDropdownOpen(false);
-      }
       if (variant === 'compact' && containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        if (!initialRecord && todoItems.every(t => !t.text.trim()) && !selectedContactId) { setIsExpanded(false); setIsDropdownOpen(false); }
+        if (!initialRecord && todoItems.every(t => !t.text.trim()) && !selectedContactId) { setIsExpanded(false); }
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [variant, todoItems, selectedContactId, isDropdownOpen, initialRecord]);
+  }, [variant, todoItems, selectedContactId, initialRecord]);
 
   const handleAddTodo = () => {
     if (initialRecord) return;
@@ -104,7 +92,7 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
         target=await onSave(isCreatingNew?null:target,date,todo.text.trim(),selectedContact?.followUpStatus||'following',isCreatingNew?newContactName.trim():undefined,initialRecord?todo.id:undefined,todo.completed,requestIds.current.get(todo.id),target);
       }
       requestIds.current.clear();newCustomerId.current=crypto.randomUUID();
-      if(!initialRecord){setTodoItems([{id:'1',text:'',completed:false}]);if(!initialContactId){setSelectedContactId('');setSearchTerm('');setIsCreatingNew(false);setNewContactName('');if(variant==='compact')setIsExpanded(false);}}
+      if(!initialRecord){setTodoItems([{id:'1',text:'',completed:false}]);if(!initialContactId){setSelectedContactId('');setIsCreatingNew(false);setNewContactName('');if(variant==='compact')setIsExpanded(false);}}
       onSaved?.();
     } catch(e){setSaveError(e instanceof Error?e.message:String(e));}
     finally{savingRef.current=false;setSaving(false);onSavingChange?.(false);}
@@ -115,16 +103,16 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
     <div className="space-y-1.5 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
       {todoItems.map((item, idx) => (
         <div key={item.id} className="flex items-center gap-3 group/todo">
-          <button 
+          <IconButton
             type="button"
             onClick={() => handleToggleTodo(item.id)}
-            className={`shrink-0 transition-colors ${item.completed ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+            className="shrink-0" aria-label={item.completed?'标记未完成':'标记已完成'} aria-pressed={item.completed}
           >
             {item.completed ? <CheckSquare size={18} strokeWidth={2.5} /> : <Square size={18} strokeWidth={2.5} />}
-          </button>
-          <input 
-            type="text" 
-            value={item.text} 
+          </IconButton>
+          <Input
+            type="text"
+            value={item.text}
             onChange={(e) => handleUpdateTodo(item.id, e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -135,71 +123,47 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
                 handleRemoveTodo(item.id);
               }
             }}
-            placeholder="填写跟进内容..."
-            className={`flex-1 bg-transparent border-0 focus:ring-0 p-1 text-sm font-medium text-gray-900 placeholder:text-gray-400 ${item.completed ? 'text-gray-400 line-through' : ''}`}
+            placeholder="填写跟进内容…"
+            className={`flex-1 ${item.completed?'line-through text-gray-400':''}`}
             autoFocus={idx === todoItems.length - 1 && isExpanded}
           />
           {!initialRecord && (
-            <button 
+            <IconButton
               type="button"
               onClick={() => handleRemoveTodo(item.id)}
-              className="opacity-0 group-hover/todo:opacity-100 p-1.5 text-gray-300 hover:text-gray-600 transition-all"
+              className="opacity-0 group-hover/todo:opacity-100 text-gray-300 hover:text-gray-600 transition-colors" aria-label="删除"
             >
               <Trash2 size={16} />
-            </button>
+            </IconButton>
           )}
         </div>
       ))}
       {!initialRecord && (
-        <button 
+        <Button
           type="button"
           onClick={handleAddTodo}
-          className="flex items-center gap-2 text-[10px] font-medium text-gray-500 hover:text-gray-900 mt-2 pl-7 transition-colors"
+          className="flex items-center gap-2 text-xs font-medium text-gray-500 hover:text-gray-900 mt-2 pl-7 transition-colors" variant="plain"
         >
           <Plus size={12} strokeWidth={3} />
           <span>添加新记录项</span>
-        </button>
+        </Button>
       )}
     </div>
   );
 
   if (variant === 'compact') {
       return (
-          <fieldset disabled={saving} ref={containerRef} className={`min-w-0 bg-white border shadow-md rounded-lg transition-all duration-300 w-full overflow-visible ${isExpanded ? 'p-3 md:p-3.5 border-gray-300' : 'p-2 border-gray-200'}`}>
+          <fieldset disabled={saving} ref={containerRef} className={`min-w-0 bg-white border shadow-md rounded-lg transition-colors duration-300 w-full overflow-visible ${isExpanded ? 'p-3 md:p-3.5 border-gray-300' : 'p-2 border-gray-200'}`}>
             {feedback}
               <div className="flex flex-col gap-2.5 md:gap-3">
                   <div className={`flex items-center gap-1.5 md:gap-2 ${!isExpanded && !selectedContactId ? 'hidden' : 'flex animate-in fade-in slide-in-from-bottom-2 duration-300'}`}>
-                       <div className="relative">
-                           <button 
-                             ref={triggerRef}
-                             onClick={() => !initialRecord && setIsDropdownOpen(!isDropdownOpen)}
-                              className={`flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 rounded-md text-[10px] md:text-[11px] font-medium transition-all border ${selectedContactId ? 'bg-gray-900 text-white border-gray-900' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'}`}
-                             disabled={!!initialRecord}
-                           >
-                               <User size={12} className="shrink-0 md:w-[14px] md:h-[14px]" />
-                               <span className="max-w-[80px] md:max-w-[120px] truncate">{isCreatingNew ? `新客户: ${newContactName}` : (selectedContact?.remarkName || selectedContact?.nickname || '关联客户...') }</span>
-                               {!initialRecord && (isDropdownOpen ? <ChevronUp size={12} className="md:w-[14px] md:h-[14px]" /> : <ChevronDown size={12} className="md:w-[14px] md:h-[14px]" />)}
-                           </button>
-                           {isDropdownOpen && (
-                                <div ref={dropdownRef} className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-[100] flex flex-col max-h-[300px] animate-in slide-in-from-top-2">
-                                    <div className="p-2.5 border-b border-gray-100 bg-gray-50">
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                                            <input type="text" className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-md outline-none focus:border-gray-400 transition-all font-medium" placeholder="搜索客户..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} autoFocus />
-                                        </div>
-                                    </div>
-                                    <div className="overflow-y-auto custom-scrollbar flex-1 p-1.5">
-                                        {filteredContacts.length === 0 ? <div onClick={() => { setIsCreatingNew(true); setNewContactName(searchTerm); setIsDropdownOpen(false); setSelectedContactId(''); }} className="p-3 text-center text-xs font-medium text-gray-900 cursor-pointer hover:bg-gray-100 rounded-md border border-dashed border-gray-200">无此客户，点此创建: "{searchTerm}"</div> : filteredContacts.map(c => <div key={c.id} onClick={() => { setSelectedContactId(c.id); setIsCreatingNew(false); setIsDropdownOpen(false); }} className="flex items-center gap-3 p-2 hover:bg-gray-50 cursor-pointer rounded-md transition-colors"><div className="w-7 h-7 rounded-md bg-gray-100 flex items-center justify-center text-[10px] font-medium text-gray-500 border border-gray-200">{c.remarkName?.[0] || c.nickname?.[0]}</div><div className="text-sm font-medium text-gray-700 truncate">{c.remarkName || c.nickname}</div>{c.id === selectedContactId && <Check size={14} className="text-gray-900 ml-auto" strokeWidth={3} />}</div>)}
-                                   </div>
-                               </div>
-                           )}
-                       </div>
-                        <div className="relative">
-                            <input 
-                              type="date" 
-                              value={date} 
-                              onChange={e => setDate(e.target.value)} 
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 transition-all cursor-pointer"
+                       <ClientPicker contacts={contacts} value={selectedContactId} disabled={Boolean(initialRecord)} className="min-w-0 flex-1" newName={isCreatingNew?newContactName:''} openRequest={pickerRequest} onChange={id=>{setSelectedContactId(id);setIsCreatingNew(false);}} onCreate={name=>{setIsCreatingNew(true);setNewContactName(name);setSelectedContactId('');}}/>
+                        <div className="w-40 shrink-0">
+                            <Input
+                              type="date"
+                              value={date}
+                              onChange={e => setDate(e.target.value)}
+                              aria-label="跟进日期"
                             />
                         </div>
                   </div>
@@ -210,33 +174,33 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
                           </div>
                        ) : (
                           <div className="flex items-center gap-2">
-                            {!selectedContactId && <button onClick={() => { setIsExpanded(true); setIsDropdownOpen(true); }} className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all border border-gray-200 bg-white"><UserPlus size={18} /></button>}
-                            <div 
-                              onClick={() => setIsExpanded(true)} 
-                              className="flex-1 p-2.5 text-sm text-gray-400 cursor-text min-h-[44px] flex items-center font-medium bg-gray-50 rounded-md border border-gray-200 hover:bg-white hover:border-gray-300 transition-all"
+                            {!selectedContactId && <IconButton onClick={() => { setIsExpanded(true); setPickerRequest(n=>n+1); }} className="text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors border border-gray-200 bg-white" aria-label="选择关联客户"><UserPlus size={18} /></IconButton>}
+                            <Button variant="plain"
+                              onClick={() => setIsExpanded(true)}
+                              className="flex-1 p-2.5 text-sm text-gray-400 cursor-text min-h-[44px] flex items-center font-medium bg-gray-50 rounded-md border border-gray-200 hover:bg-white hover:border-gray-300 transition-colors"
                             >
-                              输入今日跟进事项...
-                            </div>
-                            <button 
-                              onClick={handleSave} 
+                              输入今日跟进事项…
+                            </Button>
+                            <Button
+                              onClick={handleSave}
                               disabled={saving || (!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim())}
-                              className={`shrink-0 px-4 md:px-8 py-2 md:py-2.5 rounded-md text-xs md:text-sm font-medium transition-all ${(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim()) ? 'bg-gray-200 text-gray-400' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
+                              className="shrink-0" variant="primary"
                             >
                               {saving?'正在保存…':'立即录入'}
-                            </button>
+                            </Button>
                           </div>
                        )}
                        <div className={`flex justify-end items-center gap-3 mt-1 px-1 ${!isExpanded ? 'hidden' : ''}`}>
                            {isExpanded && !initialRecord && (
-                             <button onClick={() => setIsExpanded(false)} className="text-[11px] font-medium text-gray-400 hover:text-gray-900">收起</button>
+                             <Button onClick={() => setIsExpanded(false)} className="text-xs font-medium text-gray-400 hover:text-gray-900" variant="plain">收起</Button>
                            )}
-                           <button 
-                             onClick={handleSave} 
+                           <Button
+                             onClick={handleSave}
                              disabled={saving || (!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim())}
-                             className={`shrink-0 px-6 md:px-10 py-2 md:py-2.5 rounded-md text-xs md:text-sm font-medium transition-all ${(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim()) ? 'bg-gray-200 text-gray-400' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
+                             className="shrink-0" variant="primary"
                            >
                             {saving?'正在保存…':initialRecord?'保存修改':'立即录入'}
-                          </button>
+                          </Button>
                        </div>
                   </div>
               </div>
@@ -248,56 +212,21 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
     <fieldset disabled={saving} className={`min-w-0 space-y-4 ${className}`}>
       {feedback}
            <div className="space-y-2 relative">
-              <label className="text-xs font-medium text-gray-700 block ml-1">关联客户对象</label>
+              <label className="text-xs font-medium text-gray-700 block ml-1">关联客户</label>
               {isCreatingNew ? (
                   <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
-                      <div className="relative flex-1"><UserPlus className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><input type="text" value={newContactName} onChange={(e) => setNewContactName(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-md border border-gray-200 bg-white text-gray-900 focus:bg-white focus:border-gray-400 outline-none font-medium" placeholder="客户姓名" autoFocus /></div>
-                      <button onClick={() => setIsCreatingNew(false)} className="text-xs font-medium text-gray-400 hover:text-gray-900 underline">返回搜索</button>
+                      <div className="relative flex-1"><Input aria-label="客户姓名" leadingIcon={UserPlus} type="text" value={newContactName} onChange={(e) => setNewContactName(e.target.value)} className="w-full" placeholder="客户姓名" autoFocus /></div>
+                      <Button onClick={() => setIsCreatingNew(false)} className="text-xs font-medium text-gray-400 hover:text-gray-900 underline" variant="plain">返回搜索</Button>
                   </div>
               ) : selectedContactId ? (
-                  <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-md"><div className="flex items-center gap-3"><div className="w-9 h-9 rounded-md bg-gray-100 flex items-center justify-center text-sm font-medium text-gray-700 border border-gray-200">{selectedContact?.remarkName?.[0] || selectedContact?.nickname?.[0] || '?'}</div><div><div className="font-medium text-gray-900 text-sm">{selectedContact?.remarkName || selectedContact?.nickname}</div></div></div>{!initialRecord && <button onClick={() => setSelectedContactId('')} className="text-xs text-gray-600 font-medium px-3 py-1.5 hover:bg-gray-100 border border-gray-200 rounded-md transition-all">更换</button>}</div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-md"><div className="flex items-center gap-3"><div className="w-9 h-9 rounded-md bg-gray-100 flex items-center justify-center text-sm font-medium text-gray-700 border border-gray-200">{selectedContact?.remarkName?.[0] || selectedContact?.nickname?.[0] || '?'}</div><div><div className="font-medium text-gray-900 text-sm">{selectedContact?.remarkName || selectedContact?.nickname}</div></div></div>{!initialRecord && <Button onClick={() => setSelectedContactId('')} className="text-xs text-gray-600 font-medium px-3 py-1.5 hover:bg-gray-100 border border-gray-200 rounded-md transition-colors" variant="plain">更换</Button>}</div>
                ) : (
-                   <div className="relative group">
-                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-900 transition-colors" size={18} />
-                     <input 
-                       type="text" 
-                       placeholder="搜索或输入直接创建..." 
-                       value={searchTerm} 
-                       onChange={(e) => { setSearchTerm(e.target.value); setIsDropdownOpen(true); }} 
-                       onFocus={() => setIsDropdownOpen(true)} 
-                       className="w-full pl-11 pr-4 py-2.5 rounded-md bg-white border border-gray-200 focus:bg-white focus:border-gray-400 outline-none transition-all font-medium text-gray-900" 
-                     />
-                     {isDropdownOpen && (
-                       <div className="absolute left-0 right-0 top-full bg-white rounded-md shadow-lg border border-gray-200 max-h-60 overflow-y-auto z-[60] mt-2 p-2 space-y-1 animate-in fade-in slide-in-from-top-2">
-                         {filteredContacts.length === 0 ? (
-                           <div onClick={() => { setIsCreatingNew(true); setNewContactName(searchTerm); setIsDropdownOpen(false); setSelectedContactId(''); }} className="p-3 text-center cursor-pointer hover:bg-gray-50 text-gray-600 font-medium flex items-center justify-center gap-2 rounded-md transition-colors border border-dashed border-gray-200">
-                             <UserPlus size={16} /> 创建并关联："{searchTerm}"
-                           </div>
-                         ) : (
-                           <>
-                             {filteredContacts.map(c => (
-                               <div key={c.id} onClick={() => { setSelectedContactId(c.id); setIsDropdownOpen(false); }} className="p-2.5 hover:bg-gray-50 cursor-pointer flex items-center gap-3 rounded-md transition-all">
-                                 <div className="w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600 border border-gray-200">
-                                   {c.remarkName?.[0] || c.nickname?.[0]}
-                                 </div>
-                                 <div className="font-medium text-gray-700 text-sm">{c.remarkName || c.nickname}</div>
-                               </div>
-                             ))}
-                             {searchTerm && (
-                               <div onClick={() => { setIsCreatingNew(true); setNewContactName(searchTerm); setIsDropdownOpen(false); setSelectedContactId(''); }} className="p-3 hover:bg-gray-50 cursor-pointer border-t border-gray-100 text-gray-700 text-sm font-medium flex items-center justify-center gap-2 sticky bottom-0 bg-white rounded-b-md">
-                                 <UserPlus size={16} /> 创建新客户："{searchTerm}"
-                               </div>
-                             )}
-                           </>
-                         )}
-                       </div>
-                     )}
-                   </div>
+                   <ClientPicker contacts={contacts} value={selectedContactId} disabled={Boolean(initialRecord)} className="min-w-0" onChange={id=>{setSelectedContactId(id);setIsCreatingNew(false);}} onCreate={name=>{setIsCreatingNew(true);setNewContactName(name);setSelectedContactId('');}}/>
                )}
            </div>
             <div className="space-y-2">
                <label className="text-xs font-medium text-gray-700 block ml-1">沟通日期</label>
-               <div className="relative group"><Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-900" size={18} /><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full pl-11 pr-4 py-2.5 rounded-md bg-white border border-gray-200 focus:bg-white focus:border-gray-400 outline-none transition-all font-medium text-gray-900" /></div>
+               <div className="relative group"><Input aria-label="沟通日期" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full" /></div>
             </div>
             <div className="space-y-2">
                <label className="text-xs font-medium text-gray-700 block ml-1">{initialRecord ? '更新记录详情' : '跟进事项清单'}</label>
@@ -306,10 +235,10 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
                </div>
             </div>
             <WorkspaceDialogFooter>
-                {onCancel && <button disabled={saving} onClick={onCancel} className="btn btn-secondary text-sm">取消</button>}
-                <button onClick={handleSave} disabled={saving || (!selectedContactId && !newContactName) || !todoItems.some(t => t.text.trim())} className="btn btn-primary text-sm">
+                {onCancel && <Button disabled={saving} onClick={onCancel} className="" variant="secondary">取消</Button>}
+                <Button onClick={handleSave} disabled={saving || (!selectedContactId && !newContactName) || !todoItems.some(t => t.text.trim())} className="" variant="primary" validate>
                   <Check size={18} strokeWidth={3} /><span>{saving?'正在保存…':initialRecord?'保存修改':'保存记录'}</span>
-                </button>
+                </Button>
             </WorkspaceDialogFooter>
     </fieldset>
   );

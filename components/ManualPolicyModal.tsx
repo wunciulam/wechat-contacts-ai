@@ -1,3 +1,4 @@
+import Button from './ui/Button';
 import React, {useEffect,useState} from 'react';
 import type {Contact,Policy} from '../types';
 import type {ManagedPolicy} from '../services/renewal';
@@ -26,8 +27,8 @@ export default function ManualPolicyModal({isOpen,onClose,contacts,onSave}:{isOp
       <PolicyFieldsForm value={draft} onChange={p=>{setDraft(!p.insured&&p.applicantId?{...p,insured:p.applicant,insuredId:p.applicantId}:p);setError('');}} contacts={contacts} requireApplicant/>
     </div>
     <WorkspaceDialogFooter>
-      <button className="btn btn-secondary text-sm" onClick={close}>取消</button>
-      <button className="btn btn-primary text-sm" disabled={!draft.applicantId||!draft.productName.trim()} onClick={save}>保存保单</button>
+      <Button className="" onClick={close} variant="secondary">取消</Button>
+      <Button className="" disabled={!draft.applicantId||!draft.productName.trim()} onClick={save} variant="primary" validate>保存保单</Button>
     </WorkspaceDialogFooter>
   </WorkspaceDialog>;
 }

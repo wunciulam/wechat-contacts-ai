@@ -1,3 +1,4 @@
+import Button from './ui/Button';
 import PolicyFieldsForm, {policyFields} from './PolicyFieldsForm';
 import MingyaPolicyDetailModal from './MingyaPolicyDetailModal';
 import { createPortal } from 'react-dom';
@@ -35,9 +36,9 @@ export default function PolicyDetail({
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div><h3 className="text-sm font-semibold">{policy.productName || '保单信息'}</h3><p className="mt-1 text-xs text-gray-500">{policy.policyNumber}</p></div>
-        {!editing && <button className="btn btn-secondary text-sm" onClick={() => setEditing(true)}><Edit2 size={16}/>编辑资料</button>}
+        {!editing && <Button className="" onClick={() => setEditing(true)} variant="secondary"><Edit2 size={16}/>编辑资料</Button>}
       </div>
-      {policy.mingya && <button className="btn btn-secondary text-sm mb-4" onClick={() => setSourceOpen(true)}>明亚采集详情</button>}
+      {policy.mingya && <Button className="mb-4" onClick={() => setSourceOpen(true)} variant="secondary">明亚采集详情</Button>}
       <MingyaPolicyDetailModal policy={sourceOpen ? policy : null} onClose={() => setSourceOpen(false)} />
       <section className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
         <h4 className="mb-2 text-xs font-medium text-gray-500">下一次缴费</h4>
@@ -53,16 +54,16 @@ export default function PolicyDetail({
       <PolicyFieldsForm value={draft} onChange={p=>{setSaved(false);setDraft(p);}} contacts={contacts} identityReadonly disabled={busy}/>
       {footer && createPortal(<div className="flex justify-end gap-3 border-t border-gray-100 bg-white px-5 py-4 items-center">
         <span className="text-xs text-gray-500">{saved ? "已保存" : ""}</span>
-        <button className="btn btn-secondary text-sm" disabled={busy} onClick={() => { setDraft(policy); setEditing(false); }}>取消</button>
-        <button
+        <Button className="" disabled={busy} onClick={() => { setDraft(policy); setEditing(false); }} variant="secondary">取消</Button>
+        <Button
           disabled={busy}
-          className="btn btn-primary text-sm"
+          className=""
           onClick={async () => {
             if (await onSave(draft)) { setSaved(true); setEditing(false); }
-          }}
+          }} variant="primary" validate
         >
           <Save size={16}/> {busy ? "正在保存…" : "保存保单信息"}
-        </button>
+        </Button>
       </div>, footer)}
       </>}
       {saved && !editing && <p role="status" className="mt-3 text-sm text-gray-600">保单资料已保存</p>}
@@ -92,13 +93,13 @@ export default function PolicyDetail({
                       <td className="p-3 whitespace-nowrap text-right tabular-nums">{formatMoney(q.amount, policy.mingya?.currency)}</td>
                       <td className="p-3">{q.status}</td>
                       <td className="p-3 text-right">
-                        <button
+                        <Button
                           disabled={busy}
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => onMark(q.date)}
+                          className=""
+                          onClick={() => onMark(q.date)} variant="secondary" size="sm"
                         >
                           {q.status === "已缴费" ? "改为未缴费" : "标记已缴费"}
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                     {!!q.history?.length && (

@@ -1,3 +1,4 @@
+import Button from './ui/Button';
 import React from 'react';
 import { CheckSquare, Square } from 'lucide-react';
 
@@ -30,12 +31,12 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     <div className={`p-5 flex ${compactActions ? 'flex-row items-center' : 'flex-col sm:flex-row flex-wrap items-start sm:items-center'} justify-between gap-4 ${className}`}>
       <div className="flex items-center gap-3">
         {onSelectAll && (
-          <button
+          <Button
             onClick={onSelectAll} aria-label={allSelected ? "取消全选" : "选择全部"}
-            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors" variant="plain"
           >
             {allSelected ? <CheckSquare size={20} className="text-gray-900" /> : <Square size={20} />}
-          </button>
+          </Button>
         )}
         <div>
           <h2 className="text-lg font-semibold text-gray-900 flex flex-wrap items-center gap-2">

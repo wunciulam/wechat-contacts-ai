@@ -1,3 +1,6 @@
+import Button from './ui/Button';
+import Input,{SearchInput} from './ui/Input';
+import Select from './ui/Select';
 import {excludedPolicyImport} from '../services/policyImportRules';
 import WorkspaceDialog from './WorkspaceDialog';
 import PolicyPaymentSummary, { PaymentDate, formatMoney } from './PolicyPaymentSummary';
@@ -25,7 +28,6 @@ import {
   remainingInstallments,
   projectContacts,
 } from "../services/renewal";
-const btn = "btn btn-secondary text-sm";
 export default function RenewalWorkspace({
   contacts,
   importFiles,
@@ -349,7 +351,7 @@ export default function RenewalWorkspace({
   const syncStatus = syncing || syncError ? (
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-5 py-3 text-sm text-gray-600" role="status">
       <span>{syncing ? "正在同步续期数据…" : syncError}</span>
-      {syncError && <button className="btn btn-secondary btn-sm" disabled={syncing} onClick={() => setRetry(n => n + 1)}>重新同步</button>}
+      {syncError && <Button className="" disabled={syncing} onClick={() => setRetry(n => n + 1)} variant="secondary" size="sm">重新同步</Button>}
     </div>
   ) : null;
   if (onCloseDetail) {
@@ -451,22 +453,22 @@ export default function RenewalWorkspace({
               actionButton={
                 <div className="flex gap-2 flex-wrap">
                   {!customerId && (
-                    <button
-                      className={btn}
-                      onClick={() => setRemindersOpen(false)}
+                    <Button
+                      className=""
+                      onClick={() => setRemindersOpen(false)} variant="secondary"
                     >
                       <ArrowLeft size={16}/>返回保单管理
-                    </button>
+                    </Button>
                   )}
-                  <button
-                    className={btn}
+                  <Button
+                    className=""
                     onClick={() => {
                       setSettings(data.settings);
                       setModal("settings");
-                    }}
+                    }} variant="secondary"
                   >
                     <Settings size={16}/>通知设置
-                  </button>
+                  </Button>
                 </div>
               }
             />
@@ -483,26 +485,25 @@ export default function RenewalWorkspace({
                 ["policies", "全部保单"],
                 ["history", "导入记录"],
               ].map(([v, l]) => (
-                <button
+                <Button
                   key={v}
                   aria-pressed={filter === v}
-                  className={btn + " renewal-filter"}
-                  onClick={() => setFilter(v)}
+                  className={" renewal-filter"}
+                  onClick={() => setFilter(v)} variant="secondary"
                 >
                   {l}
-                </button>
+                </Button>
               ))}
             </div>
-            <input
-              className="input"
-              placeholder="搜索投保人、被保人、产品或保单号"
+            <SearchInput
+              placeholder="搜索投保人、被保人、产品或保单号…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             {preview && rows.length > 0 && (
               <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
                 <span>本地表格预览：已读取 {rows.length} 条，尚未保存到线上。可在“全部保单”核对缴费字段。</span>
-                <button className={btn} onClick={() => { setPreview(false); setRows([]); }}>退出预览</button>
+                <Button className="" onClick={() => { setPreview(false); setRows([]); }} variant="secondary">退出预览</Button>
               </div>
             )}
             {filter === "history" ? (
@@ -523,10 +524,10 @@ export default function RenewalWorkspace({
                     ),
                   )
                   .map((p) => (
-                    <button
+                    <Button
                       key={p.id}
                       onClick={() => open(p)}
-                      className="w-full rounded-lg border border-gray-200 p-4 text-left text-sm hover:bg-gray-50"
+                      className="w-full rounded-lg border border-gray-200 p-4 text-left text-sm hover:bg-gray-50" variant="plain"
                     >
                       <div className="flex flex-wrap items-center gap-4">
                         <div className="min-w-28"><span className="block text-xs text-gray-400">投保人</span><strong>{p.applicant || "待补充"}</strong></div>
@@ -534,26 +535,26 @@ export default function RenewalWorkspace({
                         <div className="flex-1 min-w-56"><span className="block text-xs text-gray-400">保单</span><strong>{p.productName}</strong><span className="ml-2 text-xs text-gray-500">{p.policyNumber}</span></div>
                         <div className="min-w-36"><span className="block text-xs text-gray-400">下次缴费</span><PolicyPaymentSummary policy={p} amount={false}/></div><div className="flex flex-nowrap items-start gap-6 shrink-0"><div><span className="block text-xs text-gray-400">{nextPayment(p)?.amountReference?'下期参考金额':'本期应缴'}</span>{formatMoney(nextPayment(p)?.amount, p.mingya?.currency)}</div><div><span className="block text-xs text-gray-400">剩余期数</span>{remainingLabel(p)}</div></div>
                       </div>
-                    </button>
+                    </Button>
                   ))}
               </div>
             ) : (
               <>
               <div className="space-y-3 sm:hidden">
                 {tasks.map(t => <article key={t.policy.id + t.type} className="rounded-lg border border-gray-200 p-4">
-                  <button className="mb-3 text-left" onClick={() => open(t.policy)}>
+                  <Button className="mb-3 text-left" onClick={() => open(t.policy)} variant="plain">
                     <div className="text-sm font-semibold">{t.policy.applicant || '投保人待补充'}</div>
                     <div className="mt-1 text-sm">{t.policy.productName}</div>
                     <div className="mt-1 text-xs text-gray-500">{t.policy.policyNumber}</div>
-                  </button>
+                  </Button>
                   <PaymentDate date={t.date} estimated={t.estimated}/>
                   <dl className="my-3 grid grid-cols-2 gap-3 text-sm">
                     <div><dt className="text-xs text-gray-500">{t.type==='payment'&&nextPayment(t.policy)?.amountReference?'下期参考金额':'本期应缴'}</dt><dd className="mt-1 tabular-nums">{formatMoney(t.amount, t.policy.mingya?.currency)}</dd></div>
                     <div><dt className="text-xs text-gray-500">剩余期数</dt><dd className="mt-1">{remainingLabel(t.policy)}</dd></div>
                   </dl>
                   <div className="flex flex-wrap justify-end gap-2">
-                    {t.type === 'payment' && <button disabled={busy} className="btn btn-secondary btn-sm" onClick={() => mark(t.policy,'contact',t.date)}>{t.policy.payments.find(p => p.date === t.date)?.contactedAt ? '已联系' : '标记已联系'}</button>}
-                    <button disabled={busy} className="btn btn-primary btn-sm" onClick={() => {setSelected(t.policy);setModal(t.type === 'payment' ? 'paid:' + t.date : 'renewed');}}>确认{t.type === 'payment' ? '已缴费' : '已续保'}</button>
+                    {t.type === 'payment' && <Button disabled={busy} className="" onClick={() => mark(t.policy,'contact',t.date)} variant="secondary" size="sm">{t.policy.payments.find(p => p.date === t.date)?.contactedAt ? '已联系' : '标记已联系'}</Button>}
+                    <Button disabled={busy} className="" onClick={() => {setSelected(t.policy);setModal(t.type === 'payment' ? 'paid:' + t.date : 'renewed');}} variant="primary" size="sm">确认{t.type === 'payment' ? '已缴费' : '已续保'}</Button>
                   </div>
                 </article>)}
                 {!tasks.length && <p className="py-8 text-center text-sm text-gray-500">暂无已知的30天内待缴记录</p>}
@@ -575,16 +576,16 @@ export default function RenewalWorkspace({
                     {tasks.map((t) => (
                       <tr key={t.policy.id + t.type} className="border-b border-gray-100">
                         <td className="p-3">
-                          <button
+                          <Button
                             onClick={() => open(t.policy)}
-                            className="text-left"
+                            className="text-left" variant="plain"
                           >
                             <b>
                               {t.policy.applicant} / {t.policy.insured}
                             </b>
                             <p>{t.policy.productName}</p>
                             <small>{t.policy.policyNumber}</small>
-                          </button>
+                          </Button>
                         </td>
                         <td className="p-3">
                           {remainingLabel(t.policy)}
@@ -596,23 +597,23 @@ export default function RenewalWorkspace({
                         <td>
                           <div className="flex gap-2">
                             {t.type === "payment" && (
-                              <button
+                              <Button
                                 disabled={busy}
-                                className={btn}
+                                className=""
                                 onClick={() =>
                                   mark(t.policy, "contact", t.date)
-                                }
+                                } variant="secondary"
                               >
                                 {t.policy.payments.find(
                                   (q) => q.date === t.date,
                                 )?.contactedAt
                                   ? "已联系"
                                   : "标记已联系"}
-                              </button>
+                              </Button>
                             )}
-                            <button
+                            <Button
                               disabled={busy}
-                              className={btn}
+                              className=""
                               onClick={() => {
                                 setSelected(t.policy);
                                 setModal(
@@ -620,10 +621,10 @@ export default function RenewalWorkspace({
                                     ? "paid:" + t.date
                                     : "renewed",
                                 );
-                              }}
+                              }} variant="secondary"
                             >
                               确认{t.type === "payment" ? "已缴费" : "已续保"}
-                            </button>
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -674,12 +675,10 @@ export default function RenewalWorkspace({
                           : "表格未提供被保人的手机号、证件号，请确认关联"}
                       </small>
                     </p>
-                    <select
-                      className="input mt-2"
+                    <Select
+                      className="mt-2"
                       value={links[id] || ""}
-                      onChange={(e) =>
-                        setLinks({ ...links, [id]: e.target.value })
-                      }
+                      onValueChange={selectedValue => setLinks({ ...links, [id]: selectedValue })}
                     >
                       <option value="">请选择关联</option>
                       {candidates(p[role], undefined, undefined, contacts).map(
@@ -712,16 +711,16 @@ export default function RenewalWorkspace({
                             </option>
                           ))}
                       <option value="new">确认为不同客户，新增资料</option>
-                    </select>
+                    </Select>
                   </div>
                 ))}
-                <button
+                <Button
                   disabled={busy || pending.length > 0}
-                  className={btn + " mt-4 disabled:opacity-40"}
-                  onClick={commit}
+                  className={" mt-4 disabled:opacity-40"}
+                  onClick={commit} variant="secondary"
                 >
                   {busy ? "正在保存…" : "确认导入"}
-                </button>
+                </Button>
               </>
             )}
             {modal === "done" && (
@@ -735,9 +734,9 @@ export default function RenewalWorkspace({
                 </p>
                 <label className="block my-3">
                   收件邮箱
-                  <input
+                  <Input
                     type="email"
-                    className="input mt-2"
+                    className="mt-2"
                     value={settings.email}
                     onChange={(e) =>
                       setSettings({ ...settings, email: e.target.value })
@@ -746,9 +745,9 @@ export default function RenewalWorkspace({
                 </label>
                 <label className="block my-3">
                   北京时间
-                  <input
+                  <Input
                     type="time"
-                    className="input mt-2"
+                    className="mt-2"
                     value={settings.time}
                     onChange={(e) =>
                       setSettings({ ...settings, time: e.target.value })
@@ -771,9 +770,9 @@ export default function RenewalWorkspace({
                     QQ邮箱发信服务尚未配置完成，当前不会发送邮件。
                   </p>
                 )}
-                <button
+                <Button
                   disabled={busy || !/^\S+@\S+\.\S+$/.test(settings.email)}
-                  className={btn}
+                  className=""
                   onClick={async () => {
                     if (
                       await persist({
@@ -785,16 +784,16 @@ export default function RenewalWorkspace({
                       })
                     )
                       setModal("");
-                  }}
+                  }} variant="secondary"
                 >
                   保存设置
-                </button>
-                <button
-                  className={btn + " ml-2"}
-                  onClick={() => setModal("email")}
+                </Button>
+                <Button
+                  className={" ml-2"}
+                  onClick={() => setModal("email")} variant="secondary"
                 >
                   邮件内容预览
-                </button>
+                </Button>
               </>
             )}
             {modal === "email" && (
@@ -846,9 +845,9 @@ export default function RenewalWorkspace({
                   {selected.productName} · {selected.policyNumber} ·{" "}
                   {modal.split(":")[1]}
                 </p>
-                <button
+                <Button
                   disabled={busy}
-                  className={btn}
+                  className=""
                   onClick={async () => {
                     const saved = await mark(
                       selected,
@@ -856,10 +855,10 @@ export default function RenewalWorkspace({
                       modal.split(":")[1],
                     );
                     if (saved) setModal("");
-                  }}
+                  }} variant="secondary"
                 >
                   {busy ? "正在保存…" : "确认标记"}
-                </button>
+                </Button>
               </>
             )}
         </WorkspaceDialog>

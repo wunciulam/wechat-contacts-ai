@@ -1,3 +1,6 @@
+import Button, {IconButton} from './ui/Button';
+import WorkspaceDialog from './WorkspaceDialog';
+import Input from './ui/Input';
 import React, { useState } from 'react';
 import {
   DndContext,
@@ -84,18 +87,18 @@ const CategoryRow: React.FC<CategoryRowProps> = ({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all group ${
+      className={`flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group ${
         isDragging ? 'opacity-50 shadow-lg' : ''
       }`}
     >
-      <button
+      <IconButton
         {...attributes}
         {...listeners}
-        className="p-1 text-gray-300 hover:text-gray-600 rounded cursor-grab active:cursor-grabbing"
-        title="拖拽排序类目"
+        className="text-gray-300 hover:text-gray-600 rounded cursor-grab active:cursor-grabbing"
+        title="拖拽排序类目" aria-label="拖拽排序类目"
       >
         <GripVertical size={16} />
-      </button>
+      </IconButton>
       <div
         className="w-8 h-8 rounded-md flex items-center justify-center text-white text-sm font-bold shrink-0"
         style={{ backgroundColor: isEditing ? editColor : category.color }}
@@ -105,7 +108,7 @@ const CategoryRow: React.FC<CategoryRowProps> = ({
       <div className="flex-1 min-w-0">
         {isEditing ? (
           <div className="space-y-2">
-            <input
+            <Input
               type="text"
               value={editName}
               onChange={e => onEditNameChange(e.target.value)}
@@ -113,17 +116,17 @@ const CategoryRow: React.FC<CategoryRowProps> = ({
                 if (e.key === 'Enter') onSaveEdit();
                 if (e.key === 'Escape') onCancelEdit();
               }}
-              className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              className="w-full"
               autoFocus
             />
             <div className="flex flex-wrap gap-1.5">
               {PRESET_COLORS.map(color => (
-                <button
+                <Button
                   key={color}
                   onClick={() => onEditColorChange(color)}
-                  className={`w-5 h-5 rounded transition-all ${editColor === color ? 'ring-2 ring-offset-1 ring-gray-900' : ''}`}
+                  className={`w-5 h-5 rounded transition-colors ${editColor === color ? 'ring-2 ring-offset-1 ring-gray-900' : ''}`}
                   style={{ backgroundColor: color }}
-                  title={color}
+                  title={color} aria-label={`颜色 ${color}`} aria-pressed={editColor===color} variant="plain"
                 />
               ))}
             </div>
@@ -135,37 +138,37 @@ const CategoryRow: React.FC<CategoryRowProps> = ({
       <div className={`flex items-center gap-1 transition-opacity ${isEditing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
         {isEditing ? (
           <>
-            <button
+            <IconButton
               onClick={onSaveEdit}
-              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-all"
-              title="保存"
+              className="text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors"
+              title="保存" aria-label="保存"
             >
               <Check size={14} />
-            </button>
-            <button
+            </IconButton>
+            <IconButton
               onClick={onCancelEdit}
-              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-md transition-all"
-              title="取消"
+              className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-md transition-colors"
+              title="取消" aria-label="取消"
             >
               <X size={14} />
-            </button>
+            </IconButton>
           </>
         ) : (
           <>
-            <button
+            <IconButton
               onClick={onStartEdit}
-              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-md transition-all"
-              title="编辑"
+              className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-md transition-colors"
+              title="编辑" aria-label="编辑"
             >
               <Edit2 size={14} />
-            </button>
-            <button
+            </IconButton>
+            <IconButton
               onClick={onDelete}
-              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
-              title="删除"
+              className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+              title="删除" aria-label="删除"
             >
               <Trash2 size={14} />
-            </button>
+            </IconButton>
           </>
         )}
       </div>
@@ -247,22 +250,8 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
     onReorder(arrayMove(categories, oldIndex, newIndex));
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900">管理类目</h2>
-          <button
-            onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+  return <WorkspaceDialog title="管理分类" compact onClose={onClose}>
+        <div className="space-y-3">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -293,12 +282,12 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
           {/* Add New */}
           {isAdding ? (
             <div className="p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 space-y-3">
-              <input
+              <Input
                 type="text"
                 value={newCategoryName}
                 onChange={e => setNewCategoryName(e.target.value)}
                 placeholder="类目名称"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                className="w-full"
                 autoFocus
                 onKeyDown={e => e.key === 'Enter' && handleAdd()}
               />
@@ -306,46 +295,44 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
                 <p className="text-xs text-gray-500 font-medium">颜色</p>
                 <div className="flex flex-wrap gap-2">
                   {PRESET_COLORS.map(color => (
-                    <button
+                    <Button
                       key={color}
                       onClick={() => setNewCategoryColor(color)}
-                      className={`w-6 h-6 rounded-md transition-all ${newCategoryColor === color ? 'ring-2 ring-offset-2 ring-gray-900' : ''}`}
-                      style={{ backgroundColor: color }}
+                      className={`w-6 h-6 rounded-md transition-colors ${newCategoryColor === color ? 'ring-2 ring-offset-2 ring-gray-900' : ''}`}
+                      style={{ backgroundColor: color }} aria-label={`颜色 ${color}`} aria-pressed={newCategoryColor===color} variant="plain"
                     />
                   ))}
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
-                <button
+                <Button
                   onClick={handleAdd}
-                  className="flex-1 px-3 py-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-md transition-all"
+                  className="flex-1    font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-md transition-colors" variant="primary"
                 >
                   添加
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => {
                     setIsAdding(false);
                     setNewCategoryName('');
                   }}
-                  className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-md transition-all"
+                  className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-md transition-colors" variant="plain"
                 >
                   取消
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
-            <button
+            <Button
               onClick={() => setIsAdding(true)}
-              className="w-full flex items-center justify-center gap-2 p-3 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 transition-all"
+              className="w-full flex items-center justify-center gap-2 p-3 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 transition-colors" variant="plain"
             >
               <Plus size={16} />
               新增类目
-            </button>
+            </Button>
           )}
         </div>
-      </div>
-    </div>
-  );
+    </WorkspaceDialog>;
 };
 
 export default CategoryManager;
