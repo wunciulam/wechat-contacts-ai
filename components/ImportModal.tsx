@@ -14,6 +14,7 @@ interface ImportModalProps {
   onPolicyImport?: (files: FileList) => void;
   relatedPolicies?: Policy[];
   onPolicyDetail?: (p: Policy) => void;
+  onManagePolicies?: (contactId:string)=>void;
   onClose: () => void;
   onSave: (contacts: NewContact[],requestId?:string) => Promise<void>;
   onPersistFollowup?: (contactId:string,kind:'add'|'edit'|'delete',record:ProgressRecord,expected?:ProgressRecord)=>Promise<Contact>;
@@ -22,10 +23,11 @@ interface ImportModalProps {
   allTags?: string[];
 }
 
-const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPolicyImport, onClose, onSave, onPersistFollowup, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail }) => {
+const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPolicyImport, onClose, onSave, onPersistFollowup, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail, onManagePolicies }) => {
   const [historyBusy,setHistoryBusy]=useState(false),[profileBusy,setProfileBusy]=useState(false),[historyError,setHistoryError]=useState(''),[historySaved,setHistorySaved]=useState('');
   const historyBusyRef=useRef(false),historyRequestId=useRef(crypto.randomUUID()),profileRequestId=useRef(crypto.randomUUID());
-  const displayedPolicies = () => Array.from(new Map([...(formData.policies || []), ...relatedPolicies].map(p => [policyKey(p), p])).values());
+  const displayedPolicies = () => Array.from(new Map([...(formData.policies || []), ...relatedPolicies].map(p => [policyKey(p), p])).values()).filter(p=>!excludedPolicyImport(p.status));
+  const profileBaseline=useRef<NewContact|null>(null);
   const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'table' | 'policies'>('ai');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +76,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
         setExtractedList([]);
         setExtractedTableData(null);
       }
+      profileBaseline.current=initialData?{...initialData,policies:initialData.policies||[],progressHistory:initialData.progressHistory||[]}:null;
+      setShowPolicyAdd(false);setEditingPolicyId(null);setPolicyForm({policyNumber:'',productName:'',company:'',premium:'',effectiveDate:'',status:'正式保单',applicant:'',insured:'',paymentYears:'',insuranceType:'',coverage:''});
       setShowHistoryAdd(false);
       setEditingHistoryId(null);
       setError(null);
@@ -227,11 +231,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
     setProfileBusy(true);setError(null);
     try{await onSave([formData],profileRequestId.current);onClose();}catch(e){setError(e instanceof Error?e.message:'客户资料未保存，请重试。');}finally{setProfileBusy(false);}
   };
-  const requestClose = () => {
-    if(historyBusy||profileBusy)return;
-    if(historyForm.content?.trim()&&!window.confirm('跟进内容尚未保存，确认放弃？'))return;
-    onClose();
+  const canLeave=()=>{
+    if(historyBusy||profileBusy)return false;
+    const dirty=historyForm.content?.trim()||(showPolicyAdd&&Object.entries(policyForm).some(([k,v])=>k==='status'?v!=='正式保单':Boolean(String(v||'').trim())))||editingPolicyId||(initialData&&profileBaseline.current&&JSON.stringify(formData)!==JSON.stringify(profileBaseline.current));
+    return !dirty||window.confirm('有尚未保存的资料，确认放弃并离开？');
   };
+  const requestClose=()=>{if(canLeave())onClose();};
+  const managePolicies=()=>{if(initialData&&canLeave())onManagePolicies?.(initialData.id);};
 
   const addTag = (tag: string) => {
     const trimmed = tag.trim();
@@ -249,6 +255,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
       if(initialData&&onPersistFollowup){
         const saved=await onPersistFollowup(initialData.id,kind,record,expected);
         setFormData(prev=>({...prev,progressHistory:saved.progressHistory,lastDate:saved.lastDate,followUpStatus:saved.followUpStatus}));
+        if(profileBaseline.current)profileBaseline.current={...profileBaseline.current,progressHistory:saved.progressHistory,lastDate:saved.lastDate,followUpStatus:saved.followUpStatus};
       }else{
         setFormData(prev=>({...prev,progressHistory:kind==='add'?[record,...(prev.progressHistory||[])]:kind==='delete'?(prev.progressHistory||[]).filter(r=>r.id!==record.id):(prev.progressHistory||[]).map(r=>r.id===record.id?record:r),lastDate:record.date}));
       }
@@ -360,11 +367,11 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
+    <div role="dialog" aria-modal="true" aria-label={initialData?'编辑联系人资料':'添加 / 导入'} className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
       <div className={`bg-white shadow-2xl w-full ${!initialData&&activeTab==='policies'?'max-w-3xl':'max-w-5xl'} overflow-hidden flex flex-col max-h-[90dvh] rounded-2xl border border-gray-200`}>
         <div className="px-5 py-4 border-b border-gray-100 flex shrink-0 justify-between items-center">
           <h2 className="text-base font-semibold text-gray-800">{initialData ? '编辑联系人资料' : '添加 / 导入'}</h2>
-          <button disabled={profileBusy||historyBusy} onClick={requestClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
+          <button disabled={profileBusy||historyBusy} onClick={requestClose} aria-label="关闭" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
             <X size={20} />
           </button>
         </div>
@@ -452,11 +459,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
 
                 {/* 成交产品 - 保单表格 */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-medium text-gray-700">成交产品</label>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="mr-auto block text-xs font-medium text-gray-700">成交产品</label>
+                    {initialData&&onManagePolicies&&<button type="button" className="btn btn-secondary btn-sm" disabled={historyBusy||profileBusy} onClick={managePolicies}>管理保单</button>}
                     <button
                       onClick={() => setShowPolicyAdd(!showPolicyAdd)}
-                      className="text-xs font-medium text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                      className="btn btn-ghost btn-sm"
                     >
                       <Plus size={14} /> 添加保单
                     </button>
@@ -558,9 +566,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                   {/* 保单列表 */}
                   {displayedPolicies().length > 0 ? (
                     <div className="max-w-full border border-gray-200 rounded-lg overflow-x-auto">
-                      <table className="w-full min-w-[904px] table-fixed text-sm">
-                        <colgroup>{[260,160,120,112,130,120].map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup>
-                        <thead className="bg-gray-50 border-b border-gray-200">
+                      <table data-contact-policy-table className="w-full table-fixed text-sm" style={{minWidth:editingPolicyId?900:852}}>
+                        <colgroup>{[260,144,120,128,128,editingPolicyId?120:72].map((w,i)=><col key={i} style={i===0?undefined:{width:w}}/>)}</colgroup>
+                        <thead className="table-header border-b border-gray-200">
                           <tr>
                             <th className="text-left px-3 py-2 font-medium text-gray-600">产品名称</th>
                             <th className="text-left px-3 py-2 font-medium text-gray-600">公司</th>
@@ -596,13 +604,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                                 <>
                                   <td className="px-3 py-2 font-medium text-gray-800"><button type="button" className="text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)}>{policy.productName}</button></td>
                                   <td className="px-3 py-2 text-gray-600">{policy.company || '-'}</td>
-                                  <td className="px-3 py-2 text-gray-600">{policy.premium ? `¥${policy.premium}` : '-'}</td>
+                                  <td className="px-3 py-2 text-gray-600">{formatMoney(policy.premium,policy.mingya?.currency)}</td>
                                   <td className="px-3 py-2">
                                     <PolicyStatus status={policy.status}/>
                                   </td>
                                   <td className="px-3 py-2 text-gray-500">{policy.effectiveDate || '-'}</td>
                                   <td className="sticky right-0 z-10 border-l border-gray-200 bg-white px-3 py-2 text-right whitespace-nowrap">
-                                    <button onClick={() => onPolicyDetail && initialData ? onPolicyDetail(policy) : handleEditPolicy(policy.id)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded"><Edit2 size={12} /></button>
+                                    <button type="button" aria-label={onPolicyDetail&&initialData?'保单详情':'编辑保单'} onClick={() => onPolicyDetail && initialData ? onPolicyDetail(policy) : handleEditPolicy(policy.id)} className={onPolicyDetail&&initialData?'btn btn-ghost btn-sm':'text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded'}>{onPolicyDetail&&initialData?'详情':<Edit2 size={12}/>}</button>
                                     {!(onPolicyDetail && initialData) && <button onClick={() => handleDeletePolicy(policy.id)} className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1 rounded ml-1"><Trash2 size={12} /></button>}
                                   </td>
                                 </>

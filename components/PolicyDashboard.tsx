@@ -1,3 +1,4 @@
+import {excludedPolicyImport} from '../services/policyImportRules';
 import WorkspaceDialog, {WorkspaceDialogFooter} from './WorkspaceDialog';
 import PolicyStatus from './PolicyStatus';
 import CustomerTags from './CustomerTags';
@@ -11,6 +12,8 @@ import { PageHeader } from './PageHeader';
 
 interface PolicyDashboardProps {
   contacts: Contact[];
+  scopeContactId?:string|null;
+  onClearScope?:()=>void;
   onPolicyDetail?: (policy: Policy) => void;
   onReminders?: () => void;
   onImport?: () => void;
@@ -24,10 +27,11 @@ interface PolicyDashboardProps {
   onDeletePolicies?: (contactId:string,policyIds:string[],requestId:string)=>Promise<void>;
 }
 
-const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags, followUpFilter, onEditContact, onAddPolicy, onBatchDeleteContacts, onDeletePolicy, onDeletePolicies, onPolicyDetail, onReminders, onImport, reminderCount = 0 }) => {
+const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, scopeContactId, onClearScope, filterTags, followUpFilter, onEditContact, onAddPolicy, onBatchDeleteContacts, onDeletePolicy, onDeletePolicies, onPolicyDetail, onReminders, onImport, reminderCount = 0 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedContactIds, setExpandedContactIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  React.useEffect(()=>{if(scopeContactId)setExpandedContactIds(new Set([scopeContactId]));},[scopeContactId]);
 
   const [selectedPolicies,setSelectedPolicies]=useState<Record<string,Set<string>>>({});
   const [deleteTarget,setDeleteTarget]=useState<{contactId:string;policies:Policy[];requestId:string}|null>(null);
@@ -73,7 +77,8 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
   };
 
   const filteredContactsWithPolicies = useMemo(() => {
-    let result = contacts.filter(c => c.policies && c.policies.length > 0);
+    let result = contacts.map(c=>({...c,policies:c.policies?.filter(p=>!excludedPolicyImport(p.status))})).filter(c => c.policies && c.policies.length > 0);
+    if(scopeContactId)result=result.filter(c=>c.id===scopeContactId);
 
     if (filterTags.size > 0) {
       result = result.filter(c => c.tags.some(tag => filterTags.has(tag)));
@@ -98,7 +103,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
     }
 
     return result;
-  }, [contacts, searchTerm, filterTags, followUpFilter]);
+  }, [contacts, searchTerm, filterTags, followUpFilter,scopeContactId]);
 
   const allSelected = filteredContactsWithPolicies.length > 0 && filteredContactsWithPolicies.every(c => selectedIds.has(c.id));
 
@@ -144,7 +149,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
           allSelected={allSelected}
           onSelectAll={handleSelectAll}
           actionButton={
-            <div className="flex gap-2 flex-wrap"><button onClick={onReminders} className="btn btn-secondary text-sm"><Bell size={16}/>续期提醒（{reminderCount}）</button><button onClick={onAddPolicy} className="btn btn-primary text-sm"><Plus size={16} /><span>录入保单</span></button></div>
+            <div className="flex gap-2 flex-wrap">{scopeContactId&&onClearScope&&<button className="btn btn-secondary text-sm" onClick={onClearScope}>全部保单</button>}<button onClick={onReminders} className="btn btn-secondary text-sm"><Bell size={16}/>续期提醒（{reminderCount}）</button><button onClick={onAddPolicy} className="btn btn-primary text-sm"><Plus size={16} /><span>录入保单</span></button></div>
           }
           searchBox={
             <div className="relative w-full sm:w-72">
@@ -163,7 +168,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
 
       <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 custom-scrollbar space-y-4 md:space-y-6">
         {filteredContactsWithPolicies.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-300"><Shield size={64} className="mb-4 opacity-50" /><p className="text-lg font-medium">暂无保单数据</p><p className="text-sm mt-2 opacity-60">{filterTags.size > 0 ? '没有匹配选中标签的投保记录' : '当前没有任何投保记录'}</p></div>
+          <div className="flex flex-col items-center justify-center h-full text-gray-500"><Shield size={40} className="mb-4 opacity-50" /><p className="text-sm">{scopeContactId?'该客户暂无可展示保单':'暂无符合条件的保单'}</p></div>
         ) : (
           filteredContactsWithPolicies.map(contact => {
             const { count, totalPremium } = getTotals(contact.policies || []);
@@ -185,7 +190,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                       {contactReminders > 0 && <button onClick={e=>{e.stopPropagation();onReminders?.();}} className="text-xs text-amber-700 mt-2">{contactReminders} 份保单待处理</button>}
                       <div className="flex flex-wrap items-center gap-2 mt-2">
                         <CustomerTags tags={contact.tags}/>
-                        <button onClick={(e) => { e.stopPropagation(); onEditContact(contact); }} className="text-xs text-gray-500 hover:bg-gray-100 px-2 py-0.5 rounded-md transition-colors flex items-center gap-1 font-medium"><Edit2 size={10} /> 修改标签</button>
+                        <button onClick={(e) => { e.stopPropagation(); onEditContact(contacts.find(c=>c.id===contact.id)||contact); }} className="text-xs text-gray-500 hover:bg-gray-100 px-2 py-0.5 rounded-md transition-colors flex items-center gap-1 font-medium"><Edit2 size={10} /> 修改标签</button>
                       </div>
                     </div>
                   </div>

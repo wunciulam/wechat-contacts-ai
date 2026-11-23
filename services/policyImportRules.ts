@@ -1,6 +1,6 @@
 export function excludedPolicyImport(status:unknown):boolean {
   const value=String(status??'').trim();
-  return /终止/.test(value)||/撤单/.test(value)&&!/撤单中|撤单失败/.test(value);
+  return ['17','22'].includes(value)||/终止/.test(value)||/撤单/.test(value)&&!/撤单中|撤单失败/.test(value);
 }
 // Verified against Mingya's policy-list status choices, not order/risk statuses.
 export function mingyaStatusLabel(value:unknown):string {

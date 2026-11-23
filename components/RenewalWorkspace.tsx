@@ -1,3 +1,4 @@
+import {excludedPolicyImport} from '../services/policyImportRules';
 import WorkspaceDialog from './WorkspaceDialog';
 import PolicyPaymentSummary, { PaymentDate, formatMoney } from './PolicyPaymentSummary';
 import { ArrowLeft, Settings } from 'lucide-react';
@@ -42,6 +43,8 @@ export default function RenewalWorkspace({
   onContacts: (c: Contact[]) => void;
   beforeSave?: () => Promise<unknown>;
   customerId?: string;
+  scopeContactId?:string|null;
+  onClearScope?:()=>void;
   initialPolicyId?: string;
   onCloseDetail?: () => void;
   filterTags?: Set<string>;
@@ -368,11 +371,12 @@ export default function RenewalWorkspace({
   if (!data)
     return <div className="p-6">{error || "正在读取保单与续费数据…"}</div>;
   const shownPolicies = preview && rows.length ? mergePolicies(data.policies, rows) : data.policies;
+  const visiblePolicies=shownPolicies.filter(p=>!excludedPolicyImport(p.status));
   const all = customerId
-    ? shownPolicies.filter(
+    ? visiblePolicies.filter(
         (p) => p.applicantId === customerId || p.insuredId === customerId,
       )
-    : shownPolicies;
+    : visiblePolicies;
   const tasks = dueItems(all).filter(x => x.type === "payment").filter(
     (x) =>
       (filter === "all" || filter === x.type) &&

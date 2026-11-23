@@ -96,6 +96,8 @@ const App: React.FC = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentView, setCurrentView] = useState<'contacts' | 'followups' | 'policies'>('contacts');
   const [detailPolicyId,setDetailPolicyId]=useState<string | undefined>();
+  const [policyScopeId,setPolicyScopeId]=useState<string|null>(null);
+  const changeView=(view:typeof currentView)=>{setPolicyScopeId(null);setCurrentView(view);};
   const [policyContactId, setPolicyContactId] = useState<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
@@ -961,6 +963,7 @@ const App: React.FC = () => {
           case 'policies':
               return (
                   <RenewalWorkspace 
+                     scopeContactId={policyScopeId} onClearScope={()=>setPolicyScopeId(null)}
                      importFiles={policyImportFiles}
                      onImportConsumed={() => setPolicyImportFiles(null)}
                      onContacts={acceptSavedPolicyContacts} beforeSave={beforePolicySave}
@@ -1001,9 +1004,9 @@ const App: React.FC = () => {
         onToggleAllTags={handleToggleAllTags}
         totalContacts={contacts.length}
         followUpCount={contacts.filter(c => c.followUpStatus === 'following').length}
-        policyCount={contacts.filter(c => c.policies && c.policies.length > 0).length}
+        policyCount={contacts.filter(c => c.policies?.some(p=>!excludedPolicyImport(p.status))).length}
         currentView={currentView}
-        onChangeView={setCurrentView}
+        onChangeView={changeView}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
@@ -1034,21 +1037,21 @@ const App: React.FC = () => {
         {/* Mobile Bottom Navigation */}
         <div className="md:hidden h-16 bg-white border-t border-gray-100 flex items-center justify-around px-2 shrink-0 z-20 pb-safe">
           <button
-            onClick={() => setCurrentView('contacts')}
+            onClick={() => changeView('contacts')}
             className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all ${currentView === 'contacts' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`}
           >
             <Users size={18} />
             <span className="text-[9px] font-medium">联系人</span>
           </button>
           <button 
-            onClick={() => setCurrentView('followups')}
+            onClick={() => changeView('followups')}
             className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all ${currentView === 'followups' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`}
           >
             <ClipboardList size={18} />
             <span className="text-[9px] font-medium">工作台</span>
           </button>
           <button 
-            onClick={() => setCurrentView('policies')}
+            onClick={() => changeView('policies')}
             className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all ${currentView === 'policies' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`}
           >
             <FileText size={18} />
@@ -1074,7 +1077,8 @@ const App: React.FC = () => {
       />
       <ImportModal 
         onMingyaImport={() => { setIsModalOpen(false); setMingyaPayload(null); setIsMingyaImportOpen(true); }}
-        onPolicyImport={files => { setPolicyImportFiles(files); setIsModalOpen(false); setCurrentView('policies'); }}
+        onPolicyImport={files => { setPolicyImportFiles(files); setIsModalOpen(false); changeView('policies'); }}
+        onManagePolicies={id=>{setIsModalOpen(false);setEditingContact(null);setPolicyScopeId(id);setSelectedTags(new Set());setFollowUpFilter(null);setCurrentView('policies');}}
         relatedPolicies={editingContact ? projectContacts(contacts, migrate(contacts), true).find(c => c.id === editingContact.id)?.policies : []}
         onPolicyDetail={p=>{if(editingContact){setDetailPolicyId(p.id);setPolicyContactId(editingContact.id);}}}
         isOpen={isModalOpen}
