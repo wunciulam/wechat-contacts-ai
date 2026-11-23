@@ -7,6 +7,8 @@ import { Clock, Trash2, Calendar } from 'lucide-react';
 
 interface ContactCardProps {
   contact: Contact;
+  sortableId?: string;
+  removalLabel?: string;
   isDragging?: boolean;
   isOverlay?: boolean;
   onClick: () => void;
@@ -16,6 +18,8 @@ interface ContactCardProps {
 
 const ContactCard: React.FC<ContactCardProps> = ({
   contact,
+  sortableId,
+  removalLabel="移出工作台",
   isDragging,
   isOverlay,
   onClick,
@@ -29,7 +33,7 @@ const ContactCard: React.FC<ContactCardProps> = ({
     transform,
     transition,
     isDragging: isSortableDragging
-  } = useSortable({ id: contact.id });
+  } = useSortable({ id: sortableId || contact.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -54,6 +58,7 @@ const ContactCard: React.FC<ContactCardProps> = ({
 
   return (
     <div
+      data-contact-id={contact.id}
       ref={setNodeRef}
       style={style}
       {...attributes}
@@ -70,7 +75,7 @@ const ContactCard: React.FC<ContactCardProps> = ({
       <button
         onClick={handleRemove}
         className="absolute top-2 right-2 p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
-        title="移出工作台" aria-label="移出工作台"
+        title={removalLabel} aria-label={removalLabel}
       >
         <Trash2 size={14} />
       </button>

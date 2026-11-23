@@ -1,3 +1,4 @@
+import {boardCardId,contactKey,contactNameKey} from '../services/contactIdentity';
 import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -12,13 +13,13 @@ interface CategoryColumnProps {
   count: number;
   isOver?: boolean;
   isFiltered?: boolean;
-  onContactClick: (contact: Contact) => void;
-  onStatusChange: (contactId: string, status: 'idle' | 'following') => void;
-  onRemoveFromFollowUp: (contactId: string) => void;
-  onAddToFollowUp?: (contactId: string, categoryId: string) => void;
-  onQuickCreateContact?: (name: string, categoryId: string) => void;
+  onContactClick: (contact: Contact) => void | Promise<void>;
+  onStatusChange: (contactId: string, status: 'idle' | 'following') => void | Promise<void>;
+  onRemoveFromFollowUp: (contactId: string) => void | Promise<void>;
+  onAddToFollowUp?: (contactId: string, categoryId: string) => void | Promise<void>;
+  onQuickCreateContact?: (name: string, categoryId: string) => void | Promise<void>;
   availableContacts?: Contact[];
-  onFilterClick: () => void;
+  onFilterClick: () => void | Promise<void>;
   isUncategorized?: boolean;
   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
 }
@@ -40,6 +41,7 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
   dragHandleProps
 }) => {
   const [isAdding, setIsAdding] = useState(false);
+  const [saving,setSaving]=useState(false),[error,setError]=useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
   const droppableId = isUncategorized ? '__uncategorized__' : `category-${category?.id}`;
@@ -58,21 +60,10 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
     onStatusChange(contactId, status);
   };
 
-  const handleAddContact = (contactId: string) => {
-    const targetCategoryId = isUncategorized ? '__uncategorized__' : category?.id || '__uncategorized__';
-    onAddToFollowUp?.(contactId, targetCategoryId);
-    setIsAdding(false);
-    setSearchQuery('');
-  };
-
-  const handleQuickCreate = () => {
-    if (searchQuery.trim()) {
-      const targetCategoryId = isUncategorized ? '__uncategorized__' : category?.id || '__uncategorized__';
-      onQuickCreateContact?.(searchQuery.trim(), targetCategoryId);
-      setSearchQuery('');
-      setIsAdding(false);
-    }
-  };
+  const targetCategoryId=isUncategorized?'__uncategorized__':category!.id;
+  const perform=async(work:()=>void|Promise<void>)=>{if(saving)return;setSaving(true);setError('');try{await work();setIsAdding(false);setSearchQuery('');}catch(e){setError(e instanceof Error?e.message:'分类未保存，请重试。');}finally{setSaving(false);}};
+  const handleAddContact=(id:string)=>perform(()=>onAddToFollowUp?.(id,targetCategoryId));
+  const handleQuickCreate=()=>{if(searchQuery.trim())return perform(()=>onQuickCreateContact?.(searchQuery.trim(),targetCategoryId));};
 
   const filteredAvailableContacts = availableContacts.filter(c =>
     !contacts.some(ac => ac.id === c.id) &&
@@ -81,6 +72,7 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
 
   return (
     <div
+      data-category-id={isUncategorized?'__uncategorized__':category?.id}
       className={`w-72 h-full min-h-0 shrink-0 flex flex-col bg-gray-50 rounded-xl transition-all ${
         isOver || isDropOver ? 'ring-2 ring-gray-900 ring-offset-2' : ''
       }`}
@@ -126,9 +118,9 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
             {/* 添加联系人按钮 */}
             {onAddToFollowUp && (
               <button
-                onClick={(e) => { e.stopPropagation(); setIsAdding(!isAdding); }}
+                disabled={saving} onClick={(e) => { e.stopPropagation(); setIsAdding(!isAdding); }}
                 className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all"
-                title="添加联系人"
+                title="添加联系人" aria-label={`添加联系人到${isUncategorized?'未分类':category?.name}`}
               >
                 <Plus size={16} />
               </button>
@@ -148,12 +140,12 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="搜索联系人..."
-                className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-gray-400"
+                className="input pl-7" disabled={saving}
                 autoFocus
               />
             </div>
             <button
-              onClick={() => { setIsAdding(false); setSearchQuery(''); }}
+              disabled={saving} aria-label="关闭添加联系人" onClick={() => { setIsAdding(false); setSearchQuery('');setError(''); }}
               className="p-1 text-gray-400 hover:text-gray-600"
             >
               <X size={14} />
@@ -161,23 +153,23 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
           </div>
           <div className="max-h-40 overflow-y-auto space-y-1">
             {filteredAvailableContacts.length === 0 ? (
-              searchQuery.trim() ? (
+              searchQuery.trim() && !contacts.some(c=>contactKey(c)===contactNameKey(searchQuery)) ? (
                 /* 搜索无结果时，直接创建 */
                 <button
-                  onClick={handleQuickCreate}
+                  disabled={saving} onClick={handleQuickCreate}
                   className="w-full text-left px-2 py-2 text-xs hover:bg-gray-100 rounded transition-all flex items-center gap-2 text-gray-600"
                 >
                   <UserPlus size={14} />
-                  <span>创建 "<span className="font-medium text-gray-900">{searchQuery.trim()}</span>"</span>
+                  <span>添加 "<span className="font-medium text-gray-900">{searchQuery.trim()}</span>"</span>
                 </button>
               ) : (
-                <p className="text-xs text-gray-400 text-center py-2">无更多联系人</p>
+                <p className="text-xs text-gray-500 text-center py-2">{searchQuery.trim()?'已在此分类':'无更多联系人'}</p>
               )
             ) : (
               filteredAvailableContacts.slice(0, 10).map(contact => (
                 <button
                   key={contact.id}
-                  onClick={() => handleAddContact(contact.id)}
+                  disabled={saving} onClick={() => handleAddContact(contact.id)}
                   className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-100 rounded transition-all flex items-center gap-2"
                 >
                   <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-[10px] font-bold">
@@ -191,6 +183,8 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
         </div>
       )}
 
+      {saving&&<p role="status" className="px-3 py-2 text-xs text-gray-500">正在保存…</p>}
+      {error&&<p role="alert" className="px-3 py-2 text-xs text-danger-600">{error}</p>}
       {/* Drop Zone */}
       <div
         ref={setNodeRef}
@@ -199,22 +193,24 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
         }`}
       >
         <SortableContext
-          items={contacts.map(c => c.id)}
+          items={contacts.map(c => boardCardId(c.id,targetCategoryId))}
           strategy={verticalListSortingStrategy}
         >
           {contacts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-gray-300 text-sm">
               <p>暂无联系人</p>
-              <p className="text-xs">拖拽卡片到这里</p>
+
             </div>
           ) : (
             contacts.map(contact => (
               <ContactCard
                 key={contact.id}
                 contact={contact}
+                sortableId={boardCardId(contact.id,targetCategoryId)}
+                removalLabel={isUncategorized?'移出工作台':'移出此分类'}
                 onClick={() => onContactClick(contact)}
                 onStatusChange={handleStatusChange}
-                onRemoveFromFollowUp={onRemoveFromFollowUp}
+                onRemoveFromFollowUp={id=>perform(()=>onRemoveFromFollowUp(id))}
               />
             ))
           )}

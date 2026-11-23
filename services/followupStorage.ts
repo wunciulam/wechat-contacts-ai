@@ -23,3 +23,12 @@ export async function saveCustomerProfile(contact:Contact,expected?:Contact):Pro
  }catch(e){if(controller.signal.aborted)throw new Error('保存超时，输入已保留，请核对后重试。');throw e;}
  finally{clearTimeout(timeout);}
 }
+
+export async function saveContactCategory(contactId:string|null,name:string|null,target:string|null,source?:string|null,remove=false):Promise<Contact>{
+ const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),15000);
+ try{
+  const {data,error}=await supabase.rpc('save_contact_category_v1',{p_app_id:import.meta.env.VITE_APP_ID,p_contact_id:contactId,p_name:name,p_target:target,p_source:source??null,p_remove:remove}).abortSignal(controller.signal);
+  if(error)throw new Error(error.message||'分类未保存，请重试。');
+  if(!data?.id)throw new Error('未收到分类保存确认，请重试。');return data;
+ }catch(e){if(controller.signal.aborted)throw new Error('分类保存超时，请刷新核对后重试。');throw e;}finally{clearTimeout(timeout);}
+}

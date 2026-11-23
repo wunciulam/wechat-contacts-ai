@@ -79,6 +79,7 @@ export interface Contact {
 
   followUpStatus?: 'idle' | 'following';
   categoryId?: string;
+  categoryIds?: string[];
 }
 
 // 跟进状态标签映射

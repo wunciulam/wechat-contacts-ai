@@ -1,3 +1,5 @@
+import {PageHeader} from './PageHeader';
+import {categoryIds,parseBoardCardId} from '../services/contactIdentity';
 import React, { useState, useMemo } from 'react';
 import {
   DndContext,
@@ -33,10 +35,10 @@ interface CategoryBoardProps {
   categoryFilter: string | null;
   onContactClick: (contact: Contact) => void;
   onStatusChange: (contactId: string, status: 'idle' | 'following') => void;
-  onContactMove: (contactId: string, newCategoryId: string | null) => void;
-  onRemoveFromFollowUp: (contactId: string) => void;
-  onAddToFollowUp: (contactId: string, categoryId: string) => void;
-  onQuickCreateContact: (name: string, categoryId: string) => void;
+  onContactMove: (contactId: string, newCategoryId: string | null, source?:string) => void | Promise<void>;
+  onRemoveFromFollowUp: (contactId: string, categoryId?:string) => void | Promise<void>;
+  onAddToFollowUp: (contactId: string, categoryId: string) => void | Promise<void>;
+  onQuickCreateContact: (name: string, categoryId: string) => void | Promise<void>;
   onCategoryFilter: (categoryId: string | null) => void;
   onCategoryReorder: (categories: Category[]) => void;
   onOpenCategoryManager: () => void;
@@ -50,9 +52,9 @@ interface SortableCategoryColumnProps {
   isFiltered?: boolean;
   onContactClick: (contact: Contact) => void;
   onStatusChange: (contactId: string, status: 'idle' | 'following') => void;
-  onRemoveFromFollowUp: (contactId: string) => void;
-  onAddToFollowUp: (contactId: string, categoryId: string) => void;
-  onQuickCreateContact: (name: string, categoryId: string) => void;
+  onRemoveFromFollowUp: (contactId: string, categoryId?:string) => void | Promise<void>;
+  onAddToFollowUp: (contactId: string, categoryId: string) => void | Promise<void>;
+  onQuickCreateContact: (name: string, categoryId: string) => void | Promise<void>;
   availableContacts: Contact[];
   onFilterClick: () => void;
 }
@@ -99,7 +101,7 @@ const SortableCategoryColumn: React.FC<SortableCategoryColumnProps> = ({
         isFiltered={isFiltered}
         onContactClick={onContactClick}
         onStatusChange={onStatusChange}
-        onRemoveFromFollowUp={onRemoveFromFollowUp}
+        onRemoveFromFollowUp={id=>onRemoveFromFollowUp(id,category.id)}
         onAddToFollowUp={onAddToFollowUp}
         onQuickCreateContact={onQuickCreateContact}
         availableContacts={availableContacts}
@@ -141,6 +143,8 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
     })
   );
 
+  const [moveError,setMoveError]=useState('');
+  const [movePending,setMovePending]=useState(false);
   // 自动显示所有跟进中的联系人（不需要 categoryId）
   const filteredContacts = useMemo(() => {
     return contacts.filter(c => {
@@ -153,7 +157,7 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
 
   // 可添加到跟进工作台的联系人（尚未跟进）
   const availableContacts = useMemo(() => {
-    return contacts.filter(c => c.followUpStatus !== 'following');
+    return contacts;
   }, [contacts]);
 
   const contactsByCategory = useMemo(() => {
@@ -163,9 +167,8 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
     });
     groups['__uncategorized__'] = [];
     filteredContacts.forEach(contact => {
-      const key = contact.categoryId || '__uncategorized__';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(contact);
+      const ids=categoryIds(contact).filter(id=>categories.some(c=>c.id===id));
+      for(const key of ids.length?ids:['__uncategorized__'])groups[key].push(contact);
     });
     return groups;
   }, [filteredContacts, categories]);
@@ -188,7 +191,7 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
       return;
     }
 
-    const contact = filteredContacts.find(c => c.id === active.id);
+    const contact = filteredContacts.find(c => c.id === parseBoardCardId(activeId)?.contactId);
     if (contact) {
       setActiveContact(contact);
     }
@@ -224,43 +227,29 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
 
     if (activeId.startsWith('category-sort-')) return;
 
-    const contactId = active.id as string;
+    const card=parseBoardCardId(activeId);if(!card)return;
+    const contactId=card.contactId;
     let newCategoryId: string | null = null;
 
     if (overId === '__uncategorized__') {
       newCategoryId = null;
+    } else if(overId.startsWith('category-sort-')) {
+      newCategoryId=overId.replace('category-sort-','');
     } else if (overId.startsWith('category-')) {
       newCategoryId = overId.replace('category-', '');
     } else {
-      const targetContact = filteredContacts.find(c => c.id === overId);
-      if (targetContact) {
-        newCategoryId = targetContact.categoryId || null;
-      }
+      const target=parseBoardCardId(overId);if(!target)return;newCategoryId=target.category==='__uncategorized__'?null:target.category;
     }
+    setMoveError('');
+    if(card.category!==(newCategoryId||'__uncategorized__')){setMovePending(true);Promise.resolve(onContactMove(contactId,newCategoryId,card.category)).catch(e=>setMoveError(e instanceof Error?e.message:'分类未保存，请重试。')).finally(()=>setMovePending(false));}
 
-    if (newCategoryId !== undefined) {
-      const currentContact = filteredContacts.find(c => c.id === contactId);
-      if (currentContact && currentContact.categoryId !== newCategoryId) {
-        onContactMove(contactId, newCategoryId);
-      }
-    }
   };
 
   return (
     <div className="flex-1 h-full min-h-0 flex flex-col overflow-hidden">
-      <div className="shrink-0 px-4 md:px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold text-gray-900">跟进工作台</h1>
-          <span className="text-xs text-gray-500">{filteredContacts.length} 位联系人</span>
-        </div>
-        <button
-          onClick={onOpenCategoryManager}
-          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all"
-          title="管理类目"
-        >
-          <Settings size={20} />
-        </button>
-      </div>
+      {movePending&&<p role="status" className="px-5 py-3 text-sm text-gray-500">正在保存分类…</p>}
+      {moveError&&<p role="alert" className="px-5 py-3 text-sm text-danger-600">{moveError}</p>}
+      <div className="shrink-0 border-b border-gray-100 bg-white"><PageHeader compactActions title="跟进工作台" count={filteredContacts.length} actionButton={<button onClick={onOpenCategoryManager} className="icon-btn" aria-label="管理分类" title="管理分类"><Settings size={20}/></button>}/></div>
 
       <DndContext
         sensors={sensors}
@@ -303,7 +292,7 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
               isFiltered={categoryFilter === null}
               onContactClick={onContactClick}
               onStatusChange={onStatusChange}
-              onRemoveFromFollowUp={onRemoveFromFollowUp}
+              onRemoveFromFollowUp={id=>onRemoveFromFollowUp(id,'__uncategorized__')}
               onAddToFollowUp={onAddToFollowUp}
               onQuickCreateContact={onQuickCreateContact}
               availableContacts={availableContacts}

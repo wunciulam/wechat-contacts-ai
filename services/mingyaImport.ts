@@ -126,7 +126,7 @@ export function planMingyaImport(existing: Contact[], payload:MingyaPayload, res
       if(strong.length===1)owner=strong[0];
       else if(strong.length>1){issue='身份信息匹配到多位客户';candidates=strong;}
       else if(newOwners.has(incoming.personKey))owner=contacts.find(c=>c.id===newOwners.get(incoming.personKey));
-      else {candidates=contacts.filter(c=>sameName(c,a.name));if(candidates.length)issue='仅姓名相同，需要确认是否同一人';}
+      else {candidates=contacts.filter(c=>sameName(c,a.name));if(candidates.length){issue='同名联系人已存在，请确认合并归属';allowNew=false;}}
       // A different known insurer with the same number must not silently become a second record.
       const numberMatches=contacts.flatMap(c=>(c.policies||[]).filter(x=>normalizeId(x.policyNumber)===normalizeId(p.policyNumber)&&(companyKey(x.company)!==companyKey(p.company)||ambiguousTerm(x,incoming))).map(()=>c));
       if(numberMatches.length){issue='相同保单号的保险公司不一致，或旧记录缺少年度';candidates=numberMatches;owner=undefined;allowNew=false;}

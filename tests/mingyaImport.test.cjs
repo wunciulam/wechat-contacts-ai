@@ -81,3 +81,5 @@ test('filters ended and cancelled policies before customer matching, retaining t
 test('does not confuse suspended or cancellation-in-progress with final cancellation',()=>{
  const plan=planMingyaImport([],payload([record({policyState:'18'}),record({policyIndexId:'pending',policyCode:'PENDING',policyState:'21'})]));assert.equal(plan.filteredPolicies,0);assert.equal(plan.addedPolicies,2);
 });
+
+test('same-name policy import cannot create an independent duplicate',()=>{const p=payload([record()]),original=[contact()];const pending=planMingyaImport(original,p);assert.equal(pending.issues[0].allowNew,false);const forced=planMingyaImport(original,p,{[pending.issues[0].key]:'new'});assert.equal(forced.contacts.length,1);assert.equal(forced.addedContacts,0);assert.equal(forced.issues.length,1);});

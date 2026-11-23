@@ -1,5 +1,6 @@
+import {categoryIds,contactKey,contactNameKey} from './services/contactIdentity';
 import {excludedPolicyImport} from './services/policyImportRules';
-import {saveFollowup,saveCustomerProfile} from './services/followupStorage';
+import {saveFollowup,saveCustomerProfile,saveContactCategory} from './services/followupStorage';
 import { rememberRenewalSnapshot } from './services/renewalCache';
 import { migrate, projectContacts, mergePolicies } from './services/renewal';
 import RenewalWorkspace from './components/RenewalWorkspace';
@@ -452,6 +453,7 @@ const App: React.FC = () => {
     for(const [index,data] of newContactDataArray.entries()){
       const previous=editingContact&&newContactDataArray.length===1?editingContact:undefined;
       const input:Contact=previous?{...previous,...data,id:previous.id}:applyAutoTags({...data,id:requestId?`${requestId}-${index}`:crypto.randomUUID(),addedAt:Date.now(),tags:data.tags?.length?data.tags:['潜在客户'],followUpStatus:'following',policies:data.policies||[]});
+      if(contactsRef.current.some(c=>c.id!==input.id&&contactKey(c)===contactKey(input)))throw new Error('同名联系人已存在，请编辑已有联系人；跟进分类可在工作台中添加。');
       const saved=await saveCustomerProfile(input,previous);
       acceptSavedFollowup(saved);
     }
@@ -674,7 +676,8 @@ const App: React.FC = () => {
     });
   };
   const handleQuickAddProgress: import('./types').FollowUpSave = async (contactId,date,content,newStatus,newContactName,existingRecordId,completed,requestId,newContactId) => {
-    const id=contactId||newContactId||crypto.randomUUID();
+    const existingByName=!contactId&&newContactName?contactsRef.current.find(c=>contactKey(c)===contactNameKey(newContactName)):undefined;
+    const id=contactId||existingByName?.id||newContactId||crypto.randomUUID();
     const current=contactsRef.current.find(c=>c.id===id);
     const expected=existingRecordId?current?.progressHistory?.find(r=>r.id===existingRecordId):undefined;
     if(existingRecordId&&!expected)throw new Error('原记录已变化，请刷新后重试。');
@@ -861,49 +864,14 @@ const App: React.FC = () => {
       }));
   };
 
-  // 从跟进工作台移除联系人，状态变为"暂未跟进"
-  const handleRemoveFromFollowUp = (contactId: string) => {
-      setContacts(prev => prev.map(c => {
-          if (c.id === contactId) {
-              return { ...c, followUpStatus: 'idle', categoryId: undefined };
-          }
-          return c;
-      }));
+  const categoryWriteRef=useRef<Promise<void>>(Promise.resolve());
+  const updateContactCategory=(contactId:string|null,name:string|null,target:string|null,source?:string,remove=false)=>{
+    const task=categoryWriteRef.current.catch(()=>{}).then(async()=>{await beforePolicySave();acceptSavedFollowup(await saveContactCategory(contactId,name,target,source,remove));});
+    categoryWriteRef.current=task;return task;
   };
-
-  // 添加联系人到跟进工作台
-  const handleAddToFollowUp = (contactId: string, categoryId: string) => {
-      setContacts(prev => prev.map(c => {
-          if (c.id === contactId) {
-              return {
-                  ...c,
-                  followUpStatus: 'following',
-                  categoryId: categoryId === '__uncategorized__' ? undefined : categoryId
-              };
-          }
-          return c;
-      }));
-  };
-
-  // 快捷创建联系人并添加到跟进工作台
-  const handleQuickCreateContact = (name: string, categoryId: string) => {
-      const newContact: Contact = {
-          id: generateId(),
-          addedAt: Date.now(),
-          wxid: '',
-          nickname: name,
-          remarkName: name,
-          remarkInfo: '快速创建',
-          tags: [],
-          dealProducts: [],
-          intentProducts: [],
-          progressHistory: [],
-          followUpStatus: 'following',
-          categoryId: categoryId === '__uncategorized__' ? undefined : categoryId,
-          policies: []
-      };
-      setContacts(prev => [newContact, ...prev]);
-  };
+  const handleRemoveFromFollowUp=(contactId:string,source?:string)=>updateContactCategory(contactId,null,null,source,true);
+  const handleAddToFollowUp=(contactId:string,target:string)=>updateContactCategory(contactId,null,target);
+  const handleQuickCreateContact=(name:string,target:string)=>updateContactCategory(null,name,target);
 
   // 类目相关处理函数
   const handleAddCategory = (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -934,16 +902,12 @@ const App: React.FC = () => {
   const handleDeleteCategory = (id: string) => {
     // 删除类目时，将该类目下的联系人移到"无类目"
     setContacts(prev => prev.map(c =>
-      c.categoryId === id ? { ...c, categoryId: undefined } : c
+      categoryIds(c).includes(id) ? { ...c, categoryId: undefined, categoryIds:categoryIds(c).filter(x=>x!==id) } : c
     ));
     setCategories(prev => prev.filter(c => c.id !== id));
   };
 
-  const handleMoveContactToCategory = (contactId: string, newCategoryId: string | null) => {
-    setContacts(prev => prev.map(c =>
-      c.id === contactId ? { ...c, categoryId: newCategoryId || undefined } : c
-    ));
-  };
+  const handleMoveContactToCategory=(contactId:string,target:string|null,source?:string)=>updateContactCategory(contactId,null,target,source);
 
   const renderContent = () => {
       switch (currentView) {
