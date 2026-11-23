@@ -34,7 +34,7 @@ export default function PolicyFieldsForm({value,onChange,contacts,identityReadon
           onChange({...value,[k]:c?c.remarkName||c.nickname:value[k],[k==='applicant'?'applicantId':'insuredId']:c?.id});
         }}>
           <option value="">{textValue||'选择客户'}</option>
-          {contacts.map(c=><option value={c.id} key={c.id}>{c.remarkName||c.nickname}{c.phoneNumber?` · 尾号${c.phoneNumber.slice(-4)}`:''}</option>)}
+          {contacts.map(c=><option value={c.id} key={c.id}>{c.remarkName||c.nickname}{c.phoneNumber?` · 尾号${String(c.phoneNumber).slice(-4)}`:''}</option>)}
         </select>:k==='paymentFrequency'?<select id={`${formId}-${k}`} className="input mt-1.5 font-normal text-gray-900" value={textValue} onChange={e=>update(e.target.value)}>
           {['','期交-年','期交-半年','期交-季','期交-月','趸交',...(!['','期交-年','期交-半年','期交-季','期交-月','趸交'].includes(textValue)?[textValue]:[])].map(v=><option key={v} value={v}>{v||'待补充'}</option>)}
         </select>:<input id={`${formId}-${k}`} className="input mt-1.5 font-normal text-gray-900 read-only:bg-gray-50" type={type||'text'} required={k==='productName'}

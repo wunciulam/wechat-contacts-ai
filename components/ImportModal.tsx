@@ -1,3 +1,4 @@
+import {readPolicyNumber} from '../services/policyIdentity';
 import {excludedPolicyImport,mingyaStatusLabel} from '../services/policyImportRules';
 import PolicyStatus from './PolicyStatus';
 import {formatMoney} from './PolicyPaymentSummary';
@@ -6,7 +7,7 @@ import { X, Upload, Check, AlertCircle, Plus, FileSpreadsheet, ShoppingBag, Tras
 import { extractContactsFromMedia, extractTableFromMedia } from '../services/geminiService';
 import { NewContact, Contact, ProgressRecord, ExtractedTableData, Policy, ExcelCustomerRow, ExcelPolicyRow } from '../types';
 import * as XLSX from 'xlsx';
-import { key as policyKey } from '../services/renewal';
+import { mergePolicies } from '../services/renewal';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -26,7 +27,7 @@ interface ImportModalProps {
 const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPolicyImport, onClose, onSave, onPersistFollowup, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail, onManagePolicies }) => {
   const [historyBusy,setHistoryBusy]=useState(false),[profileBusy,setProfileBusy]=useState(false),[historyError,setHistoryError]=useState(''),[historySaved,setHistorySaved]=useState('');
   const historyBusyRef=useRef(false),historyRequestId=useRef(crypto.randomUUID()),profileRequestId=useRef(crypto.randomUUID());
-  const displayedPolicies = () => Array.from(new Map([...(formData.policies || []), ...relatedPolicies].map(p => [policyKey(p), p])).values()).filter(p=>!excludedPolicyImport(p.status));
+  const displayedPolicies = () => mergePolicies([...(formData.policies || []), ...relatedPolicies].map(p=>({...p,payments:(p as any).payments||[]})),[]).filter(p=>!excludedPolicyImport(p.status));
   const profileBaseline=useRef<NewContact|null>(null);
   const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'table' | 'policies'>('ai');
   const [loading, setLoading] = useState(false);
@@ -160,7 +161,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
         tableData = {
           type: 'policy',
           items: jsonData.map((row: any) => ({
-            policyNumber: getRowValue(row, '保单号', '保单号') || '',
+            policyNumber: readPolicyNumber(getRowValue(row, '保单号', '保单号')),
             productName: getRowValue(row, '产品名称', '产品名称') || '',
             company: getRowValue(row, '保险公司', '保险公司') || '',
             premium: String(getRowValue(row, '保费', '保费') || '0'),

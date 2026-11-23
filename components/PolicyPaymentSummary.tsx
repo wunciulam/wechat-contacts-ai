@@ -1,5 +1,5 @@
 import React from 'react';
-import { inactive, nextPayment, remainingInstallments, today, type ManagedPolicy } from '../services/renewal';
+import { inactive, nextPayment, remainingInstallments, paymentTermEnded, today, type ManagedPolicy } from '../services/renewal';
 
 export function formatMoney(value: unknown, currency = 'CNY') {
   if (value === null || value === undefined || String(value).trim() === '') return '待补充';
@@ -13,6 +13,7 @@ export function paymentStatus(policy: ManagedPolicy) {
   if (policy.status.includes('明亚状态')) return '保单状态待确认，暂不提醒';
   if (inactive(policy.status)) return '已退出续期提醒';
   if (remainingInstallments(policy) === 0) return '缴费期已完成';
+  if (paymentTermEnded(policy)) return '缴费期已结束，历史缴费待核对';
   if (/趸|一次/.test(policy.paymentFrequency || '') || /趸/.test(policy.paymentYears || '')) return '一次性缴费';
   return '下次缴费待确认';
 }

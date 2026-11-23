@@ -1,3 +1,4 @@
+import {findPolicyMatch,policyBaseKey,policyTermKey,policyNumberKey,readPolicyNumber} from './policyIdentity.ts';
 import {excludedPolicyImport,mingyaStatusLabel} from './policyImportRules.ts';
 import { detailNextPayment, reconcileMingyaPayments } from './mingyaPayments.ts';
 import * as XLSX from "xlsx";
@@ -38,14 +39,8 @@ export const emptyData: RenewalData = {
   imports: [],
 };
 export const inactive = (s: string) => /撤单|退保|拒保|终止|失效/.test(s || "");
-export const normalizedPolicyNumber = (value: unknown) => {
-  const clean = String(value ?? "").trim().replace(/[^0-9A-Za-z]/g, "").toUpperCase();
-  return clean.replace(/^0+(?=[0-9A-Z])/, "");
-};
-const legacyKey = (p: Partial<ManagedPolicy>) =>
-  normalizedPolicyNumber(p.policyNumber)
-    ? `${p.company?.trim()}|${normalizedPolicyNumber(p.policyNumber)}`
-    : `manual:${p.id}`;
+export const normalizedPolicyNumber=policyNumberKey;
+const legacyKey=(p:Partial<ManagedPolicy>)=>policyBaseKey(p)?`${policyBaseKey(p)}|${policyTermKey(p.effectiveDate)}|${String(p.applicant||'').replace(/\s/g,'').toLowerCase()}|${String(p.insured||'').replace(/\s/g,'').toLowerCase()}`:`manual:${p.id}`;
 export const key = (p: Partial<ManagedPolicy>) => p.mingya?.key ? `mingya:${p.mingya.key}` : legacyKey(p);
 const text = (v: unknown) => String(v ?? "").trim();
 export function date(v: unknown) {
@@ -88,7 +83,7 @@ export function parseWorkbook(
       };
       const status=text(get("保单状态"))||(text(get("保单状态代码"))?mingyaStatusLabel(get("保单状态代码")):"");
       if(excludedPolicyImport(status)){filtered++;continue;}
-      const num = text(get("保单号"));
+      const num = readPolicyNumber(get("保单号"));
       if (!num) {
         if (text(get("保单状态")) === "撤单") continue;
         if (row.some((v) => text(v)))
@@ -153,40 +148,40 @@ export function candidates(
     });
 }
 export function mergePolicies(old: ManagedPolicy[], incoming: ManagedPolicy[]) {
-  const map = new Map(old.map((p) => [key(p), structuredClone(p)]));
-  for (const p of incoming) {
-    let prev = map.get(key(p)) || [...map.values()].find(old => old.id === p.id);
-    if (!prev && !p.mingya) {
-      const related=[...map.values()].filter(old=>old.mingya && legacyKey(old)===legacyKey(p));
-      prev=related.find(old=>date(old.effectiveDate)===date(p.effectiveDate)) || (related.length===1?related[0]:undefined);
-    }
-    const targetKey=prev?.mingya && !p.mingya ? key(prev) : key(p);
-    if (prev && key(prev)!==targetKey) map.delete(key(prev));
+  const map=new Map<string,ManagedPolicy>();
+  for(const [index,p] of [...old,...incoming].entries()) {
+    const dedupe=index<old.length;
+    const prev=findPolicyMatch(p,[...map.values()]);
+    const targetKey=prev?.mingya&&!p.mingya?key(prev):key(p);
+    if(prev)map.delete(key(prev));
     if (!prev) {
       map.set(key(p), structuredClone(p));
       continue;
     }
     const payments = new Map((prev.payments||[]).map((x) => [x.date, x]));
-    for (const x of p.payments) {
+    for (const x of p.payments||[]) {
       const before=payments.get(x.date);
+      const beforeTime=Date.parse(before?.confirmedAt||'')||0,incomingTime=Date.parse(x.confirmedAt||'')||0;
+      const keepBefore=before&&(beforeTime>incomingTime||(dedupe&&beforeTime===incomingTime&&before.status==='已缴费'&&x.status!=='已缴费'));
+      const selected=keepBefore?{...x,...before}:x;
       const histories=[...(before?.history||[]),...(x.history||[])];
-      if(before&&before.status!==x.status&&!histories.some(h=>h.from===before.status&&h.to===x.status)) {
-        histories.push({at:x.sourceCapturedAt||p.mingya?.capturedAt||new Date().toISOString(),from:before.status,to:x.status,source:x.source||p.source||'导入'});
+      if(before&&before.status!==selected.status&&!histories.some(h=>h.from===before.status&&h.to===selected.status)) {
+        histories.push({at:x.sourceCapturedAt||p.mingya?.capturedAt||new Date().toISOString(),from:before.status,to:selected.status,source:x.source||p.source||'导入'});
       }
       const history=[...new Map(histories.map(h=>[`${h.at}|${h.from}|${h.to}|${h.source}`,h])).values()];
-      payments.set(x.date,{...before,...x,contactedAt:before?.contactedAt,history});
+      payments.set(x.date,{...before,...selected,contactedAt:before?.contactedAt||x.contactedAt,history});
     }
     const nonempty = Object.fromEntries(
       Object.entries(p).filter(
         ([k, v]) =>
-          v !== "" && v !== undefined && !["id", "payments"].includes(k),
+          v !== "" && v !== undefined && !["id", "payments"].includes(k) && !(prev.mingya&&!p.mingya&&prev[k as keyof ManagedPolicy]!==undefined&&prev[k as keyof ManagedPolicy]!==''),
       ),
     );
     map.set(targetKey, {
       ...prev,
       ...nonempty,
       id: prev.id,
-      ...(p.payments.length && !p.mingya
+      ...((p.payments||[]).length && !p.mingya
         ? {
             status: prev.status || p.status,
             premium: prev.premium || p.premium,
@@ -215,7 +210,7 @@ export function dueItems(policies: ManagedPolicy[], now = today()) {
   return policies
     .filter((p) => !inactive(p.status) && !p.status.includes('明亚状态'))
     .flatMap((p) => {
-      const pay = nextPayment(p);
+      const pay = nextPayment(p,now);
       const items: {
         policy: ManagedPolicy;
         type: "payment" | "renewal";
@@ -248,7 +243,7 @@ export function migrate(contacts: Contact[]) {
     for (const p of c.policies || [])
       all.push({
         ...p,
-        applicantId: c.id,
+        applicantId: (p as ManagedPolicy).applicantId || c.id,
         payments: (p as ManagedPolicy).payments || [],
       });
   return mergePolicies([], all);
@@ -264,14 +259,22 @@ export function addMonths(anchor: string, months: number): string {
   target.setUTCDate(Math.min(d, last));
   return target.toISOString().slice(0, 10);
 }
-export function nextPayment(p: ManagedPolicy): Payment | undefined {
+export function paymentTermEnd(p:ManagedPolicy):string {
+ const explicit=date(p.paymentEndDate||p.mingya?.paymentEndDate);if(explicit)return explicit;
+ const years=/^(\d+)年$/.exec(p.paymentYears||'');return years&&date(p.effectiveDate)?addMonths(p.effectiveDate,Number(years[1])*12):'';
+}
+export const paymentTermEnded=(p:ManagedPolicy,asOf=today())=>Boolean(paymentTermEnd(p)&&paymentTermEnd(p)<=asOf);
+export function nextPayment(p: ManagedPolicy,asOf=today()): Payment | undefined {
   if (inactive(p.status) || p.status.includes('明亚状态')) return;
-  const detail=detailNextPayment(p,p.payments||[]);if(detail)return detail;
+  const end=paymentTermEnd(p);
+  const detail=detailNextPayment(p,p.payments||[]);if(detail&&(!end||detail.date<end)&&!(paymentTermEnded(p,asOf)&&detail.amountReference))return detail;
   const latest = [...reconcileMingyaPayments(p.payments||[],p)].sort((a, b) =>
     b.date.localeCompare(a.date),
   )[0];
-  if (latest?.status === "未缴费") return latest;
+  if (latest?.status === "未缴费") return !end||latest.date<end?latest:undefined;
   if (latest && latest.status !== "已缴费") return;
+  if(paymentTermEnded(p,asOf))return;
+  if(!latest&&date(p.effectiveDate)&&p.effectiveDate<asOf)return;
   const frequency = p.paymentFrequency || "";
   if (/趸|一次/.test(frequency) || /趸/.test(p.paymentYears || "")) return;
   const months = /半年/.test(frequency)
@@ -286,8 +289,7 @@ export function nextPayment(p: ManagedPolicy): Payment | undefined {
   const years = /^(\d+)年$/.exec(p.paymentYears || "");
   if (!months || !date(p.effectiveDate) || (!p.paymentEndDate && !years))
     return;
-  const end =
-    p.paymentEndDate || addMonths(p.effectiveDate, Number(years![1]) * 12);
+
   let candidate = p.effectiveDate;
   if (latest) {
     let n = Math.max(
@@ -327,7 +329,7 @@ export function projectContacts(
     return {
       ...c,
       policies: [
-        ...(c.policies || []).filter((p) => !known.has(key(p)) && !knownIds.has(p.id)),
+        ...(c.policies || []).filter((p) => !known.has(key(p)) && !knownIds.has(p.id) && !findPolicyMatch(p,policies)),
         ...associated,
       ],
     };

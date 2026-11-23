@@ -24,7 +24,7 @@ export default function MingyaImportModal({open,initialPayload,onClose,onLoad,on
   },[open,initialPayload]);
   const result=useMemo(()=>{
     if(!payload||!snapshot)return {plan:null,error:''};
-    try{return {plan:planMingyaImport(snapshot.contacts,payload,resolutions,mode),error:''};}catch{return {plan:null,error:'文件包含无法识别的字段，请重新采集并导出。'};}
+    try{return {plan:planMingyaImport(snapshot.contacts,payload,resolutions,mode),error:''};}catch(e){return {plan:null,error:e instanceof Error&&e.message.includes('长保单号')?e.message:'文件包含无法识别的字段，请重新采集并导出。'};}
   },[payload,snapshot,resolutions,mode]);
   const plan=result.plan;
   const rows=plan?.rows.filter(r=>!query||`${r.name} ${r.number} ${r.product} ${r.contact}`.toLowerCase().includes(query.toLowerCase()))||[];

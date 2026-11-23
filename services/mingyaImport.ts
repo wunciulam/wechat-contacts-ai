@@ -1,3 +1,4 @@
+import {policyNumberKey,readPolicyNumber} from './policyIdentity';
 import {excludedPolicyImport,mingyaStatusLabel} from './policyImportRules';
 import { financialFromDetail, money } from './mingyaFinancial';
 import { reconcileMingyaPayments } from './mingyaPayments';
@@ -23,7 +24,7 @@ const phoneKey = (v: unknown) => readable(v).replace(/^\+?86(?=1\d{10}$)/,'').re
 const identity = (v: unknown) => normalizeId(readable(v));
 const companyKey = (v: unknown) => normalizeId(v).replace(/[（）()]/g,'');
 export const dateKey = (v: unknown) => { const s=text(v),m=s.match(/^(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})/);return m?`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`:s.slice(0,10); };
-const policyKey = (p: Policy) => normalizeId(p.policyNumber)+'|'+companyKey(p.company);
+const policyKey = (p: Policy) => policyNumberKey(p.policyNumber)+'|'+companyKey(p.company);
 const uuid = () => crypto.randomUUID();
 const has = (v: unknown) => v !== undefined && v !== null && text(v) !== '';
 const person = (input: Json = {}): MingyaPerson => { const p=input||{};return ({ name:text(p.name),idCard:readable(p.cardNo),phone:readable(p.mobile),birthday:text(p.birthday).slice(0,10),sex:text(p.sex),address:text(p.homeAddress||p.postAddress),share:text(p.bnfRate),order:text(p.bnfOrder) }); };
@@ -64,7 +65,7 @@ export function normalizeMingya(payload: MingyaPayload): {items: IncomingPolicy[
   const items:IncomingPolicy[]=[],seen=new Set<string>();let duplicates=0;
   for(const r of payload.records){
     const p={...r.list,...(r.detail||{})};
-    const index=text(p.policyIndexId),number=text(p.policyCode),company=text(p.insComName||p.insComSimpleName);
+    const index=text(p.policyIndexId),number=readPolicyNumber(p.policyCode),company=text(p.insComName||p.insComSimpleName);
     const key=index?`index:${index}`:`policy:${text(p.dataSource)}:${text(p.policyId)||normalizeId(number)+'|'+companyKey(company)}`;
     const deDupe=normalizeId(number)&&companyKey(company)?normalizeId(number)+'|'+companyKey(company)+'|'+dateKey(p.validDate||p.effectDate):key;
     if(seen.has(key)||seen.has(deDupe)){duplicates++;continue;}seen.add(key);seen.add(deDupe);
@@ -128,7 +129,7 @@ export function planMingyaImport(existing: Contact[], payload:MingyaPayload, res
       else if(newOwners.has(incoming.personKey))owner=contacts.find(c=>c.id===newOwners.get(incoming.personKey));
       else {candidates=contacts.filter(c=>sameName(c,a.name));if(candidates.length){issue='同名联系人已存在，请确认合并归属';allowNew=false;}}
       // A different known insurer with the same number must not silently become a second record.
-      const numberMatches=contacts.flatMap(c=>(c.policies||[]).filter(x=>normalizeId(x.policyNumber)===normalizeId(p.policyNumber)&&(companyKey(x.company)!==companyKey(p.company)||ambiguousTerm(x,incoming))).map(()=>c));
+      const numberMatches=contacts.flatMap(c=>(c.policies||[]).filter(x=>policyNumberKey(x.policyNumber)===policyNumberKey(p.policyNumber)&&(companyKey(x.company)!==companyKey(p.company)||ambiguousTerm(x,incoming))).map(()=>c));
       if(numberMatches.length){issue='相同保单号的保险公司不一致，或旧记录缺少年度';candidates=numberMatches;owner=undefined;allowNew=false;}
       if(selection&&selection!=='new'){
         const selected=contacts.find(c=>c.id===selection);
@@ -150,6 +151,7 @@ export function planMingyaImport(existing: Contact[], payload:MingyaPayload, res
     }
     if(matches.length===1){
       const old=matches[0].policy;const merged={...old};
+      if(policyNumberKey(old.policyNumber)===policyNumberKey(p.policyNumber))merged.policyNumber=p.policyNumber;
       for(const key of ['policyNumber','productName','company','premium','effectiveDate','status','applicant','insured','paymentYears','paymentFrequency','paymentEndDate','coveragePeriod','expiryDate','insuranceType','coverage'] as const){
         const value=p[key];if(has(old[key])&&has(value)&&text(old[key])!==text(value)){plan.fieldConflicts++;plan.conflicts.push({number:p.policyNumber,field:key,existing:text(old[key]),incoming:text(value)});}
         const fixOldPremium=key==='premium'&&old.mingya&&old.mingya.mappingVersion!==2&&money(old.premium)!==''&&money(old.premium)===p.mingya?.termTotalPremium;

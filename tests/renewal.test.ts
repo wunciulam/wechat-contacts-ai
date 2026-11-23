@@ -244,3 +244,6 @@ test('Mingya workbook status codes use the verified cancellation mapping',()=>{
  ]),'保单');
  assert.deepEqual(parseWorkbook(XLSX.write(book,{type:'array',bookType:'xlsx'}),'codes.xlsx').map(p=>p.policyNumber),['A','PENDING']);
 });
+test('expired payment term with no billing history cannot invent an overdue first installment',()=>{const old={...p,effectiveDate:'2009-05-19',paymentEndDate:'2023-05-19',paymentYears:'15年',paymentFrequency:'期交-年',payments:[]};assert.equal(nextPayment(old,'2026-11-23'),undefined);assert.equal(dueItems([old],'2026-11-23').length,0);assert.equal(nextPayment({...old,paymentEndDate:''},'2026-11-23'),undefined);});
+test('term end does not erase a real unpaid historical installment',()=>{const old={...p,effectiveDate:'2009-05-19',paymentEndDate:'2023-05-19',paymentYears:'15年',paymentFrequency:'期交-年',payments:[{date:'2022-05-19',amount:'4491',status:'未缴费'}]};assert.equal(nextPayment(old,'2026-11-23')?.date,'2022-05-19');assert.equal(nextPayment({...old,payments:[{...old.payments[0],date:'2023-05-19'}]},'2026-11-23'),undefined);});
+test('missing billing history is not proof of an unpaid first premium in an ongoing term',()=>{const current={...p,effectiveDate:'2024-01-01',paymentFrequency:'期交-年',paymentYears:'20年',payments:[]};assert.equal(nextPayment(current,'2026-11-23'),undefined);});
