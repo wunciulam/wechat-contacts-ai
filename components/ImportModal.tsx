@@ -412,7 +412,16 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                   </Field>
                   <Field className="" label={<>手机号</>}>
 
-                    <Input type="text" className="" value={formData.phoneNumber || ''} onChange={e => setFormData({...formData, phoneNumber: e.target.value})} placeholder="请输入手机号" />
+                    <Input type="text" className="" value={String(formData.phoneNumber || '')} onChange={e => setFormData({...formData, phoneNumber: e.target.value})} placeholder="请输入手机号" />
+                  </Field>
+                  <Field label="证件号">
+                    <Input value={String(formData.idCard || '')} onChange={e => setFormData({...formData, idCard:e.target.value})} />
+                  </Field>
+                  <Field label="生日">
+                    <Input type="date" value={String(formData.birthday || '')} onChange={e => setFormData({...formData, birthday:e.target.value})} />
+                  </Field>
+                  <Field className="sm:col-span-2" label="地址">
+                    <Input value={String(formData.address || '')} onChange={e => setFormData({...formData, address:e.target.value})} />
                   </Field>
                 </div>
 
