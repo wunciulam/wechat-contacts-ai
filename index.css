@@ -385,3 +385,10 @@ select.input { padding-right: 32px; }
 @layer components {
  .workspace-dialog.ui-navigation-drawer {position:fixed;inset:0 auto 0 0;margin:0;width:256px;max-width:calc(100vw - 32px);height:100dvh;max-height:100dvh;border-radius:0;border:0;}
 }
+
+@layer components {
+ .ui-input-embedded {flex:1;min-width:120px;width:auto;height:28px;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:var(--color-gray-900);font-size:14px;line-height:20px;outline:none;}
+ .ui-input-embedded::placeholder {color:var(--color-gray-400);}
+ .ui-input-embedded:focus-visible {outline:none;}
+ .ui-token-field:focus-within {border-color:var(--color-gray-400);outline:1px solid var(--color-gray-200);}
+}

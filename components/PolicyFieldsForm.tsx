@@ -31,11 +31,11 @@ export default function PolicyFieldsForm({value,onChange,contacts,identityReadon
       return <div key={k} className="min-w-0"><label htmlFor={`${formId}-${k}`} className="block text-xs font-medium text-gray-500">
         {label}{(k==='productName'||requireApplicant&&k==='applicant')&&<span aria-hidden="true"> *</span>}
         </label>
-        {k==='applicant'||k==='insured'?<Select id={`${formId}-${k}`} required={requireApplicant&&k==='applicant'} className="mt-1.5" value={value[k==='applicant'?'applicantId':'insuredId']||''} onValueChange={selectedValue => {
+        {k==='applicant'||k==='insured'?<Select searchable id={`${formId}-${k}`} required={requireApplicant&&k==='applicant'} className="mt-1.5" value={value[k==='applicant'?'applicantId':'insuredId']||''} onValueChange={selectedValue => {
           const c=contacts.find(c=>c.id===selectedValue);
           onChange({...value,[k]:c?c.remarkName||c.nickname:value[k],[k==='applicant'?'applicantId':'insuredId']:c?.id});
         }}>
-          <option value="">{textValue||'选择客户'}</option>
+          <option value="" disabled>{textValue||'选择客户'}</option>
           {contacts.map(c=><option value={c.id} key={c.id}>{c.remarkName||c.nickname}{c.phoneNumber?` · 尾号${String(c.phoneNumber).slice(-4)}`:''}</option>)}
         </Select>:k==='status'?<Select id={`${formId}-${k}`} className="mt-1.5" value={textValue} onValueChange={update}>{['正式保单','待生效','中止保单','终止保单','已撤单','已退保','拒保',...(!['正式保单','待生效','中止保单','终止保单','已撤单','已退保','拒保'].includes(textValue)?[textValue]:[])].map(v=><option key={v} value={v}>{v||'待补充'}</option>)}</Select>:k==='paymentFrequency'?<Select id={`${formId}-${k}`} className="mt-1.5" value={textValue} onValueChange={selectedValue => update(selectedValue)}>
           {['','期交-年','期交-半年','期交-季','期交-月','趸交',...(!['','期交-年','期交-半年','期交-季','期交-月','趸交'].includes(textValue)?[textValue]:[])].map(v=><option key={v} value={v}>{v||'待补充'}</option>)}

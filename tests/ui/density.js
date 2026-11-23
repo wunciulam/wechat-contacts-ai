@@ -1,0 +1,13 @@
+async(page)=>{
+ const d=page.getByRole('dialog',{name:'编辑联系人资料',exact:true});
+ for(const label of ['标签','意向产品']){const input=d.getByRole('textbox',{name:label,exact:true});const border=await input.evaluate(e=>getComputedStyle(e).borderWidth);if(border!=='0px')throw Error('nested input border: '+label);}
+ await d.getByRole('textbox',{name:'标签',exact:true}).fill('回归标签');await page.keyboard.press('Enter');if(!await d.getByText('回归标签',{exact:true}).count())throw Error('embedded tag entry');
+ await d.getByRole('textbox',{name:'意向产品',exact:true}).fill('回归产品');await page.keyboard.press('Enter');if(!await d.getByText('回归产品',{exact:true}).count())throw Error('embedded product entry');
+ await page.screenshot({animations:'disabled',path:'output/ui-regression/embedded-fields.png'});
+ await page.setViewportSize({width:390,height:844});await d.getByRole('textbox',{name:'意向产品',exact:true}).scrollIntoViewIfNeeded();await page.screenshot({animations:'disabled',path:'output/ui-regression/embedded-fields-mobile.png'});await page.setViewportSize({width:1304,height:880});await page.goto('__BASE_URL__/');page._follow.contacts[0].progressHistory=Array.from({length:15},(_,i)=>({id:'history-'+i,date:'2026-11-20',content:'历史记录 '+i,completed:false}));await page.reload();await page.getByRole('heading',{name:'示例客户',exact:true}).click();
+ const history=d.locator('[data-followup-history]');const layout=await history.evaluate(e=>({height:e.getBoundingClientRect().height,overflow:getComputedStyle(e).overflowY}));if(layout.height<=300||layout.overflow==='auto')throw Error('history still independently limited');
+ await d.getByRole('button',{name:'取消',exact:true}).click();await page.getByRole('button',{name:/跟进工作台/}).click();if(await page.locator('[data-category-id]').getByText('跟进中',{exact:true}).count())throw Error('board has redundant followup status');await page.screenshot({animations:'disabled',path:'output/ui-regression/board-without-status.png'});
+ await page.getByRole('button',{name:/保单管理/}).click();await page.getByRole('button',{name:'录入保单',exact:true}).click();const manual=page.getByRole('dialog',{name:'录入新保单',exact:true});await manual.getByLabel(/^投保人/).click();const search=page.getByRole('searchbox',{name:'搜索选项',exact:true});await search.fill('其他');const option=page.getByRole('option',{name:'其他客户',exact:true});await option.waitFor();await option.click();if(await manual.getByLabel(/^投保人/).innerText()!=='其他客户')throw Error('customer search selection');
+ await page.screenshot({animations:'disabled',path:'output/ui-regression/searchable-customer.png'});
+ return {passed:true,embeddedFields:true,history:layout,boardStatusRemoved:true,searchableCustomer:true};
+}

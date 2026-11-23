@@ -93,7 +93,6 @@ const ContactCard: React.FC<ContactCardProps> = ({
             {contact.remarkName || contact.nickname}
           </h3>
 
-          {contact.followUpStatus === 'following' && <span className="follow-status mt-1"><span/>跟进中</span>}
 
           <CustomerTags tags={contact.tags}/>
         </div>

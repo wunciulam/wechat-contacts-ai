@@ -419,13 +419,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                 <div className="space-y-1.5 relative" ref={tagInputContainerRef}>
                   <label className="block text-xs font-medium text-gray-700">标签管理</label>
                   <div
-                    className={`flex flex-wrap gap-2 p-3 min-h-[50px] border rounded-lg transition-colors ${showTagSuggestions ? 'border-gray-900 ring-1 ring-gray-900/10' : 'border-gray-200'}`}
+                    className={`ui-token-field flex flex-wrap gap-2 p-3 min-h-[50px] border rounded-lg transition-colors ${showTagSuggestions ? 'border-gray-900 ring-1 ring-gray-900/10' : 'border-gray-200'}`}
                     onClick={() => setShowTagSuggestions(true)}
                   >
                     {formData.tags.map(t => <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700">{t}<IconButton onClick={(e) => { e.stopPropagation(); setFormData({...formData, tags: formData.tags.filter(x => x !== t)}); }} className="hover:text-gray-900 transition-colors" aria-label="关闭"><X size={10} strokeWidth={3}/></IconButton></span>)}
                     <Input
                       type="text"
-                      placeholder="输入标签…"
+                      appearance="embedded" aria-label="标签" placeholder="输入标签…"
                       className="flex-1 min-w-[120px]"
                       value={tagInput}
                       onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
@@ -628,7 +628,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
 
                 <div className="space-y-1.5">
                   <label className="block text-xs font-medium text-gray-700">意向产品</label>
-                  <div className="flex flex-wrap gap-2 p-3 min-h-[50px] border border-gray-200 rounded-lg">
+                  <div className="ui-token-field flex flex-wrap gap-2 p-3 min-h-[50px] border border-gray-200 rounded-lg">
                     {(formData.intentProducts || []).map((product, idx) => (
                       <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 border border-blue-100 rounded-full text-xs font-medium text-blue-700">
                         {product}
@@ -637,7 +637,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                     ))}
                     <Input
                       type="text"
-                      placeholder="添加意向产品…"
+                      appearance="embedded" aria-label="意向产品" placeholder="添加意向产品…"
                       className="flex-1 min-w-[120px]"
                       onKeyDown={e => {
                         if (e.key === 'Enter' && e.currentTarget.value.trim()) {
@@ -718,7 +718,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                   </div>
                 )}
 
-                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                <div data-followup-history className="space-y-2">
                   {[...(formData.progressHistory || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((record) => (
                     <div key={record.id} className="p-4 bg-white border border-gray-200 rounded-lg group relative hover:border-gray-300 transition-colors">
                       {editingHistoryId === record.id ? (

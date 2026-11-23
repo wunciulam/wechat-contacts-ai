@@ -4,9 +4,10 @@ import DateInput from "./DateInput";
 
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   leadingIcon?: React.ElementType;
+  appearance?: "default" | "embedded";
 };
 const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
-  { leadingIcon: Icon, className = "", type = "text", ...props },
+  { leadingIcon: Icon, appearance="default", className = "", type = "text", ...props },
   ref,
 ) {
   if (type === "date")
@@ -22,7 +23,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
       </span>
     );
   return (
-    <input {...props} ref={ref} type={type} className={`input ${className}`} />
+    <input {...props} ref={ref} type={type} className={`${appearance==="embedded"?"ui-input-embedded":"input"} ${className}`} />
   );
 });
 export default Input;

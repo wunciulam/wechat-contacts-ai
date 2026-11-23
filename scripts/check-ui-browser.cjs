@@ -116,6 +116,8 @@ function command(args) {
   await run("follow-up failure/retry", "followup.js");
   await run("fixture reset", "setup.js");
   await run("business entry regression", "workflows.js");
+  await run("fixture reset", "setup.js");
+  await run("density and customer search", "density.js");
   await run("component acceptance", "acceptance.js");
   fs.writeFileSync(
     path.join(out, "results.json"),
