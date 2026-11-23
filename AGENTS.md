@@ -14,3 +14,8 @@ Keep user-requested local validation separate from production publication. A pas
 - Check desktop 1304×880 and mobile 390×844, open controls, long/empty content, scrolling/fixed actions, keyboard focus/Escape, validation and failed-save input retention. Inspect screenshots; automatic geometry checks do not replace visual review.
 - Independently remove duplicate or nonfunctional copy. Record what was removed and why necessary instructions remain in the verification report.
 - Deploy a staged build, verify it, then promote that same build and verify the public domain. Record actual test evidence and deployment; do not say CI ran unless it actually did.
+
+
+## Visible copy and density
+
+Every visible text must help a decision, operation, key-data reading, result confirmation, or necessary accessibility/legal requirement. Remove purposeless text and duplicates within the current reading area. Avoid decorative English numbers, labels and generic explanatory cards; use spacing, size, weight and alignment for hierarchy. Show core information and next action first, with details on demand. Before delivery, independently audit copy in desktop, mobile and scrolled states; report actual removals and why necessary instructions remain.
