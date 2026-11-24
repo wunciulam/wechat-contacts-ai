@@ -1,11 +1,23 @@
 import type {MingyaFinancial} from './services/mingyaFinancial';
 
+export interface ChatFollowup {
+  transcript: string;
+  note?: string;
+  analysis?: {
+    stage: string;
+    blocker: string;
+    evidence: number[];
+  };
+  nextAction?: { text: string; dueDate?: string };
+}
+
 export interface ProgressRecord {
   id: string;
   date: string;
   content: string;
   completed?: boolean;
   updatedAt?: string;
+  chat?: ChatFollowup;
 }
 
 export type FollowUpSave = (contactId:string|null,date:string,content:string,status:'following'|'contacted',newContactName?:string,existingRecordId?:string,completed?:boolean,requestId?:string,newContactId?:string)=>Promise<string>;

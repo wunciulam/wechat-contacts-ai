@@ -9,6 +9,7 @@ type Props = Omit<
 > & {
   onValueChange?: (value: string) => void;
   searchable?: boolean;
+  placeholder?: string;
   onCreate?: (name: string) => void;
   openRequest?: number;
 };
@@ -45,6 +46,7 @@ export default function Select({
   name,
   required,
   searchable = false,
+  placeholder,
   onCreate,
   openRequest = 0,
   ...props
@@ -188,7 +190,7 @@ export default function Select({
           setOpen(!open);
         }}
       >
-        <span>{current?.label ?? selected ?? "请选择"}</span>
+        <span>{current?.label ?? (selected || placeholder || "")}</span>
         <ChevronDown size={16} aria-hidden="true" />
       </button>
       {open && (

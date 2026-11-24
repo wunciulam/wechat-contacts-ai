@@ -1,3 +1,4 @@
+import ChatFollowUpDetails from './ChatFollowUpDetails';
 import Button, {IconButton} from './ui/Button';
 import WorkspaceDialog,{WorkspaceDialogFooter} from './WorkspaceDialog';
 import Field from './ui/Field';
@@ -22,6 +23,7 @@ interface ImportModalProps {
   onPolicyDetail?: (p: Policy) => void;
   onManagePolicies?: (contactId:string)=>void;
   onClose: () => void;
+  onImportChat?: (contactId: string) => void;
   onSave: (contacts: NewContact[],requestId?:string) => Promise<void>;
   onPersistFollowup?: (contactId:string,kind:'add'|'edit'|'delete',record:ProgressRecord,expected?:ProgressRecord)=>Promise<Contact>;
   onTableSave?: (data: ExtractedTableData) => void;
@@ -29,7 +31,7 @@ interface ImportModalProps {
   allTags?: string[];
 }
 
-const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPolicyImport, onClose, onSave, onPersistFollowup, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail, onManagePolicies }) => {
+const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPolicyImport, onClose, onImportChat, onSave, onPersistFollowup, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail, onManagePolicies }) => {
   const [historyBusy,setHistoryBusy]=useState(false),[profileBusy,setProfileBusy]=useState(false),[historyError,setHistoryError]=useState(''),[historySaved,setHistorySaved]=useState('');
   const historyBusyRef=useRef(false),historyRequestId=useRef(crypto.randomUUID()),profileRequestId=useRef(crypto.randomUUID());
   const displayedPolicies = () => mergePolicies([...(formData.policies || []), ...relatedPolicies].map(p=>({...p,payments:(p as any).payments||[]})),[]).filter(p=>!excludedPolicyImport(p.status));
@@ -696,12 +698,18 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                 {/* 跟进历史 */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-medium text-gray-700"><Clock size={16} strokeWidth={2}/> 跟进历史</div>
+                  <div className="flex flex-wrap justify-end gap-2">
+                  {initialData && onImportChat && <Button variant="secondary" size="sm" disabled={historyBusy || profileBusy}
+                    onClick={() => { if (canLeave()) onImportChat(initialData.id); }}>
+                    导入聊天
+                  </Button>}
                   <Button
                     disabled={historyBusy||profileBusy} onClick={() => setShowHistoryAdd(!showHistoryAdd)}
                     className="text-xs font-medium text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1" variant="plain"
                   >
                     <Plus size={14} /> 新增记录
                   </Button>
+                  </div>
                 </div>
 
                 {historyError&&<p role="alert" className="text-sm text-danger-600">{historyError}</p>}
@@ -753,7 +761,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                           <div className="flex justify-between items-center">
                             <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{record.date}</span>
                           </div>
-                          <p className="text-sm text-gray-800 mt-2 leading-relaxed pr-8">{record.content}</p>
+                          <p className="text-sm text-gray-800 mt-2 leading-relaxed pr-8 break-words">{record.content}</p>
+                          <ChatFollowUpDetails record={record} />
                           <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                              <IconButton disabled={historyBusy||profileBusy} aria-label="编辑跟进记录" onClick={() => handleEditHistory(record.id)} className="text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors cursor-pointer"><Edit2 size={14}/></IconButton>
                              <IconButton disabled={historyBusy||profileBusy} aria-label="删除跟进记录" onClick={() => handleDeleteHistory(record.id)} className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"><Trash2 size={14}/></IconButton>

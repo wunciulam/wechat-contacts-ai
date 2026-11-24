@@ -30,3 +30,6 @@ dist-ssr
 .env*.local
 output/playwright/
 .playwright-cli/
+
+output/ui-regression/
+output/ui-contract-report.json

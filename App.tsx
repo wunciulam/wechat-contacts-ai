@@ -17,6 +17,7 @@ import { parseMingyaPayload, canonicalContactData, type ImportPlan, type MingyaP
 import BatchTagModal from './components/BatchTagModal';
 import ConfirmModal from './components/ConfirmModal';
 import QuickFollowUpModal from './components/QuickFollowUpModal';
+import ChatFollowUpDialog from './components/ChatFollowUpDialog';
 import ManualPolicyModal from './components/ManualPolicyModal';
 import CategoryBoard from './components/CategoryBoard';
 import CategoryManager from './components/CategoryManager';
@@ -113,6 +114,7 @@ const App: React.FC = () => {
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [chatImport, setChatImport] = useState<{ contactId?: string } | null>(null);
 
   // Quick Follow Up Modal
   const [isQuickFollowUpOpen, setIsQuickFollowUpOpen] = useState(false);
@@ -678,6 +680,30 @@ const App: React.FC = () => {
       skipImportSyncRef.current=next;return next;
     });
   };
+  const openChatImport = (contactId?: string) => {
+    if (contactId) setIsModalOpen(false);
+    setChatImport({ contactId });
+  };
+  const closeChatImport = (saved?: Contact) => {
+    const original = chatImport?.contactId;
+    setChatImport(null);
+    if (original) {
+      const contact = saved || contactsRef.current.find(item => item.id === original);
+      if (contact) {
+        setEditingContact(contact);
+        setIsModalOpen(true);
+      }
+    }
+  };
+  const saveChatFollowup = async (contactId: string, record: ProgressRecord) => {
+    const saved = await saveFollowup(contactId, 'add', record);
+    acceptSavedFollowup(saved);
+    closeChatImport(saved);
+  };
+  const completeChatTask = async (contactId: string, record: ProgressRecord) => {
+    const saved = await saveFollowup(contactId, 'edit', { ...record, completed: true }, record);
+    acceptSavedFollowup(saved);
+  };
   const handleQuickAddProgress: import('./types').FollowUpSave = async (contactId,date,content,newStatus,newContactName,existingRecordId,completed,requestId,newContactId) => {
     const existingByName=!contactId&&newContactName?contactsRef.current.find(c=>contactKey(c)===contactNameKey(newContactName)):undefined;
     const id=contactId||existingByName?.id||newContactId||crypto.randomUUID();
@@ -959,6 +985,8 @@ const App: React.FC = () => {
                      onCategoryFilter={setCategoryFilter}
                      onCategoryReorder={handleReorderCategories}
                      onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
+                     onImportChat={() => openChatImport()}
+                     onCompleteChatTask={completeChatTask}
                   />
               );
           case 'policies':
@@ -1085,11 +1113,15 @@ const App: React.FC = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveContact}
+        onImportChat={openChatImport}
         onPersistFollowup={async(contactId,kind,record,expected)=>{const saved=await saveFollowup(contactId,kind,record,expected);acceptSavedFollowup(saved);return saved;}}
         onTableSave={handleTableDataSave}
         initialData={editingContact}
         allTags={allTags}
       />
+
+      {chatImport && <ChatFollowUpDialog contacts={contacts} initialContactId={chatImport.contactId}
+        onSave={saveChatFollowup} onClose={() => closeChatImport()} />}
 
       <BatchTagModal
         isOpen={batchModalState.isOpen}

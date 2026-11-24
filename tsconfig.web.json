@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["App.tsx", "index.tsx", "types.ts", "components/**/*.tsx", "services/**/*.ts", "vite-env.d.ts"],
+  "include": ["App.tsx", "index.tsx", "types.ts", "components/**/*.tsx", "services/**/*.ts", "server/**/*.ts", "vite.config.ts", "vite-env.d.ts"],
   "exclude": ["node_modules", "mini-program", "mini-program-wx", "tools", "tests"]
 }
