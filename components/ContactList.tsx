@@ -212,7 +212,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                 {filteredContacts.map(contact => {
                   const isSelected = selectedIds.has(contact.id);
                   const latestProgress = contact.progressHistory && contact.progressHistory.length > 0
-                      ? contact.progressHistory[0]
+                      ? contact.progressHistory.filter(r=>r.kind!=='task').slice().sort((a,b)=>b.date.localeCompare(a.date))[0]
                       : (contact.progress ? { content: contact.progress, date: '' } : null);
                   const isRemarkExpanded = expandedRemarkIds.has(contact.id);
                   const hasLongRemark = contact.remarkInfo && contact.remarkInfo.length > 20;
@@ -372,7 +372,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                     {filteredContacts.map(contact => {
                       const isSelected = selectedIds.has(contact.id);
                       const latestProgress = contact.progressHistory && contact.progressHistory.length > 0
-                          ? contact.progressHistory[0]
+                          ? contact.progressHistory.filter(r=>r.kind!=='task').slice().sort((a,b)=>b.date.localeCompare(a.date))[0]
                           : (contact.progress ? { content: contact.progress, date: '' } : null);
 
                       return (

@@ -31,6 +31,7 @@ import ContactCard from './ContactCard';
 import { Settings } from 'lucide-react';
 
 interface CategoryBoardProps {
+  embedded?: boolean;
   contacts: Contact[];
   categories: Category[];
   filterTags: Set<string>;
@@ -117,7 +118,7 @@ const SortableCategoryColumn: React.FC<SortableCategoryColumnProps> = ({
   );
 };
 
-const CategoryBoard: React.FC<CategoryBoardProps> = ({
+const CategoryBoard: React.FC<CategoryBoardProps> = ({ embedded = false,
   contacts,
   categories,
   filterTags,
@@ -256,8 +257,9 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
     <div className="flex-1 h-full min-h-0 flex flex-col overflow-hidden">
       {movePending&&<p role="status" className="px-5 py-3 text-sm text-gray-500">正在保存分类…</p>}
       {moveError&&<p role="alert" className="px-5 py-3 text-sm text-danger-600">{moveError}</p>}
-      <div className="shrink-0 border-b border-gray-100 bg-white"><PageHeader compactActions title="跟进工作台" count={filteredContacts.length} actionButton={<div className="flex items-center gap-2"><Button variant="secondary" size="sm" onClick={onImportChat}>导入聊天</Button><IconButton onClick={onOpenCategoryManager} className="" aria-label="管理分类" title="管理分类"><Settings size={20}/></IconButton></div>}/></div>
-      <ChatFollowUpTasks contacts={contacts} onContactClick={onContactClick} onComplete={onCompleteChatTask} />
+      {embedded && <div className="flex shrink-0 justify-end px-5 pt-3"><IconButton onClick={onOpenCategoryManager} aria-label="管理分类" title="管理分类"><Settings size={20}/></IconButton></div>}
+      {!embedded && <div className="shrink-0 border-b border-gray-100 bg-white"><PageHeader compactActions title="跟进工作台" count={filteredContacts.length} actionButton={<div className="flex items-center gap-2"><Button variant="secondary" size="sm" onClick={onImportChat}>导入聊天</Button><IconButton onClick={onOpenCategoryManager} className="" aria-label="管理分类" title="管理分类"><Settings size={20}/></IconButton></div>}/></div>}
+
 
       <DndContext
         sensors={sensors}

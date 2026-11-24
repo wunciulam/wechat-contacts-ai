@@ -62,6 +62,7 @@ async (page) => {
   await page.goto("__BASE_URL__/");
   await page.setViewportSize({ width: 1304, height: 880 });
   await page.getByRole("button", { name: /跟进工作台/ }).click();
+  await page.getByRole("tab", { name: "客户分类", exact: true }).click();
   await page.getByRole("button", { name: "管理分类", exact: true }).click();
   const categories = page.getByRole("dialog", {
     name: "管理分类",

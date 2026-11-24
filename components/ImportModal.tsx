@@ -736,7 +736,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
                 )}
 
                 <div data-followup-history className="space-y-2">
-                  {[...(formData.progressHistory || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((record) => (
+                  {[...(formData.progressHistory || [])].filter(r=>r.kind!=='task').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((record) => (
                     <div key={record.id} className="p-4 bg-white border border-gray-200 rounded-lg group relative hover:border-gray-300 transition-colors">
                       {editingHistoryId === record.id ? (
                         <div className="space-y-3 py-1">

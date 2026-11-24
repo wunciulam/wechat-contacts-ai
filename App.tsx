@@ -1,3 +1,5 @@
+import FollowupWorkspace from './components/FollowupWorkspace';
+import {saveFollowupBundle} from './services/followupWorkspaceStorage';
 import Button, {IconButton} from './components/ui/Button';
 import {categoryIds,contactKey,contactNameKey} from './services/contactIdentity';
 import {excludedPolicyImport} from './services/policyImportRules';
@@ -114,7 +116,7 @@ const App: React.FC = () => {
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const [chatImport, setChatImport] = useState<{ contactId?: string } | null>(null);
+  const [chatImport, setChatImport] = useState<{ contactId?: string; restoreProfile?: boolean } | null>(null);
 
   // Quick Follow Up Modal
   const [isQuickFollowUpOpen, setIsQuickFollowUpOpen] = useState(false);
@@ -682,12 +684,12 @@ const App: React.FC = () => {
   };
   const openChatImport = (contactId?: string) => {
     if (contactId) setIsModalOpen(false);
-    setChatImport({ contactId });
+    setChatImport({ contactId, restoreProfile: isModalOpen });
   };
   const closeChatImport = (saved?: Contact) => {
     const original = chatImport?.contactId;
     setChatImport(null);
-    if (original) {
+    if (original && chatImport?.restoreProfile) {
       const contact = saved || contactsRef.current.find(item => item.id === original);
       if (contact) {
         setEditingContact(contact);
@@ -695,8 +697,9 @@ const App: React.FC = () => {
       }
     }
   };
-  const saveChatFollowup = async (contactId: string, record: ProgressRecord) => {
-    const saved = await saveFollowup(contactId, 'add', record);
+  const saveChatFollowup = async (contactId: string, writes: import('./services/followupMutation').FollowupWrite[]) => {
+    await beforePolicySave();
+    const saved = await saveFollowupBundle(contactId, {writes});
     acceptSavedFollowup(saved);
     closeChatImport(saved);
   };
@@ -967,16 +970,13 @@ const App: React.FC = () => {
               );
           case 'followups':
               return (
-                  <CategoryBoard
+                  <FollowupWorkspace contacts={contacts} onImport={openChatImport} onEdit={contact=>{setEditingContact(contact);setIsModalOpen(true);}} onSave={async(id,bundle)=>{await beforePolicySave();const saved=await saveFollowupBundle(id,bundle);acceptSavedFollowup(saved);return saved;}} renderCategories={open=> <CategoryBoard embedded
                      contacts={contacts}
                      categories={categories}
                      filterTags={selectedTags}
                      followUpFilter={followUpFilter}
                      categoryFilter={categoryFilter}
-                     onContactClick={(contact) => {
-                         setEditingContact(contact);
-                         setIsModalOpen(true);
-                     }}
+                     onContactClick={open}
                      onStatusChange={handleUpdateStatus}
                      onContactMove={handleMoveContactToCategory}
                      onRemoveFromFollowUp={handleRemoveFromFollowUp}
@@ -987,7 +987,7 @@ const App: React.FC = () => {
                      onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
                      onImportChat={() => openChatImport()}
                      onCompleteChatTask={completeChatTask}
-                  />
+                  />} />
               );
           case 'policies':
               return (

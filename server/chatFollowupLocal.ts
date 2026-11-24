@@ -1,3 +1,7 @@
+import { revision, addDays } from '../services/followupDomain';
+import { chinaDate } from '../services/chatAnalysis';
+import { runFollowupAi } from './followupAi';
+import { applyFollowupBundle } from '../services/followupMutation';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import type { Plugin } from 'vite';
@@ -5,9 +9,9 @@ import type { Contact, ProgressRecord } from '../types';
 import { CHAT_STAGES, isChatDate, parseChatAnalysis } from '../services/chatAnalysis';
 import { MAX_TRANSCRIPT_LENGTH } from '../services/chatTranscript';
 
-export const CHAT_PREVIEW_PORT = 4179;
+export const CHAT_PREVIEW_PORT = 4180;
 export const CHAT_PREVIEW_URL = `http://127.0.0.1:${CHAT_PREVIEW_PORT}`;
-export const CHAT_PREVIEW_APP_ID = 'chat-followup-local';
+export const CHAT_PREVIEW_APP_ID = 'followup-workbench-local';
 
 function send(res: ServerResponse, status: number, value: unknown) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -18,7 +22,7 @@ async function readJson(req: IncomingMessage) {
   let data = '';
   for await (const chunk of req.setEncoding('utf8')) {
     data += chunk;
-    if (Buffer.byteLength(data) > 450_000) throw new Error('内容太长，请缩短后重试。');
+    if (Buffer.byteLength(data) > 1_100_000) throw new Error('内容太长，请缩短后重试。');
   }
   return JSON.parse(data);
 }
@@ -74,41 +78,55 @@ function loadPreview() {
     progressHistory: [],
   };
   try {
-    return JSON.parse(readFileSync('.chat-followup-data.local', 'utf8')) as Record<string, unknown>;
+    return JSON.parse(readFileSync('.followup-workbench-data.local', 'utf8')) as Record<string, unknown>;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     return {
-      contacts: [initial],
+      contacts: demoContacts(initial),
       categories: [{ id: 'chat-preview-category', name: '重点跟进', color: '#F59E0B', icon: 'Star', order: 0, createdAt: 1, updatedAt: 1 }],
       renewal_v1: { policies: [], settings: { email: '', enabled: false, time: '09:00' }, imports: [] },
     };
   }
 }
 
+function demoContacts(initial: Contact): Contact[] {
+ const today=chinaDate();
+ const examples=[['陈女士','孩子有团险，再买会重复吗？','核对团险保障表，回复重复与缺口','follow'],['李先生','周二前发我两版方案比较','发两版方案比较表','task'],['王女士','忙完这阵再联系，现在可以看方案了','确认近期预算与保障需求','reactivate'],['孙先生','最近先不考虑，之后有需要再看','核对近况与联系意愿','check']] as const;
+ return examples.map(([name,quote,action,type],i)=>{
+  const r:ProgressRecord={id:'demo-record-'+i,date:addDays(today,type==='check'?-45:-4),kind:'communication',channel:'wechat',content:quote,completed:true};
+  const c:Contact={...initial,id:'demo-'+i,remarkName:name,nickname:name,progressHistory:[r],lastDate:r.date};
+  if(type==='task')c.progressHistory!.push({id:'demo-task-'+i,date:addDays(today,-1),kind:'task',content:action,completed:false});
+  if(i===0)c.progressHistory!.push({id:'demo-future',date:addDays(today,1),kind:'task',content:'整理现有保障资料',completed:false});
+  c.followupAnalysis={stage:i===2?'暂缓':'需求确认',blocker:i===0?'现有团险保障范围未核对':'保障需求待确认',explanation:quote,nextAction:action,script:'方便发我目前的保障信息吗？',evidence:[{recordId:r.id,quote}],generatedAt:new Date().toISOString(),revision:revision(c),...['follow','reactivate'].includes(type)&&{opportunity:{type:type as 'follow'|'reactivate',trigger:type==='follow'?'question':'activation',reason:quote,evidenceIds:[r.id]}}};
+  return c;
+ });
+}
+
 export function chatFollowupLocal(env: Record<string, string>): Plugin {
   return {
-    name: 'chat-followup-local',
+    name: 'followup-workbench-local',
     configureServer(server) {
       let data = loadPreview();
       const save = (nextData: typeof data) => {
-        writeFileSync('.chat-followup-data.tmp.local', JSON.stringify(nextData), { mode: 0o600 });
-        renameSync('.chat-followup-data.tmp.local', '.chat-followup-data.local');
+        writeFileSync('.followup-workbench-data.tmp.local', JSON.stringify(nextData), { mode: 0o600 });
+        renameSync('.followup-workbench-data.tmp.local', '.followup-workbench-data.local');
         data = nextData;
       };
       server.middlewares.use(async (req, res, next) => {
         const url = new URL(req.url || '/', CHAT_PREVIEW_URL);
-        const analysis = url.pathname === '/api/chat-followup';
+        const analysis = url.pathname === '/api/chat-followup' || url.pathname === '/api/followup-ai';
         if (!analysis && !url.pathname.startsWith('/rest/v1/')) return next();
         if (req.headers.host !== new URL(CHAT_PREVIEW_URL).host ||
           (req.headers.origin && req.headers.origin !== CHAT_PREVIEW_URL) ||
           req.headers['sec-fetch-site'] === 'cross-site') return send(res, 403, { message: '仅在本机预览地址可用。' });
         try {
           if (analysis) {
+            if (url.pathname === '/api/followup-ai' && req.method === 'GET') return send(res, 200, { configured: Boolean(env.DEEPSEEK_API_KEY) });
             if (req.method !== 'POST' || !req.headers['content-type']?.startsWith('application/json')) {
               return send(res, 405, { message: '请求格式有误。' });
             }
             if (!env.DEEPSEEK_API_KEY) return send(res, 503, { message: '尚未配置 DeepSeek Key。可以先保存对话。' });
-            return send(res, 200, await analyze(await readJson(req), env));
+            return send(res, 200, url.pathname === '/api/followup-ai' ? await runFollowupAi(await readJson(req), env) : await analyze(await readJson(req), env));
           }
           const kind = url.searchParams.get('data_type') || '';
           const type = kind.replace(/^eq\./, '');
@@ -124,6 +142,15 @@ export function chatFollowupLocal(env: Record<string, string>): Plugin {
           }
           const body = await readJson(req);
           const nextData = structuredClone(data);
+          if (url.pathname.endsWith('/rpc/save_followup_bundle_v1')) {
+            const contacts = nextData.contacts as Contact[];
+            const current = contacts.find(c => c.id === body.p_contact_id);
+            if (!current) return send(res, 409, { message: '客户已变化，请刷新。' });
+            const updated = applyFollowupBundle(current, body.p_bundle);
+            nextData.contacts = contacts.map(c => c.id === updated.id ? updated : c);
+            save(nextData);
+            return send(res, 200, updated);
+          }
           if (url.pathname.endsWith('/rpc/save_followup_v1')) {
             const contacts = nextData.contacts as Contact[];
             const contact = contacts.find(item => item.id === body.p_contact_id) || body.p_new_contact as Contact | undefined;
@@ -162,7 +189,7 @@ export function chatFollowupLocal(env: Record<string, string>): Plugin {
           if (url.pathname === '/rest/v1/app_data') {
             for (const entry of Array.isArray(body) ? body : [body]) {
               const key = entry.data_type || type;
-              if (Object.hasOwn(nextData, key)) nextData[key] = entry.data;
+              nextData[key] = entry.data;
             }
             save(nextData);
             return send(res, 200, []);

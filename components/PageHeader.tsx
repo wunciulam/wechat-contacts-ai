@@ -13,6 +13,7 @@ interface PageHeaderProps {
   searchBox?: React.ReactNode;
   className?: string;
   compactActions?: boolean;
+  workbench?: boolean;
 }
 
 export const PageHeader: React.FC<PageHeaderProps> = ({
@@ -25,10 +26,11 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   actionButton,
   searchBox,
   className = '',
+  workbench = false,
   compactActions = false
 }) => {
   return (
-    <div className={`p-5 flex ${compactActions ? 'flex-row items-center' : 'flex-col sm:flex-row flex-wrap items-start sm:items-center'} justify-between gap-4 ${className}`}>
+    <div className={`${workbench ? 'followup-page-header' : 'p-5'} flex ${compactActions ? 'flex-row items-center' : 'flex-col sm:flex-row flex-wrap items-start sm:items-center'} justify-between gap-4 ${className}`}>
       <div className="flex items-center gap-3">
         {onSelectAll && (
           <Button

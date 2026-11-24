@@ -37,6 +37,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
   onDeletePolicy,
   onEditPolicy
 }) => {
+  const communicationHistory=contact?.progressHistory?.filter(r=>r.kind!=='task')||[];
   const [copiedWxid, setCopiedWxid] = useState<string | null>(null);
   
   // 常驻输入框状态
@@ -268,7 +269,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                 <Calendar size={16} className="text-gray-900" />
                 跟进记录
                 <span className="text-xs font-normal text-gray-400">
-                  ({contact.progressHistory?.length || 0})
+                  ({communicationHistory.length})
                 </span>
               </h3>
             </div>
@@ -325,7 +326,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
               )}
             </div>
             
-            {(!contact.progressHistory || contact.progressHistory.length === 0) ? (
+            {(communicationHistory.length === 0) ? (
               <div className="text-center py-8 text-gray-400">
                 <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
                   <Calendar size={20} className="text-gray-300" />
@@ -335,10 +336,10 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
               </div>
             ) : (
               <div className="space-y-4">
-                {contact.progressHistory?.map((record, idx) => (
+                {communicationHistory.map((record, idx) => (
                   <div key={record.id || idx} className="relative pl-6 pb-4 last:pb-0">
                     {/* Timeline line */}
-                    {idx < (contact.progressHistory?.length || 0) - 1 && (
+                    {idx < (communicationHistory.length) - 1 && (
                       <div className="absolute left-[5px] top-3 bottom-0 w-0.5 bg-gray-200"></div>
                     )}
                     {/* Timeline dot */}

@@ -1,142 +1,54 @@
 async (page) => {
-  const state = page._follow;
-  const contact = state.contacts[0];
-  const customer = page.getByRole('dialog', { name: '编辑联系人资料' });
-  const dialog = page.getByRole('dialog', { name: '导入聊天记录' });
-  const transcript = dialog.getByLabel('对话原文', { exact: true });
-  const note = dialog.getByLabel('线下补充', { exact: true });
-  const analysisRequests = [];
-  let analysisFails = true;
-  await page.route('**/api/chat-followup', async route => {
-    analysisRequests.push(route.request().postDataJSON());
-    if (analysisFails) return route.fulfill({ status: 503, json: { message: '测试分析暂不可用' } });
-    return route.fulfill({ json: {
-      summary: '客户希望确认现有保障，已约定发对比表。',
-      stage: '比较方案',
-      blocker: '现有保障范围待确认。',
-      evidence: [1],
-      nextAction: '核对现有保障后发对比表',
-      dueDate: '2026-11-27',
-    } });
-  });
-  await customer.getByRole('button', { name: '导入聊天', exact: true }).click();
-  const render = async (height, rows) => Buffer.from(await page.evaluate(async ({height, rows}) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 780;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ededed';
-    ctx.fillRect(0, 0, 780, height);
-    ctx.font = '38px PingFang SC, sans-serif';
-    for (const { x, y, text, right } of rows) {
-      ctx.fillStyle = right ? '#95ec69' : '#fff';
-      ctx.fillRect(x - 18, y - 46, ctx.measureText(text).width + 36, 67);
-      ctx.fillStyle = '#171717';
-      ctx.fillText(text, x, y);
-    }
-    return canvas.toDataURL('image/png').split(',')[1];
-  }, {height, rows}), 'base64');
-  const client = { x: 104, y: 140, text: '我的医疗保险够用吗' };
-  const reply = { x: 421, y: 252, text: '周五发你一份对比表', right: true };
-  const long = await render(2970, [client, reply, { x: 88, y: 2500, text: '等我和家人先商量' }]);
-  const files = dialog.locator('input[type="file"]');
-  await files.setInputFiles({ name: 'long.png', mimeType: 'image/png', buffer: long });
-  await dialog.getByRole('button', { name: '重新识别', exact: true }).waitFor({ timeout: 65000 });
-  const longText = await transcript.inputValue();
-  if (!longText.includes('医疗保险') || !longText.includes('对比表') || !longText.includes('先商量')) {
-    throw Error('long OCR did not read text across tiles: ' + longText);
-  }
+ const state=page._follow,customer=page.getByRole('dialog',{name:'编辑联系人资料'}),dialog=page.getByRole('dialog',{name:'导入聊天记录'});
+ let aiFail=true;const requests=[];
+ await page.route('**/api/followup-ai',async route=>{if(route.request().method()==='GET')return route.fulfill({json:{configured:false}});const data=route.request().postDataJSON();requests.push(data);if(aiFail)return route.fulfill({status:503,json:{message:'测试分析暂不可用'}});if(data.mode==='daily')return route.fulfill({json:{summaries:{'2026-11-20':'客户询问医疗保障是否足够，我请他发保障表以便核对。','2026-11-21':'客户表示与家人商量，我表示等他确认。'}}});if(data.contact.id!=='c1')return route.fulfill({json:{stage:'待确认',blocker:'材料不足',explanation:'原有记录尚无具体沟通内容',nextAction:'补充沟通过程',script:'',evidence:[],opportunity:null,doNotContact:false}});return route.fulfill({json:{stage:'需求确认',blocker:'现有保障待核对',explanation:'客户询问保障是否足够。',nextAction:'核对保障表并回复保障缺口',script:'方便发我现有保障表吗？',evidence:[{recordId:'chat-day:c1:2026-11-20',quote:'医疗保障够吗'}],opportunity:{type:'follow',trigger:'question',reason:'保障问题尚待核对',evidenceIds:['chat-day:c1:2026-11-20']},doNotContact:false}});});
+ await customer.getByRole('button',{name:'导入聊天',exact:true}).click();
+ if(await dialog.getByLabel('沟通日期',{exact:true}).count()||await dialog.getByText('线下补充',{exact:true}).count())throw Error('legacy global date/offline field remains');
+ const render=async(height,rows)=>Buffer.from(await page.evaluate(({height,rows})=>{const canvas=document.createElement('canvas');canvas.width=780;canvas.height=height;const ctx=canvas.getContext('2d');ctx.fillStyle='#ededed';ctx.fillRect(0,0,780,height);ctx.font='38px PingFang SC,sans-serif';for(const {x,y,text,right}of rows){ctx.fillStyle=right?'#95ec69':'#fff';ctx.fillRect(x-18,y-46,ctx.measureText(text).width+36,67);ctx.fillStyle='#171717';ctx.fillText(text,x,y);}return canvas.toDataURL('image/png').split(',')[1];},{height,rows}),'base64');
+ const client={x:104,y:140,text:'我的医疗保险够用吗'},reply={x:421,y:252,text:'周五发你一份对比表',right:true};
+ await dialog.locator('input[type=file]').setInputFiles({name:'long.png',mimeType:'image/png',buffer:await render(2970,[client,reply,{x:88,y:2500,text:'等我和家人先商量'}])});
+ await dialog.getByRole('button',{name:/编辑消息：.*医疗保险/}).waitFor({timeout:65000});
+ await dialog.getByRole('button',{name:/编辑消息：.*先商量/}).waitFor();
+ if(requests.length)throw Error('OCR called AI');
+ await dialog.getByRole('button',{name:'移除第1张'}).click();
+ await dialog.locator('input[type=file]').setInputFiles([{name:'one.png',mimeType:'image/png',buffer:await render(480,[client,reply])},{name:'two.png',mimeType:'image/png',buffer:await render(430,[{...reply,y:140},{x:88,y:252,text:'等我和家人先商量'}])}]);
+ await dialog.getByRole('button',{name:/编辑消息：.*先商量/}).waitFor({timeout:65000});
+ if(await dialog.getByRole('button',{name:/编辑消息：.*对比表/}).count()!==1)throw Error('OCR overlap duplicated');
+ if(!await dialog.getByText('日期待确认',{exact:true}).isVisible())throw Error('undated screenshot guessed a date');
+ await page.screenshot({path:'output/ui-regression/chat-ocr-desktop.png'});
+ await dialog.getByRole('button',{name:'粘贴聊天文字'}).click();
+ await dialog.getByLabel('聊天文字',{exact:true}).fill('2026-11-20 09:00\n客户：医疗保障够吗\n我：发保障表，我先核对\n2026-11-21 10:00\n客户：等我和家人商量\n我：等您确认');
+ await dialog.getByRole('button',{name:'识别文字结构'}).click();
+ if(await dialog.locator('input[type=checkbox]:checked').count()!==5)throw Error('review is not selected by default');
+ await page.screenshot({path:'output/ui-regression/chat-review-desktop.png'});
+ await dialog.getByRole('button',{name:'生成每日梗概',exact:true}).click();
+ await dialog.getByRole('alert').filter({hasText:'测试分析暂不可用'}).waitFor();
+ await dialog.getByRole('button',{name:'编辑消息：医疗保障够吗',exact:true}).waitFor();
+ aiFail=false;await dialog.getByRole('button',{name:'生成每日梗概',exact:true}).click();
+ await dialog.getByLabel('2026-11-20每日梗概').waitFor();
+ await page.waitForTimeout(200);await page.screenshot({path:'output/ui-regression/chat-summary-desktop.png'});
+ await page.setViewportSize({width:390,height:844});
+ await page.screenshot({path:'output/ui-regression/chat-summary-mobile.png'});
+ const save=dialog.getByRole('button',{name:'保存 2 天梗概'});const box=await save.boundingBox();if(box.y+box.height>844)throw Error('save footer not fixed');
+ state.fail=true;await save.click();await dialog.getByRole('alert').filter({hasText:'测试保存失败'}).waitFor();if(!(await dialog.getByLabel('2026-11-20每日梗概').inputValue()).includes('客户询问'))throw Error('save failure lost draft');
+ state.fail=false;await save.click();await dialog.waitFor({state:'hidden'});
+ if(state.contacts[0].progressHistory.length!==3)throw Error('expected daily records');
+ if(JSON.stringify(state.contacts[0].progressHistory).includes('base64'))throw Error('stored image');
+ await customer.getByRole('button',{name:'取消',exact:true}).click();await page.setViewportSize({width:1304,height:880});
+ await page.getByRole('button',{name:/跟进工作台/}).click();await page.getByRole('button',{name:'更新线索',exact:true}).click();
+ await page.getByRole('button',{name:'安排跟进',exact:true}).first().waitFor();await page.getByRole('button',{name:'更新线索',exact:true}).waitFor();
+ await page.screenshot({path:'output/ui-regression/workbench-desktop.png'});
+ await page.getByRole('button',{name:'安排跟进',exact:true}).first().click();const schedule=page.getByRole('dialog',{name:'安排跟进',exact:true});await schedule.getByRole('button',{name:'保存待办'}).click();await schedule.waitFor({state:'hidden'});
+ const task=page.getByRole('checkbox',{name:'完成待办：核对保障表并回复保障缺口'});await task.waitFor();await task.click();const result=page.getByRole('dialog',{name:'记录跟进结果',exact:true});await result.getByLabel('沟通结果',{exact:true}).fill('客户已发保障表，我核对后说明医疗保障缺口。');
+ state.fail=true;await result.getByRole('button',{name:'保存结果并完成'}).click();await result.getByRole('alert').waitFor();if(await result.getByLabel('沟通结果',{exact:true}).inputValue()==='')throw Error('result lost on failure');state.fail=false;await result.getByRole('button',{name:'保存结果并完成'}).click();await result.waitFor({state:'hidden'});await task.waitFor({state:'hidden'});
+ await page.getByRole('button',{name:'撤销完成'}).click();await task.waitFor();if(!state.contacts[0].progressHistory.some(r=>r.content==='客户已发保障表，我核对后说明医疗保障缺口。'))throw Error('undo removed history');
+ await page.getByRole('button',{name:'示例客户',exact:true}).first().click();const panel=page.getByRole('dialog',{name:'示例客户的跟进面板'});await panel.getByText('客户已发保障表，我核对后说明医疗保障缺口。',{exact:true}).waitFor();await panel.locator('article').filter({hasText:'2026-11-20'}).getByText('查看原话',{exact:true}).click();await panel.getByText('医疗保障够吗',{exact:true}).waitFor();await page.screenshot({path:'output/ui-regression/followup-panel-desktop.png'});
+ await page.setViewportSize({width:390,height:844});await page.screenshot({path:'output/ui-regression/followup-panel-mobile.png'});const rect=await panel.boundingBox();if(rect.x<0||rect.x+rect.width>390)throw Error('panel overflow');await page.keyboard.press('Escape');await panel.waitFor({state:'hidden'});await page.screenshot({path:'output/ui-regression/workbench-mobile.png'});
+ await page.getByRole('button',{name:'改期：核对保障表并回复保障缺口'}).click();
+ const planned=page.getByLabel('调整计划日期：核对保障表并回复保障缺口',{exact:true});await planned.fill('2026-11-24');await page.getByRole('button',{name:'确认改期',exact:true}).click();await task.waitFor({state:'hidden'});
+ const future=page.getByRole('button',{name:/之后有安排/});if(await future.getAttribute('aria-expanded')!=='false')throw Error('future not initially collapsed');await future.click();await task.waitFor();await page.screenshot({path:'output/ui-regression/workbench-future-mobile.png'});
+ await page.getByRole('button',{name:'改期：核对保障表并回复保障缺口'}).click();await planned.waitFor();await planned.scrollIntoViewIfNeeded();const editing=await planned.boundingBox();if(editing.x<0||editing.x+editing.width>390)throw Error('mobile reschedule overflow');await page.screenshot({path:'output/ui-regression/workbench-reschedule-mobile.png'});await page.getByRole('button',{name:'取消',exact:true}).click();
+ await page.getByRole('button',{name:'提醒规则',exact:true}).click();const rules=page.getByRole('dialog',{name:'提醒规则'});await rules.waitFor();await page.keyboard.press('Escape');await rules.waitFor({state:'hidden'});
 
-  const first = await render(480, [client, reply]);
-  const second = await render(430, [{ ...reply, y: 140 }, { x: 88, y: 252, text: '等我和家人先商量' }]);
-  await dialog.getByRole('button', { name: '移除第 1 张截图' }).click();
-  await files.setInputFiles([
-    { name: 'one.png', mimeType: 'image/png', buffer: first },
-    { name: 'two.png', mimeType: 'image/png', buffer: second },
-  ]);
-  await dialog.getByRole('button', { name: '下移第 1 张截图' }).click();
-  await dialog.getByRole('button', { name: '上移第 2 张截图' }).click();
-  await dialog.getByRole('button', { name: '识别文字', exact: true }).click();
-  await dialog.getByRole('button', { name: '重新识别', exact: true }).waitFor({ timeout: 65000 });
-  const recognized = await transcript.inputValue();
-  if (!recognized.includes('客户：我的医疗保险') || !recognized.includes('我：周五发你一份对比表') ||
-      (recognized.match(/对比表/g) || []).length !== 1 || !recognized.includes('先商量')) {
-    throw Error('batch OCR sender/order/overlap: ' + recognized);
-  }
-  if (analysisRequests.length) throw Error('OCR called the analysis API');
-  await dialog.getByRole('button', { name: '查看第 1 张截图' }).click();
-  await dialog.getByRole('img', { name: 'one.png' }).waitFor();
-  await page.screenshot({ animations: 'disabled', path: 'output/ui-regression/chat-ocr-desktop.png' });
-  await dialog.getByRole('button', { name: '查看第 1 张截图' }).click();
-  const corrected = recognized.replace('够用吗', '够用吗？');
-  await transcript.fill(corrected);
-  await note.fill('线下见面时说周五可以联系。手机号 13800000000。');
-  await dialog.getByRole('button', { name: '分析下一步' }).click();
-  await dialog.getByRole('alert').filter({ hasText: '测试分析暂不可用' }).waitFor();
-  if (await transcript.inputValue() !== corrected) throw Error('analysis failure lost OCR text');
-  analysisFails = false;
-  await dialog.getByRole('button', { name: '分析下一步' }).click();
-  await dialog.getByText('现有保障范围待确认。').waitFor();
-  await dialog.getByText('查看依据', { exact: true }).click();
-  if (!(await dialog.getByText(corrected.split('\n')[0], { exact: true }).isVisible())) throw Error('AI evidence did not point to original OCR text');
-  const serialized = JSON.stringify(analysisRequests);
-  if (serialized.includes('13800000000') || serialized.includes('base64') || !serialized.includes('原有记录')) {
-    throw Error('analysis did not send redacted text and applicable history only');
-  }
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  const body = dialog.locator('[data-dialog-body]');
-  await body.evaluate(el => { el.scrollTop = el.scrollHeight; });
-  const scroll = await body.evaluate(el => el.scrollTop);
-  const footer = await dialog.getByRole('button', { name: '保存记录与待办' }).boundingBox();
-  const rect = await dialog.boundingBox();
-  if (!scroll || !footer || footer.y + footer.height > 844 || !rect || rect.x < 0 || rect.x + rect.width > 390) {
-    throw Error('mobile overflow or fixed footer missing');
-  }
-  await page.screenshot({ animations: 'disabled', path: 'output/ui-regression/chat-analysis-mobile.png' });
-  await page.keyboard.press('Escape');
-  await dialog.getByText('要放弃这次导入吗？').waitFor();
-  await dialog.getByRole('button', { name: '继续编辑' }).click();
-  state.fail = true;
-  await dialog.getByRole('button', { name: '保存记录与待办' }).click();
-  await dialog.getByRole('alert').filter({ hasText: '测试保存失败' }).waitFor();
-  if (await transcript.inputValue() !== corrected) throw Error('save failure lost corrected input');
-  await page.screenshot({ animations: 'disabled', path: 'output/ui-regression/chat-save-failed-mobile.png' });
-  state.fail = false;
-  await dialog.getByRole('button', { name: '保存记录与待办' }).click();
-  await dialog.waitFor({ state: 'hidden' });
-  if (contact.progressHistory.length !== 2) throw Error('expected one new followup');
-  const saved = contact.progressHistory[0];
-  if (saved.chat.transcript !== corrected || saved.chat.nextAction.dueDate !== '2026-11-27' ||
-      JSON.stringify(saved).includes('.png') || JSON.stringify(saved).includes('base64')) throw Error('archive payload wrong');
-
-  await page.reload();
-  await page.getByRole('heading', { name: '示例客户', exact: true }).click();
-  await customer.getByText('查看原话', { exact: true }).click();
-  await customer.getByText(corrected.split('\n')[0], { exact: true }).waitFor();
-  await page.screenshot({ animations: 'disabled', path: 'output/ui-regression/chat-history-mobile.png' });
-  await customer.getByRole('button', { name: '取消', exact: true }).click();
-  await page.getByRole('button', { name: '工作台', exact: true }).click();
-  const task = page.getByRole('button', { name: '完成待办：核对现有保障后发对比表' });
-  await task.waitFor();
-  await task.click();
-  await task.waitFor({ state: 'hidden' });
-  if (!contact.progressHistory[0].completed || contact.progressHistory[0].chat.transcript !== corrected) {
-    throw Error('completed task changed original record');
-  }
-
-  await page.getByRole('button', { name: '导入聊天', exact: true }).click();
-  await dialog.getByRole('combobox').click();
-  await dialog.getByRole('option', { name: '其他客户' }).waitFor();
-  if (await dialog.getByRole('option', { name: '选择客户', exact: true }).count()) throw Error('placeholder duplicated as an option');
-  await page.screenshot({ animations: 'disabled', path: 'output/ui-regression/chat-select-mobile.png' });
-  await dialog.getByRole('option', { name: '其他客户' }).click();
-  await note.fill('线下面谈，客户下周有空。');
-  await dialog.getByRole('button', { name: '保存记录', exact: true }).click();
-  await dialog.waitFor({ state: 'hidden' });
-  const noteOnly = state.contacts[1].progressHistory[0];
-  if (noteOnly.chat.note !== '线下面谈，客户下周有空。' || noteOnly.chat.nextAction || analysisRequests.length !== 2) {
-    throw Error('offline note could not be archived without AI');
-  }
-  return { batchOCR: recognized, longOCR: longText, localOCR: true, evidence: true, failedSaveRetained: true, dateAndTask: true, offlineWithoutAI: true };
+ return {localOCR:true,batchLongOCR:true,dailyMerge:true,rawSource:true,defaultSelection:true,separateAnalysis:true,atomicResult:true,undoPreservesHistory:true,saveFailure:true,desktopMobile:true,requests:requests.length};
 };

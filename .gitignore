@@ -33,3 +33,6 @@ output/playwright/
 
 output/ui-regression/
 output/ui-contract-report.json
+
+.followup-workbench-data.local
+.followup-workbench-data.tmp.local

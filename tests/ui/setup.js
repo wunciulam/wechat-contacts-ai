@@ -97,6 +97,7 @@ async (page) => {
     requests: [],
   };
   page._follow = s;
+  await page.route("**/api/followup-ai", r => r.fulfill({json:{configured:false}}));
   await page.route("**/api/renewal-email", (r) =>
     r.fulfill({ json: { configured: false } }),
   );
@@ -144,6 +145,15 @@ async (page) => {
         policies: c.policies.filter((p) => !ids.includes(p.id)),
       }));
       return route.fulfill({ json: { deletedIds: ids } });
+    }
+    if(u.pathname.endsWith("/rpc/save_followup_bundle_v1")) {
+      await new Promise(r=>setTimeout(r,s.delay));
+      if(s.fail)return route.fulfill({status:500,json:{message:"测试保存失败，输入已保留"}});
+      const c=s.contacts.find(c=>c.id===b.p_contact_id);
+      for(const {record} of b.p_bundle.writes){const index=c.progressHistory.findIndex(r=>r.id===record.id);const saved={...record,updatedAt:"2026-11-23T04:00:00.000Z"};if(index<0)c.progressHistory.unshift(saved);else c.progressHistory[index]=saved;}
+      if(b.p_bundle.analysis)c.followupAnalysis=b.p_bundle.analysis;
+      if(b.p_bundle.snoozedUntil!==undefined)c.followupSnoozedUntil=b.p_bundle.snoozedUntil;
+      return route.fulfill({json:c});
     }
     if (u.pathname.endsWith("/rpc/save_followup_v1")) {
       await new Promise((r) => setTimeout(r, s.delay));

@@ -7,10 +7,13 @@ export const DialogFooterContext = React.createContext<HTMLDivElement | null>(
 );
 type Props = {
   title: string;
+  subtitle?: string;
+  headerContent?: React.ReactNode;
+  accessibleTitle?: string;
   onClose: () => void;
   children: React.ReactNode;
   compact?: boolean;
-  size?: "import" | "confirm" | "contact";
+  size?: "import" | "confirm" | "contact" | "chat" | "followup";
   className?: string;
   bodyClassName?: string;
   closeDisabled?: boolean;
@@ -20,6 +23,9 @@ type Props = {
 };
 export default function WorkspaceDialog({
   title,
+  subtitle,
+  headerContent,
+  accessibleTitle,
   onClose,
   children,
   compact = false,
@@ -45,21 +51,26 @@ export default function WorkspaceDialog({
       });
     };
   }, []);
-  const width = compact
-    ? "max-w-lg"
-    : size === "import"
-      ? "max-w-3xl"
-      : size === "confirm"
-        ? "max-w-sm"
-        : size === "contact"
-          ? "max-w-5xl"
-          : "max-w-4xl";
+  const width =
+    size === "chat"
+      ? "max-w-[920px]"
+      : size === "followup"
+        ? "max-w-[953px]"
+        : compact
+          ? "max-w-lg"
+          : size === "import"
+            ? "max-w-3xl"
+            : size === "confirm"
+              ? "max-w-sm"
+              : size === "contact"
+                ? "max-w-5xl"
+                : "max-w-4xl";
   const drawer = presentation === "drawer";
   return (
     <dialog
       ref={ref}
-      aria-labelledby={hideHeader ? undefined : titleId}
-      aria-label={hideHeader ? title : undefined}
+      aria-labelledby={hideHeader || accessibleTitle ? undefined : titleId}
+      aria-label={accessibleTitle || (hideHeader ? title : undefined)}
       className={`workspace-dialog bg-white p-0 text-gray-900 ${drawer ? "ui-navigation-drawer" : `m-auto w-[calc(100%-2rem)] ${width} rounded-2xl border border-gray-200 shadow-2xl`} ${className}`}
       onCancel={(event) => {
         event.preventDefault();
@@ -86,11 +97,19 @@ export default function WorkspaceDialog({
       >
         {!hideHeader && (
           <header className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
-            <h2 id={titleId} className="text-base font-semibold">
-              {title}
-            </h2>
+            {headerContent || (
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 id={titleId} className="text-base font-semibold">
+                  {title}
+                </h2>
+                {subtitle && (
+                  <span className="text-xs text-gray-500">{subtitle}</span>
+                )}
+              </div>
+            )}
             <IconButton
               aria-label="关闭"
+              className={headerContent ? "self-start" : undefined}
               disabled={closeDisabled}
               onClick={onClose}
             >

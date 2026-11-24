@@ -1,7 +1,21 @@
 import type {MingyaFinancial} from './services/mingyaFinancial';
 
+export interface ChatMessage {
+  id: string; date: string; time: string; speaker: 'customer' | 'self' | 'unknown'; text: string; confidence?: number; source?: number;
+}
+
+export interface FollowupAnalysis {
+  stage: string; blocker: string; explanation: string; nextAction: string; script: string;
+  evidence: { recordId: string; quote: string }[];
+  opportunity?: { type: 'follow' | 'reactivate'; reason: string; trigger?: 'question' | 'material' | 'appointment' | 'activation'; date?: string; evidenceIds: string[] };
+  doNotContact?: boolean; generatedAt: string; revision: string;
+}
+
+export interface FollowupRules { unanswered: number; following: number; paused: number }
+
 export interface ChatFollowup {
   transcript: string;
+  messages?: ChatMessage[];
   note?: string;
   analysis?: {
     stage: string;
@@ -12,6 +26,11 @@ export interface ChatFollowup {
 }
 
 export interface ProgressRecord {
+  kind?: 'communication' | 'task';
+  channel?: 'wechat' | 'phone' | 'meeting' | 'attempt' | 'internal';
+  taskId?: string;
+  sourceRecordId?: string;
+  completedAt?: string;
   id: string;
   date: string;
   content: string;
@@ -82,6 +101,9 @@ export interface Contact {
 
   lastDate?: string;
   progressHistory?: ProgressRecord[];
+  followupAnalysis?: FollowupAnalysis;
+  followupSnoozedUntil?: string;
+  doNotContact?: boolean;
   progress?: string;
 
   dealProducts: string[];

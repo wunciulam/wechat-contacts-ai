@@ -45,7 +45,7 @@ const ContactCard: React.FC<ContactCardProps> = ({
 
   // 获取最近一条跟进记录
   const latestRecord = contact.progressHistory && contact.progressHistory.length > 0
-    ? contact.progressHistory[0]
+    ? contact.progressHistory.filter(r=>r.kind!=='task').slice().sort((a,b)=>b.date.localeCompare(a.date))[0]
     : null;
 
   const handleRemove = (e: React.MouseEvent) => {

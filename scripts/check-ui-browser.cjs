@@ -97,7 +97,7 @@ function command(args) {
       .trim()
       .replace(/;$/, "")
       .replaceAll("__BASE_URL__", base.replace(/\/$/, ""));
-    const output = await command(["run-code", code]);
+    let output;try {output=await command(["run-code", code]);}catch(e){await command(["screenshot","--filename",path.join(out,"failure.png")]).catch(()=>{});const state=await command(["run-code", 'async page => ({body:await page.locator("body").innerText(), requests:page._follow?.requests})']).catch(()=>"");fs.writeFileSync(path.join(out,"failure-state.txt"),state);throw e;}
     const match = output.match(/### Result\s*\n([^\n]+)/);
     if (!match)
       throw Error(name + ": missing result: " + output.slice(0, 1200));

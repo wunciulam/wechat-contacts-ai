@@ -1,0 +1,471 @@
+import React, { useState, useEffect } from "react";
+import {
+  Sparkles,
+  ChevronDown,
+  ChevronRight,
+  RefreshCw,
+  Check,
+  CalendarDays,
+} from "lucide-react";
+import type { Contact, ProgressRecord } from "../types";
+import {
+  STAGES,
+  notes,
+  tasks,
+  revision,
+  lastEffective,
+} from "../services/followupDomain";
+import { chinaDate, isChatDate } from "../services/chatAnalysis";
+import WorkspaceDialog from "./WorkspaceDialog";
+import Button, { IconButton } from "./ui/Button";
+import Input from "./ui/Input";
+import Tag from "./ui/Tag";
+import type { BundleSave } from "./FollowupDialogs";
+export function FollowupAvatar({ contact }: { contact: Contact }) {
+  return (
+    <span aria-hidden="true" className="followup-avatar">
+      {(contact.remarkName || contact.nickname || "?").slice(0, 1)}
+    </span>
+  );
+}
+export function FollowupTaskDate({
+  task,
+  onDate,
+}: {
+  task: ProgressRecord;
+  onDate: (date: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false),
+    [date, setDate] = useState(task.date),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  const overdue = task.date && task.date < chinaDate();
+  return (
+    <div className="followup-task-date">
+      {editing ? (
+        <div className="followup-date-edit">
+          <Input
+            autoFocus
+            type="date"
+            aria-label={"调整计划日期：" + task.content}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            disabled={busy}
+          />
+          <IconButton
+            aria-label="确认改期"
+            disabled={busy || !isChatDate(date)}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await onDate(date);
+                setEditing(false);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "改期失败");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <Check size={16} />
+          </IconButton>
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={() => {
+              setEditing(false);
+              setDate(task.date);
+            }}
+          >
+            取消
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-end gap-1">
+          <time
+            className={overdue ? "text-danger-600" : "text-gray-500"}
+            dateTime={task.date}
+          >
+            {task.date || "待安排日期"}
+          </time>
+          <IconButton
+            aria-label={"改期：" + task.content}
+            className="followup-date-icon"
+            onClick={() => {
+              setDate(task.date);
+              setEditing(true);
+            }}
+          >
+            <CalendarDays size={16} />
+          </IconButton>
+        </div>
+      )}
+      {overdue && !editing && (
+        <span className="text-danger-600">
+          逾期{" "}
+          {Math.floor(
+            (Date.parse(chinaDate()) - Date.parse(task.date)) / 86400000,
+          )}{" "}
+          天
+        </span>
+      )}
+      {error && (
+        <span role="alert" className="text-danger-600">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+export default function FollowupCustomerPanel({
+  contact,
+  onClose,
+  onEdit,
+  onImport,
+  onWrite,
+  onResult,
+  onSchedule,
+  onAnalyze,
+  onSave,
+  analyzing,
+  evidenceRecordId,
+}: {
+  contact: Contact;
+  onClose: () => void;
+  onEdit: () => void;
+  onImport: () => void;
+  onWrite: () => void;
+  onResult: (task: ProgressRecord) => void;
+  onSchedule: (text: string, source?: string) => void;
+  onAnalyze: () => Promise<void>;
+  onSave: BundleSave;
+  analyzing: boolean;
+  evidenceRecordId?: string;
+}) {
+  const [info, setInfo] = useState(false),
+    [basis, setBasis] = useState(false),
+    [all, setAll] = useState(Boolean(evidenceRecordId)),
+    [error, setError] = useState("");
+  const a = contact.followupAnalysis,
+    stale = !a || a.revision !== revision(contact),
+    history = notes(contact),
+    pending = tasks(contact),
+    stageIndex = STAGES.findIndex((s) => s === a?.stage),
+    existingAction = pending.find(
+      (t) =>
+        t.content === a?.nextAction ||
+        Boolean(
+          t.sourceRecordId &&
+            a?.evidence.some((e) => e.recordId === t.sourceRecordId),
+        ),
+    );
+  useEffect(() => {
+    if (!evidenceRecordId) return;
+    setAll(true);
+    const timer = setTimeout(
+      () =>
+        document
+          .getElementById("history-" + evidenceRecordId)
+          ?.scrollIntoView({ block: "center" }),
+      0,
+    );
+    return () => clearTimeout(timer);
+  }, [evidenceRecordId, contact.id]);
+  return (
+    <WorkspaceDialog
+      title={contact.remarkName || contact.nickname}
+      accessibleTitle={(contact.remarkName || contact.nickname) + "的跟进面板"}
+      headerContent={
+        <div className="followup-customer-basics">
+          <div className="flex items-center gap-3">
+            <FollowupAvatar contact={contact} />
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold mb-1">
+                {contact.remarkName || contact.nickname}
+              </h2>
+              <div className="followup-basic-fields">
+                <span>
+                  <small>电话</small>
+                  <strong>{String(contact.phoneNumber || "待补充")}</strong>
+                </span>
+                <span>
+                  <small>生日</small>
+                  <strong>{contact.birthday || "待补充"}</strong>
+                </span>
+                <span>
+                  <small>上次沟通</small>
+                  <strong>{lastEffective(contact) || "暂无记录"}</strong>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="plain"
+              className="flex items-center gap-1 whitespace-nowrap text-xs"
+              onClick={() => setInfo(!info)}
+            >
+              {info ? "收起资料" : "更多资料"}
+              {info ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </Button>
+            <Button size="sm" onClick={onEdit}>
+              编辑资料
+            </Button>
+          </div>
+        </div>
+      }
+      size="followup"
+      className="followup-detail-dialog"
+      bodyClassName="min-h-0 overflow-y-auto p-0"
+      onClose={onClose}
+    >
+      {info && (
+        <div className="followup-expanded-info">
+          <div>
+            <small>微信备注</small>
+            <p>{contact.remarkInfo || "待补充"}</p>
+          </div>
+          <div>
+            <small>标签</small>
+            <div className="flex flex-wrap gap-1">
+              {contact.tags.map((tag) => (
+                <Tag key={tag}>{tag}</Tag>
+              ))}
+            </div>
+          </div>
+          <div>
+            <small>关联保单</small>
+            <p>{contact.policies?.length || 0} 份</p>
+            <Button variant="plain" onClick={onEdit}>
+              查看客户资料与保单
+            </Button>
+          </div>
+        </div>
+      )}
+      <div className="followup-stage-track">
+        {STAGES.map((stage, i) => (
+          <span
+            key={stage}
+            data-active={i === stageIndex}
+            data-passed={stageIndex >= 0 && i < stageIndex}
+          >
+            {stage}
+          </span>
+        ))}
+        <small>
+          {stageIndex >= 0
+            ? "第 " + (stageIndex + 1) + " / 5 阶段"
+            : a?.stage || "阶段待确认"}
+        </small>
+      </div>
+      <div className="followup-detail-grid">
+        <aside className="followup-judgment">
+          <section className="followup-ai-card">
+            <div className="followup-ai-heading">
+              <span>
+                <Sparkles size={14} />
+                AI 分析
+              </span>
+              <div className="flex items-center gap-2">
+                <small>
+                  {a
+                    ? stale
+                      ? "有新记录，待更新"
+                      : new Date(a.generatedAt).toLocaleTimeString("zh-CN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                    : "尚未分析"}
+                </small>
+                <Button
+                  size="sm"
+                  variant={stale ? "primary" : "secondary"}
+                  disabled={analyzing || !history.length}
+                  onClick={async () => {
+                    setError("");
+                    try {
+                      await onAnalyze();
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "分析失败");
+                    }
+                  }}
+                >
+                  {analyzing ? "更新中…" : a ? "更新分析" : "生成分析"}
+                </Button>
+              </div>
+            </div>
+            <div className="followup-ai-judgment">
+              <small>当前判断</small>
+              <h3>{a?.blocker || "记录沟通后分析当前卡点"}</h3>
+              {a?.explanation && <p>{a.explanation}</p>}
+            </div>
+            <div className="followup-ai-action">
+              <small>建议行动</small>
+              <p>{a?.nextAction || "先导入聊天或记录沟通。"}</p>
+              {a?.script && (
+                <div className="followup-script">
+                  <small>参考话术</small>
+                  <p>{a.script}</p>
+                </div>
+              )}
+              {a?.nextAction && (
+                <Button
+                  variant="primary"
+                  disabled={stale && !existingAction}
+                  onClick={() => {
+                    const task = existingAction;
+                    if (task)
+                      document
+                        .getElementById("pending-" + task.id)
+                        ?.scrollIntoView({
+                          block: "center",
+                          behavior: "smooth",
+                        });
+                    else onSchedule(a.nextAction, a.evidence[0]?.recordId);
+                  }}
+                >
+                  {existingAction ? "查看已安排" : "安排跟进"}
+                </Button>
+              )}
+            </div>
+            {a?.evidence.length > 0 && (
+              <div className="followup-ai-evidence">
+                <Button
+                  variant="plain"
+                  onClick={() => setBasis(!basis)}
+                  aria-expanded={basis}
+                >
+                  判断依据
+                  <ChevronDown size={14} />
+                </Button>
+                {basis &&
+                  a.evidence.map((e, i) => (
+                    <div key={i}>
+                      <blockquote>{e.quote}</blockquote>
+                      <Button
+                        variant="plain"
+                        onClick={() => {
+                          setAll(true);
+                          setTimeout(
+                            () =>
+                              document
+                                .getElementById("history-" + e.recordId)
+                                ?.scrollIntoView({
+                                  block: "center",
+                                  behavior: "smooth",
+                                }),
+                            0,
+                          );
+                        }}
+                      >
+                        查看对应跟进记录
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </section>
+          {error && (
+            <p role="alert" className="text-sm text-danger-600">
+              {error}
+            </p>
+          )}
+          {pending.length > 0 && (
+            <section className="followup-customer-tasks">
+              <h3>已有待办</h3>
+              {pending.map((task) => (
+                <div
+                  id={"pending-" + task.id}
+                  key={task.id}
+                  className="followup-customer-task"
+                >
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={false}
+                      onChange={() => onResult(task)}
+                      aria-label={"完成待办：" + task.content}
+                    />
+                    <span>{task.content}</span>
+                  </label>
+                  <FollowupTaskDate
+                    task={task}
+                    onDate={(date) =>
+                      onSave(contact.id, {
+                        writes: [{ record: { ...task, date }, expected: task }],
+                      }).then(() => {})
+                    }
+                  />
+                </div>
+              ))}
+            </section>
+          )}
+        </aside>
+        <section className="followup-history">
+          <div className="followup-history-heading">
+            <h3>跟进记录</h3>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={onImport}>
+                导入聊天
+              </Button>
+              <Button size="sm" onClick={onWrite}>
+                写跟进
+              </Button>
+            </div>
+          </div>
+          {!history.length && (
+            <p className="text-sm text-gray-500 py-6">暂无跟进记录</p>
+          )}
+          {(all ? history : history.slice(0, 8)).map((record) => (
+            <article
+              id={"history-" + record.id}
+              key={record.id}
+              className="followup-history-row"
+              data-highlight={record.id === evidenceRecordId}
+            >
+              <time>{record.date}</time>
+              <div>
+                <p>{record.content}</p>
+                {record.channel === "attempt" && <small>联系尝试</small>}
+                {record.channel === "internal" && <small>内部工作</small>}
+                {record.chat?.transcript && (
+                  <details open={record.id === evidenceRecordId}>
+                    <summary>查看原话</summary>
+                    <div className="followup-original-messages">
+                      {record.chat.messages?.length ? (
+                        record.chat.messages.map((m, i) => (
+                          <div key={m.id + "-" + i}>
+                            <header>
+                              <strong>
+                                {m.speaker === "self"
+                                  ? "我"
+                                  : m.speaker === "customer"
+                                    ? "客户"
+                                    : "待核对"}
+                              </strong>
+                              <time>{m.time}</time>
+                            </header>
+                            <p>{m.text}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="whitespace-pre-wrap">
+                          {record.chat.transcript}
+                        </p>
+                      )}
+                    </div>
+                  </details>
+                )}
+              </div>
+            </article>
+          ))}
+          {history.length > 8 && !all && (
+            <Button variant="plain" onClick={() => setAll(true)}>
+              查看全部 {history.length} 条记录
+            </Button>
+          )}
+        </section>
+      </div>
+    </WorkspaceDialog>
+  );
+}

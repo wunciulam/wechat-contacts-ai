@@ -37,7 +37,7 @@ export function formatChatLines(lines: OCRLine[], width: number): string[] {
       if (!value) return [];
       const center = (bbox.x0 + bbox.x1) / (2 * width);
       const time = /^(?:(?:\d{2,4}[-年/.]\d{1,2}(?:[-月/.]\d{1,2}日?)?|昨天|今天|星期[一二三四五六日天]|周[一二三四五六日天])\s*)?(?:(?:上午|下午|晚上|凌晨|中午)\s*)?\d{1,2}[:：]\d{2}$/;
-      if (center > .33 && center < .67 && time.test(value)) return [value];
+      if (center > .25 && center < .75 && (time.test(value) || /^(?:\d{4}[年\-/.]\d{1,2}[月\-/.]\d{1,2}日?|\d{1,2}月\d{1,2}日|今天|昨天|星期[一二三四五六日天])$/.test(value))) return [value];
       const left = bbox.x0 / width;
       const right = bbox.x1 / width;
       const speaker = ownBubble || left >= .42 || (right >= .72 && left > .22 && center > .57) ? '我'
