@@ -121,7 +121,7 @@ async (page) => {
   page._follow.profileFail=true;await edit.getByLabel("地址",{exact:true}).fill("统一客户详情回归地址");await edit.getByRole('alert').waitFor();
   await Promise.all([page.waitForResponse(r=>r.url().endsWith('/rpc/save_customer_profile_v1')&&r.status()===409),detail.getByRole('tab',{name:'跟进',exact:true}).click()]);await detail.getByRole('button',{name:'重试',exact:true}).waitFor();
   if(await detail.getByRole('tab',{name:'资料',exact:true}).getAttribute('aria-selected')!=='true')throw Error('failed autosave navigation lost draft');
-  page._follow.profileFail=false;await edit.getByRole('button',{name:'重试',exact:true}).click();await edit.getByText('已保存',{exact:true}).waitFor();
+  page._follow.profileFail=false;await edit.getByRole('button',{name:'重试',exact:true}).click();await page.getByText('客户资料已保存',{exact:true}).waitFor();
   if(await edit.getByLabel('地址',{exact:true}).inputValue()!=='统一客户详情回归地址')throw Error('autosave changed draft');
   await page.keyboard.press("Escape");
   if (

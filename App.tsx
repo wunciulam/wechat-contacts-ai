@@ -1,3 +1,6 @@
+import GlobalNotifications from './components/GlobalNotifications';
+import CategoryDeleteDialog from './components/CategoryDeleteDialog';
+import {notify} from './services/notifications';
 import {matchesCustomerFilters} from './services/customerFilters';
 import AiSettingsDialog from "./components/AiSettingsDialog";
 import CustomerDetailDialog, {
@@ -223,6 +226,7 @@ const App: React.FC = () => {
   const categoryLive=useRef(categories);categoryLive.current=categories;
   const categoryWrites=useRef<Promise<unknown>>(Promise.resolve());
   async function ensureCategory(name:string):Promise<Category>{let result:Category|undefined;const pending=categoryWrites.current.then(async()=>{const existing=categoryLive.current.find(c=>c.name.trim()===name.trim());if(existing){result=existing;return;}const stamp=Date.now();result={id:crypto.randomUUID(),name:name.trim(),color:"#f59e0b",icon:"Tag",order:categoryLive.current.length,createdAt:stamp,updatedAt:stamp};const next=[...categoryLive.current,result];if(!await saveToCloud("categories",next))throw Error("分类未保存，请重试。");categoryLive.current=next;setCategories(next);localStorage.setItem(CATEGORIES_STORAGE_KEY,JSON.stringify(next));});categoryWrites.current=pending.catch(()=>{});await pending;return result!;}
+  const [categoryDeleteIds,setCategoryDeleteIds]=useState<string[]|null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
 
@@ -442,7 +446,7 @@ const App: React.FC = () => {
         try {
           console.log("正在从云端加载数据...");
           const cloudData = await loadFromCloud("contacts");
-          if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
+          if (cloudData && Array.isArray(cloudData)) {
             console.log("从云端加载成功，联系人数量:", cloudData.length);
             const migratedData = cloudData.map((c) => {
               const baseContact: Contact = {
@@ -658,7 +662,7 @@ const App: React.FC = () => {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             setCategories(parsed);
             return;
           }
@@ -970,7 +974,7 @@ const App: React.FC = () => {
     }
 
     setContacts(updatedContacts.map(applyAutoTags));
-    alert(
+    notify(
       `导入完成！\n新增联系人: ${newContactsCount}\n更新联系人: ${updatedContactsCount}\n新增保单: ${newPoliciesCount}`,
     );
   };
@@ -1099,7 +1103,7 @@ const App: React.FC = () => {
       );
       acceptSavedFollowup(saved);
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : "跟进记录未保存，请重试。");
+      notify(e instanceof Error ? e.message : "跟进记录未保存，请重试。",{tone:"error"});
     }
   };
   const handleToggleProgress = (contactId: string, progressId: string) => {
@@ -1369,21 +1373,11 @@ const App: React.FC = () => {
     );
   };
 
-  const handleDeleteCategory = (id: string) => {
-    // 删除类目时，将该类目下的联系人移到"无类目"
-    setContacts((prev) =>
-      prev.map((c) =>
-        categoryIds(c).includes(id)
-          ? {
-              ...c,
-              categoryId: undefined,
-              categoryIds: categoryIds(c).filter((x) => x !== id),
-            }
-          : c,
-      ),
-    );
-    setCategories((prev) => prev.filter((c) => c.id !== id));
-  };
+  const handleDeleteCategory=(id:string)=>setCategoryDeleteIds([id]);
+  async function deleteCategories(ids:string[]){
+    for(const c of contactsRef.current){if(!categoryIds(c).some(id=>ids.includes(id)))continue;const next=categoryIds(c).filter(id=>!ids.includes(id));const saved=await saveCustomerProfile({...c,categoryIds:next,categoryId:next[0]||''},c);acceptSavedFollowup(saved);}
+    const next=categoryLive.current.filter(c=>!ids.includes(c.id));if(!await saveToCloud("categories",next))throw Error("分类未删除，请重试。");categoryLive.current=next;setCategories(next);localStorage.setItem(CATEGORIES_STORAGE_KEY,JSON.stringify(next));setSelectedCategories(old=>new Set([...old].filter(id=>!ids.includes(id))));notify("已删除 "+ids.length+" 个分类");
+  }
 
   const handleMoveContactToCategory = (
     contactId: string,
@@ -1500,10 +1494,13 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-white overflow-hidden font-sans">
+      <GlobalNotifications/>
+      {categoryDeleteIds&&<CategoryDeleteDialog categories={categories.filter(c=>categoryDeleteIds.includes(c.id))} count={contacts.filter(c=>categoryIds(c).some(id=>categoryDeleteIds.includes(id))).length} onClose={()=>setCategoryDeleteIds(null)} onDelete={()=>deleteCategories(categoryDeleteIds)}/>}
       <Sidebar
         categories={categories}
         selectedCategories={selectedCategories}
         onToggleAllCategories={ids=>setSelectedCategories(new Set(ids))}
+        onDeleteCategories={setCategoryDeleteIds}
         onSelectCategory={id=>setSelectedCategories(old=>{const next=new Set(old);next.has(id)?next.delete(id):next.add(id);return next;})}
         tags={allTags}
         selectedTags={selectedTags}

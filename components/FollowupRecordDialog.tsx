@@ -1,3 +1,4 @@
+import {notify} from '../services/notifications';
 import React, { useRef, useState } from "react";
 import type { Contact, ProgressRecord } from "../types";
 import WorkspaceDialog, { WorkspaceDialogFooter } from "./WorkspaceDialog";
@@ -69,6 +70,7 @@ export default function FollowupRecordDialog({
           ),
         };
       await onMutate(mode, mode === "delete" ? record : edited, record);
+      if(deletingTask)notify("待办已删除");
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存失败，请重试。");

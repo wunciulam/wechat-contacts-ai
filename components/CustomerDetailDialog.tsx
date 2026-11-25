@@ -1,3 +1,4 @@
+import {notify} from '../services/notifications';
 import {applyProfileDraft} from '../services/customerProfileMutation';
 import React, { useEffect, useRef, useState } from "react";
 import type { Category, Contact, ProgressRecord } from "../types";
@@ -135,12 +136,14 @@ export default function CustomerDetailDialog({
       setNotice("");
       setUndoId(null);
     } catch (e) {
-      setUndoError(e instanceof Error ? e.message : "撤销失败，请重试。");
+      setUndoError(e instanceof Error ? e.message : "撤销失败，请重试。");throw e;
     } finally {
       undoRunning.current = false;
       setUndoBusy(false);
     }
   }
+  const undoRef=useRef(undo);undoRef.current=undo;
+  useEffect(()=>{if(notice)notify(notice,{id:"customer-result",action:undoId?{label:"撤销完成",run:()=>undoRef.current()}:undefined});},[notice,undoId]);
   async function analyze() {
     if (analysisRunning.current) return;
     analysisRunning.current = true;
@@ -238,19 +241,6 @@ export default function CustomerDetailDialog({
               </span>
             )}
           </div>
-        }
-        feedback={
-          notice ? (
-            <div className="followup-success">
-              <span role="status">{notice}</span>
-              {undoId && (
-                <Button variant="text" disabled={undoBusy} onClick={undo}>
-                  {undoBusy ? "撤销中…" : "撤销完成"}
-                </Button>
-              )}
-              {undoError && <span role="alert">{undoError}</span>}
-            </div>
-          ) : null
         }
       />
       {historyAction&&<FollowupRecordDialog record={historyAction.record} mode={historyAction.mode} onMutate={onMutateHistory} onClose={()=>setHistoryAction(null)} onSaved={()=>{setNotice(historyAction.mode==="delete"?"记录已删除":"记录已更新");setUndoId(null);setHistoryAction(null);}}/>}

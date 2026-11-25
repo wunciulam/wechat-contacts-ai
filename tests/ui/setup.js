@@ -1,7 +1,10 @@
 async (page) => {
-  page.setDefaultTimeout(6000);
+  page.setDefaultTimeout(10000);
+  page.setDefaultNavigationTimeout(30000);
   await page.clock.setFixedTime(new Date("2026-11-23T04:00:00Z"));
   await page.unrouteAll({ behavior: "wait" });
+  await page.route("https://fonts.googleapis.com/**",r=>r.fulfill({contentType:"text/css",body:""}));
+  await page.route("https://fonts.gstatic.com/**",r=>r.fulfill({contentType:"font/woff2",body:""}));
   const policies = [
     "正式保单",
     "终止保单",

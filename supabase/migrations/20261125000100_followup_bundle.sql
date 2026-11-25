@@ -1,4 +1,4 @@
--- Not applied to production. Uses existing app_data/RLS and contact recovery trigger.
+-- Applied 2026-11-25 after rollback-only anon/atomicity/conflict validation; uses existing app_data/RLS and recovery trigger.
 create or replace function public.save_followup_bundle_v1(p_app_id text,p_contact_id text,p_bundle jsonb)
 returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
 declare row_data public.app_data%rowtype;c jsonb;hist jsonb;oldr jsonb;r jsonb;w jsonb;idx integer;stamp text:=to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');changed_comm boolean:=false;latest text;

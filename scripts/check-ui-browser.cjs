@@ -139,6 +139,8 @@ function command(args) {
   await run("customer category filters, task deletion and simplified import", "filter-task-simplify.js");
   await run("fixture reset", "setup.js");
   await run("profile autosave, shared selection and original dialog", "autosave-components.js");
+  await run("fixture reset", "setup.js");
+  await run("global notices, category deletion and breathing motion", "global-notifications.js");
   await run("component acceptance", "acceptance.js");
   fs.writeFileSync(
     path.join(out, "results.json"),

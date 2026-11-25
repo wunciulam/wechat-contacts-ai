@@ -1,3 +1,4 @@
+import {notify} from '../services/notifications';
 import FollowupTaskDelete,{type DeleteTask} from './FollowupTaskDelete';
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -267,9 +268,11 @@ export default function FollowupWorkspace({
       setUndo(null);
       setMessage("已恢复待办，沟通历史保留。");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "恢复失败，请重试。");
+      throw e;
     }
   }
+  const undoRef=useRef(undoTask);undoRef.current=undoTask;
+  useEffect(()=>{if(message)notify(message,{id:"workspace-result",action:undo?{label:"撤销完成",run:()=>undoRef.current()}:undefined});},[message,undo]);
   const taskRow = ({
     contact,
     task,
@@ -478,17 +481,6 @@ export default function FollowupWorkspace({
               </Button>
             ))}
           </div>
-          {message && (
-            <div role="status" className="followup-success">
-              <Check size={16} />
-              <span>{message}</span>
-              {undo && (
-                <Button variant="plain" onClick={undoTask}>
-                  撤销完成
-                </Button>
-              )}
-            </div>
-          )}
           {filter !== "all" && (
             <div className="flex items-center justify-between text-xs">
               <span>仅看{countCards.find((c) => c.key === filter)?.label}</span>

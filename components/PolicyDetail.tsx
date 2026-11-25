@@ -1,3 +1,4 @@
+import {notify} from '../services/notifications';
 import Button from './ui/Button';
 import PolicyFieldsForm, {policyFields} from './PolicyFieldsForm';
 import MingyaPolicyDetailModal from './MingyaPolicyDetailModal';
@@ -59,14 +60,14 @@ export default function PolicyDetail({
           disabled={busy}
           className=""
           onClick={async () => {
-            if (await onSave(draft)) { setSaved(true); setEditing(false); }
+            if (await onSave(draft)) { setSaved(true); setEditing(false);notify("保单资料已保存"); }
           }} variant="primary" validate
         >
           <Save size={16}/> {busy ? "正在保存…" : "保存保单信息"}
         </Button>
       </div>, footer)}
       </>}
-      {saved && !editing && <p role="status" className="mt-3 text-sm text-gray-600">保单资料已保存</p>}
+
       <details className="mt-6 border-t border-gray-100 pt-4" open>
         <summary className="font-medium cursor-pointer">
           缴费历史（{policy.payments.length}期）

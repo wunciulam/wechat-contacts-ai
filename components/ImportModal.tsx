@@ -1,3 +1,4 @@
+import {notify} from '../services/notifications';
 import TokenInput from './ui/TokenInput';
 import useProfileAutosave from './useProfileAutosave';
 import ChatFollowUpDetails from "./ChatFollowUpDetails";
@@ -140,6 +141,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
     policies: [],
   });
 
+  useEffect(()=>{if(historySaved&&!historyError&&!historyBusy)notify(historySaved,{id:"legacy-followup"});},[historySaved,historyError,historyBusy]);
   const categoryPending=useRef<Promise<void>|null>(null);
   const autosave=useProfileAutosave(formData,onAutoSave,v=>Boolean(v.remarkName?.trim()||v.nickname?.trim()));
 
@@ -1455,11 +1457,6 @@ const ImportModal: React.FC<ImportModalProps> = ({
                         {historyError}
                       </p>
                     )}
-                    {historySaved && !historyError && !historyBusy && (
-                      <p role="status" className="text-xs text-gray-500">
-                        {historySaved}
-                      </p>
-                    )}
                     {showHistoryAdd && (
                       <div className="p-4 bg-gray-50 rounded-lg space-y-3 animate-fade-in">
                         <Input
@@ -1829,7 +1826,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
       </div>
 
       {/* 底部操作区 - 仅在手动录入时显示 */}
-      {onAutoSave?<WorkspaceDialogFooter>{autosave.error?<><p role="alert" className="mr-auto text-sm text-danger-600">{autosave.error}</p><Button onClick={()=>void autosave.flush()}>重试</Button></>:<span role="status" className="text-xs text-gray-500">{autosave.state}</span>}</WorkspaceDialogFooter>:(activeTab === "manual" || initialData) && (
+      {onAutoSave?<WorkspaceDialogFooter>{autosave.error?<><p role="alert" className="mr-auto text-sm text-danger-600">{autosave.error}</p><Button onClick={()=>void autosave.flush()}>重试</Button></>:autosave.state&&autosave.state!=="已保存"?<span role="status" className="text-xs text-gray-500">{autosave.state}</span>:null}</WorkspaceDialogFooter>:(activeTab === "manual" || initialData) && (
         <WorkspaceDialogFooter>
           {!error&&saveFeedback&&<span role="status" className="mr-auto text-sm">{saveFeedback}</span>}
           {error && (

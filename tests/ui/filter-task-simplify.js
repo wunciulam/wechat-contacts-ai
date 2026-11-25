@@ -7,7 +7,7 @@ async page=>{
  const d=page.getByRole('dialog',{name:'示例客户的客户详情',exact:true});
  s.profileFail=true;await d.getByLabel('客户分类',{exact:true}).fill('老客户');await d.getByLabel('客户分类',{exact:true}).press('Enter');await d.getByRole('button',{name:'移除客户分类：重点跟进',exact:true}).click();await d.getByRole('alert').waitFor();
  if(!await d.getByRole('button',{name:'移除客户分类：老客户',exact:true}).count())throw Error('failed category lost selection');await page.screenshot({timeout:30000,path:'output/ui-regression/category-edit-failure-desktop.png'});
- s.profileFail=false;await d.getByRole('button',{name:'重试',exact:true}).click();await d.getByText('已保存',{exact:true}).waitFor();
+ s.profileFail=false;await d.getByRole('button',{name:'重试',exact:true}).click();await page.getByText('客户资料已保存',{exact:true}).waitFor();
  if(JSON.stringify(s.contacts[0].categoryIds)!=='["b"]'||s.contacts[0].categoryId!=='b')throw Error('category not saved');
  await page.keyboard.press('Escape');await page.reload();
  await page.getByLabel('筛选分类：重点跟进',{exact:true}).check();

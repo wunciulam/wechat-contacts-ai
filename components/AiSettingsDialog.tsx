@@ -1,3 +1,4 @@
+import {notify} from '../services/notifications';
 import React, { useEffect, useRef, useState } from "react";
 import WorkspaceDialog, { WorkspaceDialogFooter } from "./WorkspaceDialog";
 import Button from "./ui/Button";
@@ -63,11 +64,11 @@ export default function AiSettingsDialog({
     try {
       const data = await aiSettingsRequest({ action, apiKey, model });
       if (action === "test") {
-        setTested(true);
+        setTested(true);notify("连接成功，可以生成梗概和客户分析。",{id:"ai-config"});
       } else {
         setStatus(data);
         setApiKey("");
-        setSaved(true);
+        setSaved(true);notify("已保存并启用",{id:"ai-config"});
         setTested(false);
         onSaved();
       }
@@ -145,16 +146,6 @@ export default function AiSettingsDialog({
               </p>
             )}
           </>
-        )}
-        {tested && (
-          <p role="status" className="text-sm">
-            连接成功，可以生成梗概和客户分析。
-          </p>
-        )}
-        {saved && (
-          <p role="status" className="text-sm">
-            已保存并启用
-          </p>
         )}
         {error && (
           <p role="alert" className="text-sm text-danger-600">

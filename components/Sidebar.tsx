@@ -1,6 +1,5 @@
 import Checkbox from './ui/Checkbox';
 import type {Category} from '../types';
-import {UNCATEGORIZED} from '../services/customerFilters';
 import Input from './ui/Input';
 import WorkspaceDialog from './WorkspaceDialog';
 import Button, {IconButton} from './ui/Button';
@@ -14,6 +13,7 @@ interface SidebarProps {
   selectedCategories:Set<string>;
   onSelectCategory:(id:string)=>void;
   onToggleAllCategories:(ids:string[])=>void;
+  onDeleteCategories:(ids:string[])=>void;
   tags: string[];
   selectedTags: Set<string>;
   onSelectTag: (tag: string | null) => void;
@@ -34,7 +34,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
-  categories,selectedCategories,onSelectCategory,onToggleAllCategories,tags, selectedTags, onSelectTag, onAddNew, onDeleteTag, onRenameTag, onBatchDeleteTags, onToggleAllTags, totalContacts, followUpCount, policyCount, currentView, onChangeView, followUpFilter, onFollowUpFilter, isMobileOpen, onCloseMobile
+  categories,selectedCategories,onSelectCategory,onToggleAllCategories,onDeleteCategories,tags, selectedTags, onSelectTag, onAddNew, onDeleteTag, onRenameTag, onBatchDeleteTags, onToggleAllTags, totalContacts, followUpCount, policyCount, currentView, onChangeView, followUpFilter, onFollowUpFilter, isMobileOpen, onCloseMobile
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [editingTag, setEditingTag] = useState<string | null>(null);
@@ -168,7 +168,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               ))}
             </div>
-            <section aria-label="客户分类筛选"><div className="flex items-center gap-2 px-3 mb-2"><Checkbox aria-label="全选客户分类" checked={selectedCategories.size===categories.length+1} indeterminate={selectedCategories.size>0&&selectedCategories.size<categories.length+1} onChange={e=>onToggleAllCategories(e.target.checked?[...categories.map(c=>c.id),UNCATEGORIZED]:[])}/><h2 className="text-xs font-semibold text-gray-500">客户分类筛选</h2></div><div className="space-y-1">{[...categories,{id:UNCATEGORIZED,name:"未分类"}].map(category=><label key={category.id} className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-gray-50 cursor-pointer"><Checkbox aria-label={"筛选分类："+category.name} checked={selectedCategories.has(category.id)} onChange={()=>onSelectCategory(category.id)}/><span>{category.name}</span></label>)}</div></section>
+            <section className="sidebar-category-filters" aria-label="客户分类筛选"><div className="flex items-center gap-2 px-3 mb-2"><Checkbox aria-label="全选客户分类" checked={categories.length>0&&selectedCategories.size===categories.length} indeterminate={selectedCategories.size>0&&selectedCategories.size<categories.length} onChange={e=>onToggleAllCategories(e.target.checked?categories.map(c=>c.id):[])}/><h2 className="text-xs font-semibold text-gray-500 flex-1">客户分类筛选</h2>{selectedCategories.size>0&&<IconButton aria-label="删除选中分类" onClick={()=>onDeleteCategories([...selectedCategories])}><Trash2 size={13}/></IconButton>}</div><div className="space-y-1">{categories.map(category=><label key={category.id} className="group flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-gray-50 cursor-pointer"><Checkbox aria-label={"筛选分类："+category.name} checked={selectedCategories.has(category.id)} onChange={()=>onSelectCategory(category.id)}/><span className="flex-1">{category.name}</span><IconButton className="sidebar-category-delete" aria-label={"删除分类："+category.name} onClick={e=>{e.preventDefault();onDeleteCategories([category.id]);}}><Trash2 size={13}/></IconButton></label>)}</div></section>
             </div>
           )}
         </div>
