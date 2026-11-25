@@ -4,14 +4,14 @@ import DateInput from "./DateInput";
 
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   leadingIcon?: React.ElementType;
-  appearance?: "default" | "embedded";
+  appearance?: "default" | "embedded" | "date-icon";
 };
 const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
   { leadingIcon: Icon, appearance="default", className = "", type = "text", ...props },
   ref,
 ) {
   if (type === "date")
-    return <DateInput {...props} className={className} ref={ref} />;
+    return <DateInput {...props} iconOnly={appearance === "date-icon"} className={className} ref={ref} />;
   if (Icon)
     return (
       <span

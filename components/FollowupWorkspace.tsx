@@ -48,11 +48,13 @@ export default function FollowupWorkspace({
   onImport,
   onEdit,
   renderCategories,
+  onManageCategories,
 }: {
   contacts: Contact[];
   onSave: BundleSave;
   onImport: (id?: string) => void;
   onEdit: (c: Contact) => void;
+  onManageCategories: () => void;
   renderCategories: (open: (c: Contact) => void) => React.ReactNode;
 }) {
   const [tab, setTab] = useState<"leads" | "categories">("leads"),
@@ -389,14 +391,7 @@ export default function FollowupWorkspace({
               >
                 {busy ? "更新中…" : "更新线索"}
               </Button>
-              <Button
-                variant="plain"
-                className="followup-rules-action"
-                onClick={() => setShowRules(true)}
-              >
-                <Settings2 size={16} />
-                提醒规则
-              </Button>
+
             </>
           }
         />
@@ -420,10 +415,12 @@ export default function FollowupWorkspace({
             客户分类
           </Button>
         </div>
-        <small>
-          截至{today}
-          {lastUpdate ? "　" + lastUpdate + "更新" : ""}
-        </small>
+        <div className="followup-tabs-tools">
+          <small>截至{today}{lastUpdate ? "　" + lastUpdate + "更新" : ""}</small>
+          <Button variant="plain" className="followup-rules-action" onClick={() => tab === "leads" ? setShowRules(true) : onManageCategories()}>
+            <Settings2 size={16} />{tab === "leads" ? "提醒规则" : "管理分类"}
+          </Button>
+        </div>
       </div>
       {tab === "categories" ? (
         <div className="followup-category-view">

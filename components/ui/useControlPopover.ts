@@ -44,7 +44,7 @@ export function useControlPopover(
         close.current();
         (anchor.current?.matches("button,input")
           ? anchor.current
-          : anchor.current?.querySelector<HTMLElement>("input,button")
+          : anchor.current?.querySelector<HTMLElement>('input:not([aria-hidden="true"]),button')
         )?.focus();
       }
     };

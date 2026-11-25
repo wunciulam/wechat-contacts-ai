@@ -63,7 +63,8 @@ async (page) => {
   await page.setViewportSize({ width: 1304, height: 880 });
   await page.getByRole("button", { name: /跟进工作台/ }).click();
   await page.getByRole("tab", { name: "客户分类", exact: true }).click();
-  await page.getByRole("button", { name: "管理分类", exact: true }).click();
+  const tabs=page.locator('.followup-tabs');const tabBox=await tabs.getByRole('tab',{name:'客户分类',exact:true}).boundingBox();const manageBox=await tabs.getByRole('button',{name:'管理分类',exact:true}).boundingBox();if(Math.abs(tabBox.y-manageBox.y)>8)throw Error('category action not in tab row');
+  await tabs.getByRole("button", { name: "管理分类", exact: true }).click();
   const categories = page.getByRole("dialog", {
     name: "管理分类",
     exact: true,

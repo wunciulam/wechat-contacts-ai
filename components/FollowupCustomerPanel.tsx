@@ -35,88 +35,28 @@ export function FollowupTaskDate({
   task: ProgressRecord;
   onDate: (date: string) => Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false),
-    [date, setDate] = useState(task.date),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const running = useRef(false);
   const overdue = task.date && task.date < chinaDate();
-  return (
-    <div className="followup-task-date">
-      {editing ? (
-        <div className="followup-date-edit">
-          <Input
-            autoFocus
-            type="date"
-            aria-label={"调整计划日期：" + task.content}
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            disabled={busy}
-          />
-          <IconButton
-            aria-label="确认改期"
-            disabled={busy || !isChatDate(date)}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await onDate(date);
-                setEditing(false);
-              } catch (e) {
-                setError(e instanceof Error ? e.message : "改期失败");
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <Check size={16} />
-          </IconButton>
-          <Button
-            size="sm"
-            disabled={busy}
-            onClick={() => {
-              setEditing(false);
-              setDate(task.date);
-            }}
-          >
-            取消
-          </Button>
-        </div>
-      ) : (
-        <div className="flex items-center justify-end gap-1">
-          <time
-            className={overdue ? "text-danger-600" : "text-gray-500"}
-            dateTime={task.date}
-          >
-            {task.date || "待安排日期"}
-          </time>
-          <IconButton
-            aria-label={"改期：" + task.content}
-            className="followup-date-icon"
-            onClick={() => {
-              setDate(task.date);
-              setEditing(true);
-            }}
-          >
-            <CalendarDays size={16} />
-          </IconButton>
-        </div>
-      )}
-      {overdue && !editing && (
-        <span className="text-danger-600">
-          逾期{" "}
-          {Math.floor(
-            (Date.parse(chinaDate()) - Date.parse(task.date)) / 86400000,
-          )}{" "}
-          天
-        </span>
-      )}
-      {error && (
-        <span role="alert" className="text-danger-600">
-          {error}
-        </span>
-      )}
+  async function changeDate(date: string) {
+    if (running.current || !isChatDate(date) || date === task.date) return;
+    running.current = true; setBusy(true); setError("");
+    try { await onDate(date); }
+    catch (e) { setError(e instanceof Error ? e.message : "改期未保存，请重试。"); }
+    finally { running.current = false; setBusy(false); }
+  }
+  return <div className="followup-task-date" aria-busy={busy}>
+    <div className="flex items-center justify-end gap-1">
+      <time className={overdue ? "text-danger-600" : "text-gray-500"} dateTime={task.date}>{task.date || "待安排日期"}</time>
+      <Input type="date" appearance="date-icon" aria-label={"改期：" + task.content}
+        className="followup-date-icon" value={task.date} disabled={busy}
+        onChange={e => { void changeDate(e.target.value); }} />
     </div>
-  );
+    {overdue && <span className="text-danger-600">逾期 {Math.floor((Date.parse(chinaDate()) - Date.parse(task.date)) / 86400000)} 天</span>}
+    {error && <span role="alert" className="text-danger-600">{error}</span>}
+  </div>;
 }
+
 export default function FollowupCustomerPanel({
   contact,
   onClose,

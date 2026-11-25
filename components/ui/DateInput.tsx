@@ -20,10 +20,11 @@ const offset = (s: string, days: number) => {
 };
 const DateInput = React.forwardRef<
   HTMLInputElement,
-  React.InputHTMLAttributes<HTMLInputElement>
+  React.InputHTMLAttributes<HTMLInputElement> & { iconOnly?: boolean }
 >(function DateInput(
   {
     value,
+    iconOnly = false,
     defaultValue,
     onChange,
     className = "",
@@ -51,6 +52,7 @@ const DateInput = React.forwardRef<
     [yearDraft, setYearDraft] = React.useState(""),
     [touched, setTouched] = React.useState(false);
   const input = React.useRef<HTMLInputElement>(null),
+    trigger = React.useRef<HTMLButtonElement>(null),
     anchor = React.useRef<HTMLSpanElement>(null),
     panel = React.useRef<HTMLDivElement>(null),
     calendarId = React.useId();
@@ -89,7 +91,7 @@ const DateInput = React.forwardRef<
     setTouched(false);
     setOpen(false);
     setMonthView(false);
-    el.focus();
+    (iconOnly ? trigger.current : el)?.focus();
   };
   const show = () => {
     if (disabled || readOnly) return;
@@ -175,6 +177,7 @@ const DateInput = React.forwardRef<
         ref={anchor}
         className="ui-date-control"
         data-disabled={disabled || undefined}
+        data-icon-only={iconOnly || undefined}
       >
         <input
           {...props}
@@ -204,7 +207,9 @@ const DateInput = React.forwardRef<
               ? `${calendarId}-error`
               : props["aria-describedby"]
           }
-          className="ui-input-content"
+          className={iconOnly ? "sr-only" : "ui-input-content"}
+          tabIndex={iconOnly ? -1 : props.tabIndex}
+          aria-hidden={iconOnly || undefined}
           onKeyDown={(e) => {
             props.onKeyDown?.(e);
             if (e.key === "ArrowDown" && !e.defaultPrevented) {
@@ -216,8 +221,9 @@ const DateInput = React.forwardRef<
         <button
           type="button"
           className="icon-btn"
+          ref={trigger}
           disabled={disabled || readOnly}
-          aria-label={`选择${label}`}
+          aria-label={iconOnly ? label : `选择${label}`}
           aria-expanded={open}
           aria-controls={calendarId}
           onClick={() => (open ? setOpen(false) : show())}
@@ -338,7 +344,7 @@ const DateInput = React.forwardRef<
               </div>
             </>
           )}
-          <div className="ui-calendar-footer">
+          {!iconOnly && <div className="ui-calendar-footer">
             <button
               type="button"
               className="btn btn-ghost btn-sm"
@@ -357,7 +363,7 @@ const DateInput = React.forwardRef<
             >
               今天
             </button>
-          </div>
+          </div>}
         </div>
       )}
     </span>

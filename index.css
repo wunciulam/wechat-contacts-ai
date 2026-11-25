@@ -333,6 +333,9 @@ select.input { padding-right: 32px; }
  .ui-date-field {display:block;min-width:0;}
  .ui-date-control {padding-right:4px;}
  .ui-date-control>button {flex-shrink:0;}
+ .ui-date-control[data-icon-only=true] {width:32px;height:32px;padding:0;border:0;background:transparent;}
+ .ui-date-control[data-icon-only=true]>.icon-btn {width:32px;height:32px;}
+ .ui-date-field:has(>.ui-date-control[data-icon-only=true]) {display:inline-block;flex-shrink:0;}
  .ui-input-content[type="search"]::-webkit-search-cancel-button {cursor:pointer;}
  .ui-select {min-width:0;}
  .ui-select-trigger {display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;font-weight:400;}
@@ -403,7 +406,8 @@ select.input { padding-right: 32px; }
   .followup-tabs [role=tablist] {display:flex;gap:8px;}
   .followup-tabs [role=tab] {height:36px;padding:8px 16px;border-radius:6px;font-size:14px;color:#737373;white-space:nowrap;}
   .followup-tabs [role=tab][aria-selected=true] {color:#171717;background:#fafafa;font-weight:600;}
-  .followup-tabs>small {font-size:12px;color:#737373;white-space:nowrap;}
+  .followup-tabs-tools {display:flex;align-items:center;gap:12px;margin-left:auto;}
+  .followup-tabs-tools>small {font-size:12px;color:#737373;white-space:nowrap;}
   .followup-home-content {min-height:0;flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:16px;background:#fafafa;}
   .followup-category-view {flex:1;min-height:0;overflow:hidden;}
   .followup-stats {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
@@ -430,9 +434,6 @@ select.input { padding-right: 32px; }
   .followup-task-date {font-size:12px;display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0;}
   .followup-date-icon {opacity:0;}
   .followup-task-row:hover .followup-date-icon,.followup-task-row:focus-within .followup-date-icon,.followup-customer-task:hover .followup-date-icon,.followup-customer-task:focus-within .followup-date-icon {opacity:1;}
-  .followup-date-edit {display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
-  .followup-date-edit>.ui-date-control {min-width:150px;}
-  .followup-task-row:has(.followup-date-edit) {grid-template-columns:16px 96px minmax(0,1fr) 236px;}
   .followup-future-toggle {display:flex;align-items:center;gap:8px;width:100%;text-align:left;font-size:12px;min-height:20px;}
   .followup-future-toggle span {color:#737373;flex:1;}
   .followup-future-toggle small {font-size:12px;color:#737373;}
@@ -480,7 +481,11 @@ select.input { padding-right: 32px; }
   .followup-judgment {display:flex;flex-direction:column;gap:20px;min-width:0;}
   .followup-ai-card {position:relative;isolation:isolate;border:2px solid transparent;border-radius:10px;overflow:hidden;background:linear-gradient(#fff,#fff) padding-box,linear-gradient(140deg,#47bad980,#8c5cd980,#f2c76b80,#fa8f7380) border-box;}
   .followup-ai-glow {position:absolute;inset:0;z-index:-1;pointer-events:none;overflow:hidden;border-radius:8px;}
-  .followup-ai-glow>span {position:absolute;border-radius:50%;}
+  .followup-ai-glow>span {position:absolute;border-radius:50%;animation:followup-glow-drift 24s ease-in-out infinite alternate;}
+  .followup-ai-glow-orange {animation-delay:-8s;}
+  .followup-ai-glow-purple {animation-delay:-16s;}
+  @keyframes followup-glow-drift {0% {translate:-8px -4px;opacity:.72;}50% {translate:8px 4px;opacity:1;}100% {translate:14px -6px;opacity:.8;}}
+  @media (prefers-reduced-motion:reduce) {.followup-ai-glow>span {animation:none;}}
   .followup-ai-glow-cyan {left:128.08px;top:-30.14px;width:113px;height:65px;background:#bdf3ffb3;filter:blur(50px);transform:rotate(-.096244deg);}
   .followup-ai-glow-orange {left:58px;top:-25px;width:107px;height:59px;background:#ffad3b4d;filter:blur(35px);}
   .followup-ai-glow-purple {left:-8px;top:-12px;width:84px;height:47px;background:#b200ff66;filter:blur(50px);}
@@ -503,9 +508,9 @@ select.input { padding-right: 32px; }
   .followup-ai-evidence div>.ui-action {font-size:12px;margin-top:6px;}
   .followup-customer-tasks {border-top:1px solid #e5e5e5;padding-top:18px;}
   .followup-customer-tasks h3 {font-size:14px;font-weight:600;margin-bottom:14px;}
-  .followup-customer-task {padding-bottom:12px;}
-  .followup-customer-task label {display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;cursor:pointer;}
-  .followup-customer-task .followup-task-date {margin-top:6px;}
+  .followup-customer-task {padding-bottom:12px;display:flex;gap:12px;align-items:flex-start;}
+  .followup-customer-task label {flex:1;min-width:0;min-height:32px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;cursor:pointer;}
+  .followup-customer-task .followup-task-date {margin-top:0;flex-shrink:0;}
   .followup-history {min-width:0;}
   .followup-history-heading {display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:16px;}
   .followup-history-heading h3 {font-size:14px;font-weight:600;}
@@ -555,19 +560,21 @@ select.input { padding-right: 32px; }
   @media (max-width:767px) {
     .followup-page-header {padding:16px;}
     .followup-tabs {padding:8px 16px;flex-wrap:wrap;}
-    .followup-tabs>small {margin-left:auto;}
+    .followup-tabs-tools {gap:8px;}
+    .followup-tabs-tools>small {display:none;}
+    .ui-date-control[data-icon-only=true],.ui-date-control[data-icon-only=true]>.icon-btn {width:44px;height:44px;}
     .followup-home-content {padding:16px;}
     .followup-stats {grid-template-columns:repeat(2,minmax(0,1fr));}
     .followup-lead-columns {grid-template-columns:1fr;}
-    .followup-task-row,.followup-task-row:has(.followup-date-edit) {grid-template-columns:16px minmax(0,1fr) 126px;gap:10px;padding:14px 0;}
+    .followup-task-row {grid-template-columns:16px minmax(0,1fr) 126px;gap:10px;padding:14px 0;}
     .followup-task-customer {grid-column:2;grid-row:1;}
     .followup-task-check {grid-column:1;grid-row:1;}
     .followup-task-copy {grid-column:2/4;grid-row:2;}
     .followup-task-date {grid-column:3;grid-row:1;}
-    .followup-task-row:has(.followup-date-edit) .followup-task-date {grid-column:2 / 4;grid-row:3;align-items:stretch;}
     .followup-basic-fields {gap:6px 12px;}
     .followup-basic-fields strong {font-size:12px;}
     .followup-date-icon {opacity:1;min-width:36px;min-height:44px;}
+    .followup-customer-task label {min-height:44px;}
     .followup-customer-basics {align-items:flex-start;}
     .followup-basic-fields {gap:6px 12px;}
     .followup-customer-basics>div:last-child {margin-left:auto;}

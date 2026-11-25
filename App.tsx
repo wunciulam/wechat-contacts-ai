@@ -970,7 +970,7 @@ const App: React.FC = () => {
               );
           case 'followups':
               return (
-                  <FollowupWorkspace contacts={contacts} onImport={openChatImport} onEdit={contact=>{setEditingContact(contact);setIsModalOpen(true);}} onSave={async(id,bundle)=>{await beforePolicySave();const saved=await saveFollowupBundle(id,bundle);acceptSavedFollowup(saved);return saved;}} renderCategories={open=> <CategoryBoard embedded
+                  <FollowupWorkspace onManageCategories={()=>setIsCategoryManagerOpen(true)} contacts={contacts} onImport={openChatImport} onEdit={contact=>{setEditingContact(contact);setIsModalOpen(true);}} onSave={async(id,bundle)=>{await beforePolicySave();const saved=await saveFollowupBundle(id,bundle);acceptSavedFollowup(saved);return saved;}} renderCategories={open=> <CategoryBoard embedded
                      contacts={contacts}
                      categories={categories}
                      filterTags={selectedTags}
