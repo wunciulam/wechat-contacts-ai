@@ -1,3 +1,4 @@
+import FollowupTaskDelete,{type DeleteTask} from './FollowupTaskDelete';
 import React, { useState, useEffect, useRef } from "react";
 import {
   Sparkles,
@@ -100,6 +101,7 @@ export function FollowupTaskDate({
 }
 
 export default function FollowupCustomerPanel({
+  onDeleteTask,
   contact,
   onClose,
   onEdit,
@@ -128,6 +130,7 @@ export default function FollowupCustomerPanel({
   followupStatusControl?:React.ReactNode;
   closeDisabled?:boolean;
   contact: Contact;
+  onDeleteTask?:DeleteTask;
   onClose: () => void;
   onEdit: () => void;
   onImport: () => void;
@@ -477,7 +480,7 @@ export default function FollowupCustomerPanel({
                         />
                         <span>{task.content}</span>
                       </label>
-                      <FollowupTaskDate
+                      <div className="followup-task-actions"><FollowupTaskDate
                         task={task}
                     showOverdue={false}
                         onDate={(date) =>
@@ -488,6 +491,7 @@ export default function FollowupCustomerPanel({
                           }).then(() => {})
                         }
                       />
+                      {onDeleteTask&&<FollowupTaskDelete contactId={contact.id} task={task} onDelete={onDeleteTask}/>}</div>
                     </div>
                   ))}
                 </section>

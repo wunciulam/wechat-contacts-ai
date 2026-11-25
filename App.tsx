@@ -1,3 +1,4 @@
+import {matchesCustomerFilters} from './services/customerFilters';
 import AiSettingsDialog from "./components/AiSettingsDialog";
 import CustomerDetailDialog, {
   type CustomerRequest,
@@ -197,6 +198,7 @@ const App: React.FC = () => {
   const [isMingyaImportOpen, setIsMingyaImportOpen] = useState(false);
   const [mingyaPayload, setMingyaPayload] = useState<unknown>(null);
 
+  const [selectedCategories,setSelectedCategories]=useState<Set<string>>(new Set());
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentView, setCurrentView] = useState<
@@ -1386,12 +1388,15 @@ const App: React.FC = () => {
     source?: string,
   ) => updateContactCategory(contactId, null, target, source);
 
+  const filteredByCustomer=contacts.filter(c=>matchesCustomerFilters(c,selectedTags,selectedCategories,categories));
+  const deleteTask=async(id:string,task:ProgressRecord)=>{const saved=await saveFollowup(id,"delete",task,task);acceptSavedFollowup(saved);return saved;};
   const renderContent = () => {
     switch (currentView) {
       case "contacts":
         return (
           <ContactList
-            contacts={contacts}
+            contacts={filteredByCustomer}
+            hasCategoryFilter={selectedCategories.size>0}
             onEdit={(contact) =>
               setCustomerDetail({ id: contact.id, tab: "profile" })
             }
@@ -1410,7 +1415,7 @@ const App: React.FC = () => {
             }
             onBatchDelete={handleBatchDelete}
             onRemoveTagFromContact={handleRemoveTagFromContact}
-            onClearTags={() => setSelectedTags(new Set())}
+            onClearTags={() => {setSelectedTags(new Set());setSelectedCategories(new Set());}}
             onUpdateStatus={handleUpdateStatus}
             onBatchUpdateStatus={handleBatchUpdateStatus}
           />
@@ -1418,12 +1423,13 @@ const App: React.FC = () => {
       case "followups":
         return (
           <FollowupWorkspace
+            onDeleteTask={deleteTask}
             onOpenAiSettings={()=>setAiSettingsOpen(true)}
             onOpenCustomer={(c, evidenceId) =>
               setCustomerDetail({ id: c.id, tab: "followup", evidenceId })
             }
             onManageCategories={() => setIsCategoryManagerOpen(true)}
-            contacts={contacts}
+            contacts={filteredByCustomer}
             onImport={openChatImport}
             onEdit={(contact) => {
               setEditingContact(contact);
@@ -1438,7 +1444,7 @@ const App: React.FC = () => {
             renderCategories={(open) => (
               <CategoryBoard
                 embedded
-                contacts={contacts}
+                contacts={filteredByCustomer}
                 categories={categories}
                 filterTags={selectedTags}
                 followUpFilter={followUpFilter}
@@ -1468,6 +1474,7 @@ const App: React.FC = () => {
             onContacts={acceptSavedPolicyContacts}
             beforeSave={beforePolicySave}
             contacts={contacts}
+            visibleCustomerIds={new Set(filteredByCustomer.map(c=>c.id))}
             filterTags={selectedTags}
             followUpFilter={followUpFilter}
             onOpenCustomer={(contact) =>
@@ -1491,6 +1498,9 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-white overflow-hidden font-sans">
       <Sidebar
+        categories={categories}
+        selectedCategories={selectedCategories}
+        onSelectCategory={id=>setSelectedCategories(old=>{const next=new Set(old);next.has(id)?next.delete(id):next.add(id);return next;})}
         tags={allTags}
         selectedTags={selectedTags}
         onSelectTag={handleToggleTag}

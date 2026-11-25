@@ -919,7 +919,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
                     )}
                 </div>
 
-                {embedded&&initialData&&<div><span className="block text-xs font-medium text-gray-700 mb-1.5">客户分类</span><div className="flex flex-wrap gap-2">{categoryIds(initialData).length?categoryIds(initialData).map(id=><SystemTag key={id} tone={categoryTagTone(categories.find(c=>c.id===id)?.color)}>{categories.find(c=>c.id===id)?.name||'未分类'}</SystemTag>):<SystemTag>未分类</SystemTag>}</div></div>}
+                {categories.length>0&&<Field label="客户分类"><div className="flex flex-wrap gap-3">{categories.map(category=><label key={category.id} className="flex items-center gap-2 text-sm"><input type="checkbox" aria-label={'客户分类：'+category.name} checked={categoryIds(formData).includes(category.id)} onChange={e=>{const ids=categoryIds(formData);const next=e.target.checked?[...ids,category.id]:ids.filter(id=>id!==category.id);setFormData({...formData,categoryIds:next,categoryId:next[0]||''});}}/><SystemTag tone={categoryTagTone(category.color)}>{category.name}</SystemTag></label>)}</div></Field>}
                 <Field className="" label={<>详细描述</>}>
                   <Textarea
                     id="contact-description"

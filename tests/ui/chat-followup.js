@@ -18,9 +18,10 @@ async (page) => {
  if(await dialog.getByRole('button',{name:/编辑消息：.*对比表/}).count()!==1)throw Error('OCR overlap duplicated');
  if(!await dialog.getByText('日期待确认',{exact:true}).isVisible())throw Error('undated screenshot guessed a date');
  await page.screenshot({timeout:30000,path:'output/ui-regression/chat-ocr-desktop.png'});
- await dialog.getByRole('button',{name:'粘贴聊天文字'}).click();
- await dialog.getByLabel('聊天文字',{exact:true}).fill('2026-11-20 09:00\n客户：医疗保障够吗\n我：发保障表，我先核对\n2026-11-21 10:00\n客户：等我和家人商量\n我：等您确认');
- await dialog.getByRole('button',{name:'识别文字结构'}).click();
+ while(await dialog.getByRole('button',{name:'移除第1张'}).count())await dialog.getByRole('button',{name:'移除第1张'}).click();
+ await page.route('**/api/chat-vision',route=>{visionCalls++;return route.fulfill({json:{messages:[['医疗保障够吗','customer','2026-11-20','09:00'],['发保障表，我先核对','self','2026-11-20','09:01'],['等我和家人商量','customer','2026-11-21','10:00'],['等您确认','self','2026-11-21','10:01']].map(([text,speaker,date,time],i)=>({text,speaker,date,time,image:0,reviewRequired:false,box:[100,80+i*140,600,160+i*140]}))}});});
+ await dialog.locator('input[type=file]').setInputFiles('tests/fixtures/chat-vision-multiline.png');
+ await dialog.getByRole('button',{name:'编辑消息：医疗保障够吗',exact:true}).waitFor();
  if(await dialog.locator('input[type=checkbox]:checked').count()!==5)throw Error('review is not selected by default');
  await page.screenshot({timeout:30000,path:'output/ui-regression/chat-review-desktop.png'});
  await dialog.getByRole('button',{name:'生成每日梗概',exact:true}).click();

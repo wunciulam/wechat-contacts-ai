@@ -1,3 +1,4 @@
+import FollowupTaskDelete,{type DeleteTask} from './FollowupTaskDelete';
 import React, { useEffect, useRef, useState } from "react";
 import {
   CalendarDays,
@@ -44,6 +45,7 @@ import FollowupCustomerPanel, {
 type TaskEntry = { contactId: string; task: ProgressRecord };
 export default function FollowupWorkspace({
   contacts,
+  onDeleteTask,
   onSave,
   onImport,
   onEdit,
@@ -53,6 +55,7 @@ export default function FollowupWorkspace({
   onOpenAiSettings,
 }: {
   contacts: Contact[];
+  onDeleteTask:DeleteTask;
   onSave: BundleSave;
   onImport: (id?: string) => void;
   onEdit: (c: Contact) => void;
@@ -295,14 +298,14 @@ export default function FollowupWorkspace({
         <h3>{task.content}</h3>
         <p>{notes(contact)[0]?.content || "尚无沟通记录"}</p>
       </div>
-      <FollowupTaskDate
+      <div className="followup-task-actions"><FollowupTaskDate
         task={task}
         onDate={(date) =>
           onSave(contact.id, {
             writes: [{ record: { ...task, date }, expected: task }],
           }).then(() => {})
         }
-      />
+      /><FollowupTaskDelete contactId={contact.id} task={task} onDelete={onDeleteTask}/></div>
     </div>
   );
   const leadCard = (c: Contact, type: "follow" | "reactivate" | "check") => (
@@ -612,6 +615,7 @@ export default function FollowupWorkspace({
       {selected && (
         <FollowupCustomerPanel
           contact={selected}
+          onDeleteTask={onDeleteTask}
           onClose={() => setCustomerId(null)}
           onEdit={() => {
             setCustomerId(null);

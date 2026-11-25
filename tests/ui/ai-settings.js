@@ -156,11 +156,9 @@ async (page) => {
   await customer.getByText("现有保障待核对", { exact: true }).waitFor();
   await customer.getByRole("button", { name: "导入聊天", exact: true }).click();
   const chat = page.getByRole("dialog", { name: "导入聊天记录", exact: true });
-  await chat.getByRole("button", { name: "粘贴聊天文字", exact: true }).click();
-  await chat
-    .getByLabel("聊天文字", { exact: true })
-    .fill("2026-11-20 10:00\n客户：保障够吗\n我：发保障表，我帮您核对");
-  await chat.getByRole("button", { name: "识别文字结构", exact: true }).click();
+  await page.route('**/api/chat-vision',route=>route.fulfill({json:{messages:[{text:'保障够吗',speaker:'customer',date:'2026-11-20',time:'10:00',image:0,reviewRequired:false,box:[100,100,600,200]},{text:'发保障表，我帮您核对',speaker:'self',date:'2026-11-20',time:'10:01',image:0,reviewRequired:false,box:[100,250,600,350]}]}}));
+  await chat.locator('input[type=file]').setInputFiles('tests/fixtures/chat-vision-multiline.png');
+  await chat.getByRole('button',{name:'编辑消息：保障够吗',exact:true}).waitFor();
   await chat.getByRole("button", { name: "生成每日梗概", exact: true }).click();
   await chat.getByLabel("2026-11-20每日梗概").waitFor();
   if (!modes.includes("daily")) throw Error("daily analysis not connected");

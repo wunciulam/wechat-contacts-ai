@@ -19,8 +19,9 @@ test("marquee selects and cancels intersecting bubbles from an unchanged baselin
     false,
   );
   const base = new Set(["a"]);
-  assert.deepEqual([...applyMarquee(base, ["b"], "retain")], ["a", "b"]);
-  assert.deepEqual([...applyMarquee(base, ["a"], "exclude")], []);
+  assert.deepEqual([...applyMarquee(base, ["b"])], ["a", "b"]);
+  assert.deepEqual([...applyMarquee(base, ["a"])], []);
+  assert.deepEqual([...applyMarquee(base, ["a","b","b"])], ["b"]);
   assert.deepEqual([...base], ["a"]);
 });
 test("unreviewed selected text with known date and speaker can generate, unfinished unrelated rows never block it", () => {

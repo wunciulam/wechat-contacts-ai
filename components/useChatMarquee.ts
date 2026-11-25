@@ -13,8 +13,7 @@ export default function useChatMarquee(
   onChange: () => void,
   enabled: boolean,
 ) {
-  const [mode, setMode] = useState<"retain" | "exclude">("retain"),
-    [rect, setRect] = useState<SelectionRect | null>(null);
+  const [rect, setRect] = useState<SelectionRect | null>(null);
   const gesture = useRef<{
       x: number;
       y: number;
@@ -23,7 +22,6 @@ export default function useChatMarquee(
       startClientX: number;
       startClientY: number;
       base: Set<string>;
-      mode: "retain" | "exclude";
       active: boolean;
       pointerId: number;
     } | null>(null),
@@ -58,7 +56,7 @@ export default function useChatMarquee(
         });
       })
       .map((row) => row.dataset.chatMessage!);
-    const next = applyMarquee(g.base, hits, g.mode);
+    const next = applyMarquee(g.base, hits);
     setSelected((old) =>
       old.size === next.size && [...old].every((id) => next.has(id))
         ? old
@@ -93,7 +91,6 @@ export default function useChatMarquee(
       startClientX: e.clientX,
       startClientY: e.clientY,
       base: new Set(selected),
-      mode: e.altKey ? "exclude" : mode,
       active: false,
       pointerId: e.pointerId,
     };
@@ -140,8 +137,6 @@ export default function useChatMarquee(
     [],
   );
   return {
-    mode,
-    setMode,
     rect,
     handlers: {
       onPointerDown: down,

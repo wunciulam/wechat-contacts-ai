@@ -1,3 +1,5 @@
+import type {Category} from '../types';
+import {UNCATEGORIZED} from '../services/customerFilters';
 import Input from './ui/Input';
 import WorkspaceDialog from './WorkspaceDialog';
 import Button, {IconButton} from './ui/Button';
@@ -7,6 +9,9 @@ import { Users, PlusCircle, Trash2, Edit2, Check, X, Sparkles, ClipboardList, Fi
 import { Clock, CheckCircle2, CircleDashed } from 'lucide-react';
 
 interface SidebarProps {
+  categories:Category[];
+  selectedCategories:Set<string>;
+  onSelectCategory:(id:string)=>void;
   tags: string[];
   selectedTags: Set<string>;
   onSelectTag: (tag: string | null) => void;
@@ -27,7 +32,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
-  tags, selectedTags, onSelectTag, onAddNew, onDeleteTag, onRenameTag, onBatchDeleteTags, onToggleAllTags, totalContacts, followUpCount, policyCount, currentView, onChangeView, followUpFilter, onFollowUpFilter, isMobileOpen, onCloseMobile
+  categories,selectedCategories,onSelectCategory,tags, selectedTags, onSelectTag, onAddNew, onDeleteTag, onRenameTag, onBatchDeleteTags, onToggleAllTags, totalContacts, followUpCount, policyCount, currentView, onChangeView, followUpFilter, onFollowUpFilter, isMobileOpen, onCloseMobile
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [editingTag, setEditingTag] = useState<string | null>(null);
@@ -123,7 +128,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             ))}
           </div>
 
-          {!compact && (
+          {!compact && (<div className="space-y-5">
             <div className="space-y-1 animate-fade-in">
               <div className="flex items-center justify-between px-3 mb-2">
                 <div className="flex items-center gap-2">
@@ -165,6 +170,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 </div>
               ))}
+            </div>
+            <section aria-label="客户分类筛选"><h2 className="px-3 mb-2 text-xs font-semibold text-gray-500">客户分类筛选</h2><div className="space-y-1">{[...categories,{id:UNCATEGORIZED,name:"未分类"}].map(category=><label key={category.id} className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-gray-50 cursor-pointer"><input type="checkbox" aria-label={"筛选分类："+category.name} checked={selectedCategories.has(category.id)} onChange={()=>onSelectCategory(category.id)}/><span>{category.name}</span></label>)}</div></section>
             </div>
           )}
         </div>

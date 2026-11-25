@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { ImagePlus, ArrowUp, ArrowDown, X, Pencil } from "lucide-react";
 import type { Contact, ChatMessage } from "../types";
 import {
-  parseMessages,
   groupMessages,
   mergeMessages,
   dailyDraft,
@@ -52,8 +51,6 @@ export default function ChatFollowUpDialog({
     [selected, setSelected] = useState<Set<string>>(new Set()),
     [step, setStep] = useState<"review" | "summary">("review");
   const [summaries, setSummaries] = useState<Record<string, string>>({}),
-    [paste, setPaste] = useState(""),
-    [showPaste, setShowPaste] = useState(false),
     [editing, setEditing] = useState<string | null>(null),
     [activeFile, setActiveFile] = useState(0),
     [zoomFile,setZoomFile]=useState<File|null>(null);
@@ -75,7 +72,7 @@ export default function ChatFollowUpDialog({
   const reviewRef=useRef<HTMLElement|null>(null);
   const marquee=useChatMarquee(reviewRef,selected,setSelected,()=>setSummaries({}),step==='review'&&!busy&&!confirmClose);
   const grouped=groupMessages(messages),days=groupMessages(ready),
-    dirty = files.length > 0 || messages.length > 0 || Boolean(paste.trim());
+    dirty = files.length > 0 || messages.length > 0;
   const allMerged = days.flatMap(([date, rows]) =>
     mergeMessages(
       notes(contact || ({ progressHistory: [] } as Contact)).find(
@@ -102,13 +99,6 @@ export default function ChatFollowUpDialog({
       return n;
     });
     setSummaries({});
-  }
-  function setTranscript(text: string) {
-    const rows = parseMessages(text);
-    setMessages(rows);
-    setSelected(new Set(rows.map((m) => m.id)));
-    setSummaries({});
-    setManualOption(false);
   }
   async function recognize(incoming:File[],only?:File){
     if(busyRef.current)return;busyRef.current=true;setBusy('ocr');setError('');
@@ -234,12 +224,6 @@ export default function ChatFollowUpDialog({
                 value={m.date}
                 onChange={(e) => patch(m.id, { date: e.target.value })}
               />
-              <Input
-                aria-label="消息时间"
-                value={m.time}
-                placeholder="HH:mm"
-                onChange={(e) => patch(m.id, { time: e.target.value })}
-              />
               <Textarea
                 aria-label="消息原文"
                 rows={2}
@@ -338,7 +322,6 @@ export default function ChatFollowUpDialog({
                     e.target.value = "";
                   }}
                 />
-                <p className="text-xs text-gray-500">截图临时发送给 DeepSeek Flash 识别，系统只保存确认后的文字。</p>
                 {files.map((file, i) => (
                   <div key={file.name + i} className="chat-source-file">
                     <Button
@@ -385,7 +368,7 @@ export default function ChatFollowUpDialog({
                           setActiveFile(0);
                           visionCache.current.delete(file);
                           if (remaining.length) void recognize(remaining);
-                          else setTranscript("");
+                          else {setMessages([]);setSelected(new Set());setSummaries({});}
                         }}
                       >
                         <X size={14} />
@@ -401,12 +384,6 @@ export default function ChatFollowUpDialog({
                 {files.length > 0 && (
                   <Button onClick={() => {if(messages.length&&!window.confirm("重新识别会替换已校对内容，继续？"))return;visionCache.current.clear();void recognize(files);}}>重新识别</Button>
                 )}
-                <Button
-                  variant="plain"
-                  onClick={() => setShowPaste(!showPaste)}
-                >
-                  粘贴聊天文字
-                </Button>
               </>
             ) : (
               <>
@@ -434,26 +411,6 @@ export default function ChatFollowUpDialog({
           {marquee.rect&&<div className="chat-selection-box" aria-hidden="true" style={{left:marquee.rect.left,top:marquee.rect.top,width:marquee.rect.right-marquee.rect.left,height:marquee.rect.bottom-marquee.rect.top}}/>}
             {step === "review" ? (
               <>
-                {showPaste && (
-                  <div className="space-y-2">
-                    <Field label="聊天文字">
-                      <Textarea
-                        rows={4}
-                        value={paste}
-                        onChange={(e) => setPaste(e.target.value)}
-                        placeholder="2026-11-23 09:12&#10;客户：孩子有团险，再买会重复吗？&#10;我：发我保障表，我先核对范围。"
-                      />
-                    </Field>
-                    <Button
-                      onClick={() => {
-                        setTranscript(paste);
-                        setShowPaste(false);
-                      }}
-                    >
-                      识别文字结构
-                    </Button>
-                  </div>
-                )}
                 <div className="flex items-center justify-between gap-2">
                   <label className="flex items-center gap-2 text-sm">
                     <input
@@ -472,11 +429,10 @@ export default function ChatFollowUpDialog({
                     />
                     识别结果
                   </label>
-                  <div className="chat-marquee-tools"><Button size="sm" variant={marquee.mode==='retain'?'secondary':'ghost'} aria-pressed={marquee.mode==='retain'} onClick={()=>marquee.setMode('retain')}>框选保留</Button><Button size="sm" variant={marquee.mode==='exclude'?'secondary':'ghost'} aria-pressed={marquee.mode==='exclude'} onClick={()=>marquee.setMode('exclude')}>框选取消</Button></div>
                 </div>
                 {!messages.length && (
                   <div className="chat-empty">
-                    添加截图，或粘贴带日期的聊天文字。
+                    添加聊天截图
                   </div>
                 )}
                 {grouped.map(([d, rows]) => (

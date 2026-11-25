@@ -17,6 +17,7 @@ interface ContactListProps {
   onEdit: (contact: Contact) => void;
   onDelete: (id: string) => void;
   filterTags: Set<string>;
+  hasCategoryFilter?:boolean;
   followUpFilter: 'idle' | 'following' | 'contacted' | null;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
@@ -36,6 +37,7 @@ export const ContactList: React.FC<ContactListProps> = ({
   onEdit,
   onDelete,
   filterTags,
+  hasCategoryFilter=false,
   followUpFilter,
   selectedIds,
   onToggleSelect,
@@ -125,7 +127,7 @@ export const ContactList: React.FC<ContactListProps> = ({
     <div className="flex-1 h-full w-full overflow-hidden flex flex-col bg-white relative">
       <div className="sticky top-0 z-20 shrink-0 bg-white border-b border-gray-100">
         <PageHeader
-          title={filterTags.size > 0 ? `筛选：${filterTags.size} 个标签` : '全部联系人'}
+          title={filterTags.size>0||hasCategoryFilter?"筛选结果":"全部联系人"}
           count={filteredContacts.length}
           selectedCount={selectedIds.size}
           allSelected={allSelected}
@@ -194,9 +196,9 @@ export const ContactList: React.FC<ContactListProps> = ({
               <User size={26} className="text-gray-300" />
             </div>
             <p className="text-sm font-medium text-gray-500">暂无联系人</p>
-            <p className="text-xs mt-1 text-gray-400">添加或导入联系人开始使用</p>
+            {!searchTerm&&!filterTags.size&&!hasCategoryFilter&&<p className="text-xs mt-1 text-gray-400">添加或导入联系人开始使用</p>}
 
-            {(searchTerm || filterTags.size > 0) && (
+            {(searchTerm || filterTags.size > 0 || hasCategoryFilter) && (
               <Button
                 onClick={handleClearFilters}
                 className="mt-3 px-3 py-1.5 border border-gray-200 text-gray-500 text-xs font-medium rounded-md hover:bg-gray-50 transition-colors cursor-pointer" variant="plain"

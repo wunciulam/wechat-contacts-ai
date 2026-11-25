@@ -195,6 +195,7 @@ export default function CustomerDetailDialog({
     <>
       <FollowupCustomerPanel
         contact={contact}
+        onDeleteTask={(_id,task)=>onMutateHistory("delete",task,task)}
         activeTab={tab}
         onTabChange={switchTab}
         profileContent={profile}

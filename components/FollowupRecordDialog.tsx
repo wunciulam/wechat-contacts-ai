@@ -24,6 +24,7 @@ export default function FollowupRecordDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const deletingTask=mode==="delete"&&record.kind==="task";
   const [date, setDate] = useState(record.date),
     [content, setContent] = useState(record.content),
     [channel, setChannel] = useState(record.channel || ""),
@@ -78,7 +79,7 @@ export default function FollowupRecordDialog({
   }
   return (
     <WorkspaceDialog
-      title={mode === "edit" ? "编辑跟进记录" : "删除跟进记录"}
+      title={deletingTask?"删除待办":mode === "edit" ? "编辑跟进记录" : "删除跟进记录"}
       compact
       onClose={close}
       closeDisabled={busy}
@@ -90,7 +91,7 @@ export default function FollowupRecordDialog({
             <p className="mt-1 whitespace-pre-wrap">{record.content}</p>
           </blockquote>
           <p className="text-sm text-gray-600">
-            {record.chat
+            {deletingTask?"删除这项待办？已有沟通历史保留。":record.chat
               ? "删除这条跟进概要及其聊天原话？"
               : "删除这条跟进记录？"}
             {record.taskId ? "关联待办的完成状态保持不变。" : ""}

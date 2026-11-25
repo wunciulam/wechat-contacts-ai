@@ -25,10 +25,9 @@ export const intersects = (a: SelectionRect, b: SelectionRect) =>
 export function applyMarquee(
   base: Set<string>,
   hits: string[],
-  mode: "retain" | "exclude",
 ) {
   const next = new Set(base);
-  for (const id of hits) mode === "retain" ? next.add(id) : next.delete(id);
+  for (const id of new Set(hits)) base.has(id) ? next.delete(id) : next.add(id);
   return next;
 }
 export function summarySelection(

@@ -1,0 +1,261 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "name": "fixture load",
+      "loaded": true
+    },
+    {
+      "name": "desktop date/select/keyboard",
+      "value": "2009-05-19",
+      "status": "待生效",
+      "sizes": {
+        "date": 38,
+        "select": 38
+      },
+      "calendarInsideViewport": true,
+      "errors": []
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "mobile modal/scroll/drawer",
+      "passed": true,
+      "mobileCalendar": true,
+      "stackedFields": true,
+      "scrolling": {
+        "scroll": 585,
+        "height": 552,
+        "total": 1137
+      },
+      "fixedFooter": true,
+      "navigationFocus": true
+    },
+    {
+      "name": "search alignment and filtering",
+      "passed": true,
+      "metrics": [
+        {
+          "gap": 8,
+          "height": 38
+        }
+      ]
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "follow-up failure/retry",
+      "passed": true,
+      "failedInputRetained": true,
+      "retryPersistedAfterReload": true
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "business entry regression",
+      "passed": true,
+      "policyFields": 16,
+      "terminalPoliciesHidden": true,
+      "invalidDateBlocked": true,
+      "newPolicyMobileFooter": true,
+      "categorySearchGap": 8,
+      "mingyaOnlyEntry": true
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "density and customer search",
+      "passed": true,
+      "embeddedFields": true,
+      "history": {
+        "height": 1146,
+        "overflow": "visible"
+      },
+      "boardStatusRemoved": true,
+      "searchableCustomer": true
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "contact basic information",
+      "passed": true,
+      "storedFieldsDisplayed": true,
+      "addressPersistedAfterReload": true,
+      "historyAndPoliciesPreserved": true,
+      "mobileFits": true
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "chat OCR, evidence, archive and tasks",
+      "visionOCR": true,
+      "visionCalls": 4,
+      "batchLongOCR": true,
+      "dailyMerge": true,
+      "rawSource": true,
+      "defaultSelection": true,
+      "separateAnalysis": true,
+      "atomicResult": true,
+      "undoPreservesHistory": true,
+      "saveFailure": true,
+      "desktopMobile": true,
+      "requests": 5
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "unified customer profile/followup/policies",
+      "passed": true,
+      "sharedCustomer": true,
+      "threeEntryDefaults": true,
+      "fullPolicyColumns": 10,
+      "mobileHorizontalScroll": {
+        "width": 288,
+        "total": 1682,
+        "scroll": 1394
+      },
+      "profileFailureRetained": true,
+      "returnCategoryTab": true,
+      "errors": []
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "AI configuration and connected analysis",
+      "passed": true,
+      "invalidKeyRetained": true,
+      "testBeforeSave": true,
+      "modelChangeRevalidates": true,
+      "failedSaveRetained": true,
+      "keyNotEchoed": true,
+      "desktopMobile": true,
+      "customerAndDailyConnected": [
+        "customer",
+        "customer",
+        "customer",
+        "daily"
+      ]
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "vision tiles, retry and full-bubble review",
+      "passed": true,
+      "multilineOneBubble": true,
+      "longTiles": {
+        "images": 3,
+        "widths": [
+          780,
+          780,
+          780
+        ],
+        "heights": [
+          2036,
+          2036,
+          1168
+        ],
+        "encoded": true
+      },
+      "failedFileRetryOnly": true,
+      "manualCorrectionsRetained": true,
+      "unreviewedDraftAllowed": true,
+      "calls": 3
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "timeline, colors, date and motion",
+      "passed": true,
+      "tagColors": [
+        "oklch(0.95 0.052 163.051)",
+        "oklch(0.932 0.032 255.585)",
+        "oklch(0.943 0.029 294.588)",
+        "oklch(0.962 0.059 95.617)"
+      ],
+      "category": {
+        "color": "oklch(0.962 0.059 95.617)",
+        "size": "12px",
+        "tone": true
+      },
+      "yearOnce": true,
+      "dateNodeContentOrder": {
+        "dateRight": 640.5,
+        "markLeft": 652.5,
+        "markRight": 661.5,
+        "textLeft": 673.5,
+        "textBottom": 448,
+        "channelTop": 457
+      },
+      "pastOnlyRed": true,
+      "animatedBorder": true,
+      "reducedMotion": true
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "record edit/delete, zoom, marquee and partial drafts",
+      "passed": true,
+      "editFailureRetained": true,
+      "rawWordsPreserved": true,
+      "deleteFailureRetained": true,
+      "deletePersisted": true,
+      "year": {
+        "color": "rgb(15, 15, 15)",
+        "weight": "600"
+      },
+      "compactHistory": true,
+      "workspaceTodayNeutral": true,
+      "noOverdueDays": true,
+      "imageZoomPan": true,
+      "marqueeRetainCancel": true,
+      "noAccidentalEditing": true,
+      "partialUnreviewedDraft": true,
+      "unknownDatesNotArchived": true,
+      "recognitionCalls": 1
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "customer category filters, task deletion and simplified import",
+      "passed": true,
+      "editableCategories": true,
+      "failedSaveRetained": true,
+      "jointFilters": true,
+      "taskDeleteRetry": true,
+      "historyPreserved": true,
+      "removedChatControls": true,
+      "mobile": true
+    },
+    {
+      "name": "component acceptance",
+      "passed": true,
+      "sharedKeyboardSelect": true,
+      "sharedCalendar": true,
+      "desktopAndMobileDialog": true
+    }
+  ]
+}

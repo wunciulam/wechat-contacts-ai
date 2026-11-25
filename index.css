@@ -658,7 +658,17 @@ select.input { padding-right: 32px; }
   .chat-review {position:relative;}
   .chat-review[data-marquee-active=true] {user-select:none;}
   .chat-selection-box {position:absolute;pointer-events:none;z-index:30;border:1px solid #737373;background:#1717170d;}
-  .chat-marquee-tools {display:flex;gap:4px;}
-  @media(hover:none){.followup-record-actions{opacity:1;}.chat-marquee-tools{display:none;}}
-  @media(max-width:767px){.followup-record-actions{opacity:1;}.chat-marquee-tools{display:none;}.chat-screenshot-viewport{height:65dvh;}}
+  @media(hover:none){.followup-record-actions{opacity:1;}}
+  @media(max-width:767px){.followup-record-actions{opacity:1;}.chat-screenshot-viewport{height:65dvh;}}
 }
+
+@layer components {
+ @media(max-width:767px){.followup-task-row>.followup-task-actions{grid-column:3;grid-row:1;}}
+ .followup-task-actions{display:flex;align-items:center;justify-content:flex-end;gap:4px;min-width:0;}
+ .followup-task-delete{opacity:0;}
+ .followup-task-row:hover .followup-task-delete,.followup-task-row:focus-within .followup-task-delete,.followup-customer-task:hover .followup-task-delete,.followup-customer-task:focus-within .followup-task-delete{opacity:1;}
+ @media(hover:none){.followup-task-delete{opacity:1;}}
+ @media(max-width:767px){.followup-task-delete{opacity:1;}}
+}
+
+@layer components {@media(max-width:767px){.followup-task-row{grid-template-columns:16px minmax(0,1fr) 156px;}}}

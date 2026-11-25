@@ -48,11 +48,13 @@ export default function RenewalWorkspace({
   onContacts,
   beforeSave,
   customerId,
+  visibleCustomerIds,
   initialPolicyId,
   onCloseDetail,
   ...dashboardProps
 }: {
   contacts: Contact[];
+  visibleCustomerIds?:Set<string>;
   embedded?: boolean;
   onOpenCustomer?: (contact: Contact) => void;
   importFiles?: FileList | null;
@@ -563,7 +565,7 @@ export default function RenewalWorkspace({
       {!remindersOpen && !customerId ? (
         <PolicyDashboard
           {...dashboardProps}
-          contacts={projectContacts(contacts, data.policies, true)}
+          contacts={projectContacts(contacts, data.policies, true).filter(c=>!visibleCustomerIds||visibleCustomerIds.has(c.id))}
           filterTags={dashboardProps.filterTags || new Set()}
           followUpFilter={dashboardProps.followUpFilter || null}
           onEditContact={dashboardProps.onEditContact || (() => {})}
