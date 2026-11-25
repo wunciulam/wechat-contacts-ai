@@ -1,10 +1,7 @@
 async (page) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page
-    .getByRole("dialog", { name: "示例客户的客户详情", exact: true })
-    .getByRole("button", { name: "取消", exact: true })
-    .click();
+
   page._follow.contacts[0].progressHistory.push({id:'unified-task',kind:'task',date:'2026-11-22',content:'统一详情待办',completed:false});
   await page.reload();await page.getByRole('heading',{name:'示例客户',exact:true}).click();
   const detail = page.getByRole("dialog", {
@@ -121,20 +118,11 @@ async (page) => {
     (await edit.getByRole("button", { name: "添加保单", exact: true }).count())
   )
     throw Error("profile editor duplicates domain tabs");
-  await edit.getByLabel("地址", { exact: true }).fill("统一客户详情回归地址");
-  page._autoDismissDialogs=false;page.once('dialog',d=>d.dismiss());await detail.getByRole('tab',{name:'跟进',exact:true}).click();page._autoDismissDialogs=true;if(await detail.getByRole('tab',{name:'资料',exact:true}).getAttribute('aria-selected')!=='true'||await edit.getByLabel('地址',{exact:true}).inputValue()!=='统一客户详情回归地址')throw Error('unsaved profile navigation lost draft');
-  page._follow.profileFail = true;
-  await edit.getByRole("button", { name: "保存", exact: true }).click();
-  await edit.getByRole("alert").waitFor();
-  if (
-    (await edit.getByLabel("地址", { exact: true }).inputValue()) !==
-    "统一客户详情回归地址"
-  )
-    throw Error("profile failure lost input");
-  page._follow.profileFail = false;
-  await edit.getByRole("button", { name: "保存", exact: true }).click();
-  await page.waitForTimeout(250);
-  if(await detail.getByLabel("地址",{exact:true}).inputValue()!=="统一客户详情回归地址")throw Error("profile save not reflected");
+  page._follow.profileFail=true;await edit.getByLabel("地址",{exact:true}).fill("统一客户详情回归地址");await edit.getByRole('alert').waitFor();
+  await Promise.all([page.waitForResponse(r=>r.url().endsWith('/rpc/save_customer_profile_v1')&&r.status()===409),detail.getByRole('tab',{name:'跟进',exact:true}).click()]);await detail.getByRole('button',{name:'重试',exact:true}).waitFor();
+  if(await detail.getByRole('tab',{name:'资料',exact:true}).getAttribute('aria-selected')!=='true')throw Error('failed autosave navigation lost draft');
+  page._follow.profileFail=false;await edit.getByRole('button',{name:'重试',exact:true}).click();await edit.getByText('已保存',{exact:true}).waitFor();
+  if(await edit.getByLabel('地址',{exact:true}).inputValue()!=='统一客户详情回归地址')throw Error('autosave changed draft');
   await page.keyboard.press("Escape");
   if (
     (await page

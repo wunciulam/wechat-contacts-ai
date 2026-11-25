@@ -2,7 +2,7 @@ async (page) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const d = page.getByRole("dialog", { name: "示例客户的客户详情", exact: true });
-  await d.getByRole("button", { name: "取消", exact: true }).click();
+
   await page.getByRole("tab", {name:"保单",exact:true}).click();
   const table = page.locator("table").first();
   await table.waitFor();

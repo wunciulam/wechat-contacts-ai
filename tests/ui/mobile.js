@@ -2,7 +2,7 @@ async (page) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("dialog", {name:"示例客户的客户详情",exact:true}).getByRole("button",{name:"取消",exact:true}).click();
+
   await page.keyboard.press("Escape");
   await page.getByRole("button",{name:"打开菜单",exact:true}).click();
   await page.getByRole("button",{name:/添加 \/ 导入/}).click();

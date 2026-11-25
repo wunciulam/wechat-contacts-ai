@@ -25,3 +25,6 @@
 按用户要求删除截图说明、粘贴文字入口、框选模式按钮和消息时间字段；筛选结果为空不再提示添加联系人。保留删除范围说明防误删、失败信息用于重试，以及未知日期/角色提示防错误归档。没有新增装饰文字。
 
 Validation: check:release passed; 89 tests, 77 UI sources, zero UI violations; all fixture-backed browser regressions passed.
+
+
+后续批注已把分类复选编辑改为输入式增删，把详情资料的手动保存改为自动保存。当前规则与证据见2026-11-25-autosave-and-components.md。

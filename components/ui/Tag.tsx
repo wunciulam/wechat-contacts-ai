@@ -26,7 +26,7 @@ export default function Tag({
 }) {
   return (
     <span
-      className={`inline-flex whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${tones[tone]} ${className}`}
+      className={`inline-flex items-center self-center shrink-0 whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${tones[tone]} ${className}`}
     >
       {children}
       {onRemove&&<IconButton className="ui-tag-remove" aria-label={removeLabel||`移除${String(children)}`} onClick={e=>{e.stopPropagation();onRemove();}}><X size={12}/></IconButton>}

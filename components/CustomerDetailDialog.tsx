@@ -1,3 +1,4 @@
+import {applyProfileDraft} from '../services/customerProfileMutation';
 import React, { useEffect, useRef, useState } from "react";
 import type { Category, Contact, ProgressRecord } from "../types";
 import FollowupCustomerPanel from "./FollowupCustomerPanel";
@@ -29,6 +30,7 @@ export default function CustomerDetailDialog({
   onImport,
   onSave,
   onSaveProfile,
+  onCreateCategory,
   onOpenAiSettings,
   renderPolicies,
   onMutateHistory,
@@ -43,6 +45,7 @@ export default function CustomerDetailDialog({
   onEdit: () => void;
   onImport: () => void;
   onSave: BundleSave;
+  onCreateCategory:(name:string)=>Promise<Category>;
   onSaveProfile: (input: Contact, expected: Contact) => Promise<Contact>;
   onOpenAiSettings: () => void;
   renderPolicies: () => React.ReactNode;
@@ -62,19 +65,19 @@ export default function CustomerDetailDialog({
     [profileNotice,setProfileNotice]=useState(""),
     [statusBusy, setStatusBusy] = useState(false),
     [statusError, setStatusError] = useState("");
-  const canLeaveProfile = useRef<(() => boolean) | null>(null),
+  const canLeaveProfile = useRef<(() => boolean|Promise<boolean>) | null>(null),
     profileSaved = useRef<Contact | null>(null);
-  const registerCanLeave = React.useCallback((fn: (() => boolean) | null) => {
+  const registerCanLeave = React.useCallback((fn: (() => boolean|Promise<boolean>) | null) => {
     canLeaveProfile.current = fn;
   }, []);
-  const guard = () =>
+  const guard = async () =>
     !statusBusy &&
     (tab !== "profile" ||
       !canLeaveProfile.current ||
-      canLeaveProfile.current());
-  const switchTab = (next: CustomerTab) => {
-    if (next === tab || !guard()) return;
-    if (next === "profile") setProfileSnapshot(live.current);
+      await canLeaveProfile.current());
+  const switchTab = async (next: CustomerTab) => {
+    if (next === tab || !await guard()) return;
+    if (next === "profile") {setProfileSnapshot(live.current);profileSaved.current=null;setProfileVersion(v=>v+1);}
     setTab(next);
   };
   useEffect(()=>{if(!profileNotice)return;const timer=setTimeout(()=>setProfileNotice(""),4000);return()=>clearTimeout(timer);},[profileNotice]);
@@ -174,6 +177,8 @@ export default function CustomerDetailDialog({
     <ImportModal
       key={profileVersion}
       embedded
+      onCreateCategory={onCreateCategory}
+      onAutoSave={async draft=>{const expected=profileSaved.current||profileSnapshot;const saved=await onSaveProfile(applyProfileDraft(expected,draft),expected);profileSaved.current=saved;}}
       saveFeedback={profileNotice}
       profileOnly
       isOpen
@@ -200,8 +205,8 @@ export default function CustomerDetailDialog({
         onTabChange={switchTab}
         profileContent={profile}
         policyContent={tab === "policies" ? renderPolicies() : null}
-        onClose={() => {
-          if (guard()) onClose();
+        onClose={async() => {
+          if (await guard()) onClose();
         }}
         onEdit={onEdit}
         onImport={onImport}

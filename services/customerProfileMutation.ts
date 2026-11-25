@@ -13,3 +13,9 @@ export function mergeCustomerProfile(current:Contact|undefined,input:Contact,exp
  }
  return result;
 }
+
+export function applyProfileDraft(base:Contact,draft:Partial<Contact>):Contact{
+ const result={...base};
+ for(const key of ['remarkName','nickname','wxid','phoneNumber','idCard','birthday','address','tags','remarkInfo','intentProducts','categoryId','categoryIds'] as const)if(Object.prototype.hasOwnProperty.call(draft,key))(result as any)[key]=draft[key];
+ return result;
+}

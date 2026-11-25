@@ -1,3 +1,5 @@
+import TokenInput from './ui/TokenInput';
+import useProfileAutosave from './useProfileAutosave';
 import ChatFollowUpDetails from "./ChatFollowUpDetails";
 import Button, { IconButton } from "./ui/Button";
 import WorkspaceDialog, { WorkspaceDialogFooter } from "./WorkspaceDialog";
@@ -54,9 +56,11 @@ interface ImportModalProps {
   isOpen: boolean;
   profileOnly?: boolean;
   saveFeedback?:string;
+  onAutoSave?:(draft:NewContact)=>Promise<void>;
+  onCreateCategory?:(name:string)=>Promise<Category>;
   embedded?:boolean;
   categories?:Category[];
-  registerCanLeave?:(handler:(()=>boolean)|null)=>void;
+  registerCanLeave?:(handler:(()=>boolean|Promise<boolean>)|null)=>void;
   onMingyaImport?: () => void;
   onPolicyImport?: (files: FileList) => void;
   relatedPolicies?: Policy[];
@@ -77,6 +81,7 @@ interface ImportModalProps {
 }
 
 const ImportModal: React.FC<ImportModalProps> = ({
+  onAutoSave,onCreateCategory,
   profileOnly = false,
   saveFeedback,
   embedded=false,
@@ -134,6 +139,9 @@ const ImportModal: React.FC<ImportModalProps> = ({
     followUpStatus: "idle",
     policies: [],
   });
+
+  const categoryPending=useRef<Promise<void>|null>(null);
+  const autosave=useProfileAutosave(formData,onAutoSave,v=>Boolean(v.remarkName?.trim()||v.nickname?.trim()));
 
   // 保单管理
   const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null);
@@ -452,8 +460,9 @@ const ImportModal: React.FC<ImportModalProps> = ({
         JSON.stringify(formData) !== JSON.stringify(profileBaseline.current));
     return !dirty || window.confirm("有尚未保存的资料，确认放弃并离开？");
   };
-  useEffect(()=>{registerCanLeave?.(canLeave);return()=>registerCanLeave?.(null);});
+  useEffect(()=>{registerCanLeave?.(onAutoSave?async()=>{try{await categoryPending.current;}catch{return false;}await new Promise(resolve=>setTimeout(resolve,0));return autosave.flush();}:canLeave);return()=>registerCanLeave?.(null);});
   const requestClose = () => {
+    if(onAutoSave){void autosave.flush().then(ok=>{if(ok)onClose();});return;}
     if (canLeave()) onClose();
   };
   const managePolicies = () => {
@@ -919,7 +928,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
                     )}
                 </div>
 
-                {categories.length>0&&<Field label="客户分类"><div className="flex flex-wrap gap-3">{categories.map(category=><label key={category.id} className="flex items-center gap-2 text-sm"><input type="checkbox" aria-label={'客户分类：'+category.name} checked={categoryIds(formData).includes(category.id)} onChange={e=>{const ids=categoryIds(formData);const next=e.target.checked?[...ids,category.id]:ids.filter(id=>id!==category.id);setFormData({...formData,categoryIds:next,categoryId:next[0]||''});}}/><SystemTag tone={categoryTagTone(category.color)}>{category.name}</SystemTag></label>)}</div></Field>}
+                <Field label="客户分类"><TokenInput label="客户分类" items={categoryIds(formData).map(id=>{const c=categories.find(c=>c.id===id);return {id,label:c?.name||id,tone:categoryTagTone(c?.color)};})} options={categories.map(c=>({id:c.id,label:c.name,tone:categoryTagTone(c.color)}))} onRemove={id=>setFormData(v=>{const ids=categoryIds(v).filter(x=>x!==id);return {...v,categoryIds:ids,categoryId:ids[0]||''};})} onAdd={name=>{const pending=(async()=>{const existing=categories.find(c=>c.name.trim()===name);const c=existing||await onCreateCategory?.(name);if(!c)throw Error('请先在管理分类中创建分类。');setFormData(v=>{const ids=[...new Set([...categoryIds(v),c.id])];return {...v,categoryIds:ids,categoryId:ids[0]||''};});})();categoryPending.current=pending;return pending.finally(()=>{categoryPending.current=null;});}}/></Field>
                 <Field className="" label={<>详细描述</>}>
                   <Textarea
                     id="contact-description"
@@ -1820,7 +1829,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
       </div>
 
       {/* 底部操作区 - 仅在手动录入时显示 */}
-      {(activeTab === "manual" || initialData) && (
+      {onAutoSave?<WorkspaceDialogFooter>{autosave.error?<><p role="alert" className="mr-auto text-sm text-danger-600">{autosave.error}</p><Button onClick={()=>void autosave.flush()}>重试</Button></>:<span role="status" className="text-xs text-gray-500">{autosave.state}</span>}</WorkspaceDialogFooter>:(activeTab === "manual" || initialData) && (
         <WorkspaceDialogFooter>
           {!error&&saveFeedback&&<span role="status" className="mr-auto text-sm">{saveFeedback}</span>}
           {error && (

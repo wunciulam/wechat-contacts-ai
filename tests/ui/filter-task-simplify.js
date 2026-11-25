@@ -5,10 +5,9 @@ async page=>{
  s.contacts[0].progressHistory.push({id:'delete-task',kind:'task',date:'2026-11-23',content:'准备比较表',completed:false});
  await page.reload();await page.getByRole('heading',{name:'示例客户',exact:true}).click();
  const d=page.getByRole('dialog',{name:'示例客户的客户详情',exact:true});
- await d.getByLabel('客户分类：老客户',{exact:true}).check();await d.getByLabel('客户分类：重点跟进',{exact:true}).uncheck();
- s.profileFail=true;await d.getByRole('button',{name:'保存',exact:true}).click();await d.getByRole('alert').waitFor();
- if(!await d.getByLabel('客户分类：老客户',{exact:true}).isChecked())throw Error('failed category lost selection');await page.screenshot({timeout:30000,path:'output/ui-regression/category-edit-failure-desktop.png'});
- s.profileFail=false;await d.getByRole('button',{name:'保存',exact:true}).click();await d.getByText('已保存',{exact:true}).waitFor();
+ s.profileFail=true;await d.getByLabel('客户分类',{exact:true}).fill('老客户');await d.getByLabel('客户分类',{exact:true}).press('Enter');await d.getByRole('button',{name:'移除客户分类：重点跟进',exact:true}).click();await d.getByRole('alert').waitFor();
+ if(!await d.getByRole('button',{name:'移除客户分类：老客户',exact:true}).count())throw Error('failed category lost selection');await page.screenshot({timeout:30000,path:'output/ui-regression/category-edit-failure-desktop.png'});
+ s.profileFail=false;await d.getByRole('button',{name:'重试',exact:true}).click();await d.getByText('已保存',{exact:true}).waitFor();
  if(JSON.stringify(s.contacts[0].categoryIds)!=='["b"]'||s.contacts[0].categoryId!=='b')throw Error('category not saved');
  await page.keyboard.press('Escape');await page.reload();
  await page.getByLabel('筛选分类：重点跟进',{exact:true}).check();
@@ -24,7 +23,7 @@ async page=>{
  s.fail=true;await remove.getByRole('button',{name:'删除',exact:true}).click();await remove.getByRole('alert').waitFor();if(!await row.isVisible())throw Error('task removed after failure');
  s.fail=false;await remove.getByRole('button',{name:'删除',exact:true}).click();await remove.waitFor({state:'hidden'});await row.waitFor({state:'hidden'});
  if(!s.contacts[0].progressHistory.some(r=>r.id==='r0')||s.contacts[0].progressHistory.some(r=>r.id==='delete-task'))throw Error('task delete affected history');
- s.contacts[0].progressHistory.push({id:'detail-task',kind:'task',date:'2026-11-24',content:'电话确认预算',completed:false});await page.reload();await page.getByRole('heading',{name:'示例客户',exact:true}).click();await d.getByLabel('客户分类：老客户',{exact:true}).waitFor();if(!await d.getByLabel('客户分类：老客户',{exact:true}).isChecked())throw Error('category lost reload');
+ s.contacts[0].progressHistory.push({id:'detail-task',kind:'task',date:'2026-11-24',content:'电话确认预算',completed:false});await page.reload();await page.getByRole('heading',{name:'示例客户',exact:true}).click();await d.getByRole('button',{name:'移除客户分类：老客户',exact:true}).waitFor();if(!await d.getByRole('button',{name:'移除客户分类：老客户',exact:true}).count())throw Error('category lost reload');
  await d.getByRole('tab',{name:'跟进',exact:true}).click();await d.getByRole('button',{name:'导入聊天',exact:true}).click();
  const chat=page.getByRole('dialog',{name:'导入聊天记录',exact:true});
  if(await chat.getByRole('button',{name:'粘贴聊天文字',exact:true}).count()||await chat.getByText(/截图临时发送/).count()||await chat.getByRole('button',{name:/框选保留|框选取消/}).count())throw Error('removed chat controls remain');

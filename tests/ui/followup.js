@@ -1,5 +1,5 @@
 async (page) => {
-  await page.getByRole('dialog',{name:'示例客户的客户详情',exact:true}).getByRole('button',{name:'取消',exact:true}).click();
+
   const customer=page.getByRole('dialog',{name:'示例客户的客户详情',exact:true});
   await customer.getByRole('tab',{name:'跟进',exact:true}).click();
   await customer.getByRole('button',{name:'写跟进',exact:true}).click();

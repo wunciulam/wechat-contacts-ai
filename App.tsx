@@ -220,6 +220,9 @@ const App: React.FC = () => {
 
   // 类目状态
   const [categories, setCategories] = useState<Category[]>([]);
+  const categoryLive=useRef(categories);categoryLive.current=categories;
+  const categoryWrites=useRef<Promise<unknown>>(Promise.resolve());
+  async function ensureCategory(name:string):Promise<Category>{let result:Category|undefined;const pending=categoryWrites.current.then(async()=>{const existing=categoryLive.current.find(c=>c.name.trim()===name.trim());if(existing){result=existing;return;}const stamp=Date.now();result={id:crypto.randomUUID(),name:name.trim(),color:"#f59e0b",icon:"Tag",order:categoryLive.current.length,createdAt:stamp,updatedAt:stamp};const next=[...categoryLive.current,result];if(!await saveToCloud("categories",next))throw Error("分类未保存，请重试。");categoryLive.current=next;setCategories(next);localStorage.setItem(CATEGORIES_STORAGE_KEY,JSON.stringify(next));});categoryWrites.current=pending.catch(()=>{});await pending;return result!;}
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
 
@@ -1500,6 +1503,7 @@ const App: React.FC = () => {
       <Sidebar
         categories={categories}
         selectedCategories={selectedCategories}
+        onToggleAllCategories={ids=>setSelectedCategories(new Set(ids))}
         onSelectCategory={id=>setSelectedCategories(old=>{const next=new Set(old);next.has(id)?next.delete(id):next.add(id);return next;})}
         tags={allTags}
         selectedTags={selectedTags}
@@ -1636,6 +1640,7 @@ const App: React.FC = () => {
           initialTab={customerDetail.tab}
           evidenceId={customerDetail.evidenceId}
           categories={categories}
+          onCreateCategory={ensureCategory}
           onClose={() => setCustomerDetail(null)}
           onEdit={() => {
             setEditingContact(

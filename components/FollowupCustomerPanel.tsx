@@ -1,3 +1,4 @@
+import FollowupOriginalDialog from './FollowupOriginalDialog';
 import FollowupTaskDelete,{type DeleteTask} from './FollowupTaskDelete';
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -147,6 +148,7 @@ export default function FollowupCustomerPanel({
   policyContent?: React.ReactNode;
   feedback?: React.ReactNode;
 }) {
+  const [original,setOriginal]=useState<ProgressRecord|null>(null);
   const [info, setInfo] = useState(false),
     [basis, setBasis] = useState(false),
     [all, setAll] = useState(Boolean(evidenceRecordId)),
@@ -525,34 +527,7 @@ export default function FollowupCustomerPanel({
                   <div>
                     <div className="followup-history-copy"><p>{record.content}</p>{onHistoryEdit&&onHistoryDelete&&<div className="followup-record-actions"><IconButton aria-label={'编辑跟进记录：'+record.content} title="编辑记录" onClick={()=>onHistoryEdit(record)}><Pencil size={14}/></IconButton><IconButton aria-label={'删除跟进记录：'+record.content} title="删除记录" onClick={()=>onHistoryDelete(record)}><Trash2 size={14}/></IconButton></div>}</div>
                     {channelLabel(record)&&<div className="followup-history-channel"><Tag>{channelLabel(record)}</Tag></div>}
-                    {record.chat?.transcript && (
-                      <details open={record.id === evidenceRecordId}>
-                        <summary>查看原话</summary>
-                        <div className="followup-original-messages">
-                          {record.chat.messages?.length ? (
-                            record.chat.messages.map((m, i) => (
-                              <div key={m.id + "-" + i}>
-                                <header>
-                                  <strong>
-                                    {m.speaker === "self"
-                                      ? "我"
-                                      : m.speaker === "customer"
-                                        ? "客户"
-                                        : "待核对"}
-                                  </strong>
-                                  <time>{m.time}</time>{m.reviewRequired&&<Tag tone="amber">原文待核对</Tag>}
-                                </header>
-                                <p>{m.text}</p>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="whitespace-pre-wrap">
-                              {record.chat.transcript}
-                            </p>
-                          )}
-                        </div>
-                      </details>
-                    )}
+                    {record.chat?.transcript&&<Button size="sm" variant="text" onClick={()=>setOriginal(record)}>查看原话</Button>}
                   </div>
                 </article>
               ))}</section>)}
@@ -565,6 +540,7 @@ export default function FollowupCustomerPanel({
           </div>
         </>
       )}
+      {original&&<FollowupOriginalDialog record={original} onClose={()=>setOriginal(null)}/>}
     </WorkspaceDialog>
   );
 }

@@ -97,7 +97,7 @@ async (page) => {
     requests: [],
   };
   page._follow = s;
-  page.removeAllListeners("dialog");page._dialogs=[];page.on("dialog",async d=>{page._dialogs.push(d.message());if(page._autoDismissDialogs!==false)await d.dismiss();});
+  page.removeAllListeners("dialog");page._dialogs=[];page.on("dialog",async d=>{page._dialogs.push(d.message());if(d.type()==="beforeunload")await d.accept();else if(page._autoDismissDialogs!==false)await d.dismiss();});
   await page.route("**/api/followup-ai", r => r.fulfill({json:{configured:false}}));
   await page.route("**/api/renewal-email", (r) =>
     r.fulfill({ json: { configured: false } }),
@@ -199,6 +199,8 @@ async (page) => {
       return route.fulfill({ json: c });
     }
     if (req.method() === "PATCH" && type === "eq.contacts") s.contacts = b.data;
+    if (req.method() === "PATCH" && type === "eq.categories") s.categories = b.data;
+    if(req.method()==="POST"&&Array.isArray(b)){for(const item of b)if(item.data_type==="categories")s.categories=item.data;}
     if (req.method() === "POST" && Array.isArray(b))
       return route.fulfill({
         json: b

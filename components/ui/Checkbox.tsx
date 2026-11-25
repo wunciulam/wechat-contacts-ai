@@ -1,0 +1,2 @@
+import React,{useEffect,useRef} from 'react';
+export default function Checkbox({indeterminate=false,className='',...props}:React.InputHTMLAttributes<HTMLInputElement>&{indeterminate?:boolean}){const ref=useRef<HTMLInputElement>(null);useEffect(()=>{if(ref.current)ref.current.indeterminate=indeterminate;},[indeterminate]);return <input {...props} ref={ref} type="checkbox" className={'ui-checkbox '+className}/>;}
