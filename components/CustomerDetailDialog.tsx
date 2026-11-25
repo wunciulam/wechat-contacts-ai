@@ -59,8 +59,10 @@ export default function CustomerDetailDialog({
       text: string;
       source?: string;
     } | null>(null),
-    [notice, setNotice] = useState(""),
+    [notice, setNoticeState] = useState(""),
     [undoId, setUndoId] = useState<string | null>(null);
+  const [noticeVersion,bumpNotice]=useState(0);
+  const setNotice=(text:string)=>{setNoticeState(text);if(text)bumpNotice(v=>v+1);};
   const [profileSnapshot, setProfileSnapshot] = useState(contact),
     [profileVersion, setProfileVersion] = useState(0),
     [profileNotice,setProfileNotice]=useState(""),
@@ -143,7 +145,7 @@ export default function CustomerDetailDialog({
     }
   }
   const undoRef=useRef(undo);undoRef.current=undo;
-  useEffect(()=>{if(notice)notify(notice,{id:"customer-result",action:undoId?{label:"撤销完成",run:()=>undoRef.current()}:undefined});},[notice,undoId]);
+  useEffect(()=>{if(notice)notify(notice,{id:"customer-result",action:undoId?{label:"撤销完成",run:()=>undoRef.current()}:undefined});},[notice,undoId,noticeVersion]);
   async function analyze() {
     if (analysisRunning.current) return;
     analysisRunning.current = true;

@@ -88,12 +88,14 @@ export default function FollowupWorkspace({
   const [analyzing, setAnalyzing] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [message, setMessage] = useState(""),
+    [message, setMessageState] = useState(""),
     [undo, setUndo] = useState<{ contactId: string; taskId: string } | null>(
       null,
     ),
     [today, setToday] = useState(chinaDate),
     [lastUpdate, setLastUpdate] = useState("");
+  const [messageVersion,bumpMessage]=useState(0);
+  const setMessage=(text:string)=>{setMessageState(text);if(text)bumpMessage(v=>v+1);};
   const live = useRef(contacts);
   live.current = contacts;
   const busyRef = useRef(false),
@@ -272,7 +274,7 @@ export default function FollowupWorkspace({
     }
   }
   const undoRef=useRef(undoTask);undoRef.current=undoTask;
-  useEffect(()=>{if(message)notify(message,{id:"workspace-result",action:undo?{label:"撤销完成",run:()=>undoRef.current()}:undefined});},[message,undo]);
+  useEffect(()=>{if(message)notify(message,{id:"workspace-result",action:undo?{label:"撤销完成",run:()=>undoRef.current()}:undefined});},[message,undo,messageVersion]);
   const taskRow = ({
     contact,
     task,
