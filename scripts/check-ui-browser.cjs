@@ -90,6 +90,7 @@ function command(args) {
     }),
   );
   await command(["open", "about:blank", "--config", config]);
+  if(process.env.UI_STORAGE_STATE)await command(["state-load",process.env.UI_STORAGE_STATE]);
   if (process.env.UI_AUTH_URL) await command(["goto", process.env.UI_AUTH_URL]);
   async function run(name, file) {
     if(file==="live-vision-quality.js"&&process.env.LIVE_VISION!=="1")throw Error("Live provider tests require explicit LIVE_VISION=1");
