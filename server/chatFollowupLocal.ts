@@ -1,5 +1,6 @@
 import { revision, addDays } from '../services/followupDomain';
 import { chinaDate } from '../services/chatAnalysis';
+import {recognizeChatVision} from './chatVision';
 import { runFollowupAi } from './followupAi';
 import {createDeepseekSettings} from './deepseekSettings';
 import {mergeCustomerProfile} from '../services/customerProfileMutation';
@@ -20,11 +21,11 @@ function send(res: ServerResponse, status: number, value: unknown) {
   res.end(JSON.stringify(value));
 }
 
-async function readJson(req: IncomingMessage) {
+async function readJson(req: IncomingMessage,limit=1_100_000) {
   let data = '';
   for await (const chunk of req.setEncoding('utf8')) {
     data += chunk;
-    if (Buffer.byteLength(data) > 1_100_000) throw new Error('内容太长，请缩短后重试。');
+    if (Buffer.byteLength(data) > limit) throw new Error('内容太长，请缩短后重试。');
   }
   return JSON.parse(data);
 }
@@ -118,7 +119,8 @@ export function chatFollowupLocal(env: Record<string, string>): Plugin {
       server.middlewares.use(async (req, res, next) => {
         const url = new URL(req.url || '/', CHAT_PREVIEW_URL);
         const settingsRequest=url.pathname==='/api/ai-settings';
-        const analysis = url.pathname === '/api/chat-followup' || url.pathname === '/api/followup-ai';
+        const vision=url.pathname==='/api/chat-vision';
+        const analysis = vision || url.pathname === '/api/chat-followup' || url.pathname === '/api/followup-ai';
         if (!analysis && !settingsRequest && !url.pathname.startsWith('/rest/v1/')) return next();
         if (req.headers.host !== new URL(CHAT_PREVIEW_URL).host ||
           (req.headers.origin && req.headers.origin !== CHAT_PREVIEW_URL) ||
@@ -136,6 +138,7 @@ export function chatFollowupLocal(env: Record<string, string>): Plugin {
               return send(res, 405, { message: '请求格式有误。' });
             }
             if (!activeEnv.DEEPSEEK_API_KEY) return send(res, 503, { message: '尚未配置 DeepSeek Key。可以先保存对话。' });
+            if(vision)return send(res,200,await recognizeChatVision(await readJson(req,4_000_000),activeEnv));
             return send(res, 200, url.pathname === '/api/followup-ai' ? await runFollowupAi(await readJson(req), activeEnv) : await analyze(await readJson(req), activeEnv));
           }
           const kind = url.searchParams.get('data_type') || '';

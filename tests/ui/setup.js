@@ -102,7 +102,7 @@ async (page) => {
   await page.route("**/api/renewal-email", (r) =>
     r.fulfill({ json: { configured: false } }),
   );
-  await page.route(/https:\/\/.*\.supabase\.co\/rest\/v1\//, async (route) => {
+  await page.route(/\/rest\/v1\//, async (route) => {
     const req = route.request(),
       u = new URL(req.url()),
       type = u.searchParams.get("data_type") || "";
@@ -121,7 +121,7 @@ async (page) => {
             ? row("contacts", s.contacts)
             : type === "eq.renewal_v1"
               ? row("renewal_v1", s.renewal)
-              : row("categories", []),
+              : row("categories", s.categories || []),
       });
     s.requests.push({
       path: u.pathname,

@@ -1,0 +1,19 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "name": "fixture load",
+      "loaded": true
+    },
+    {
+      "name": "live-vision-quality.js",
+      "passed": true,
+      "realProvider": true,
+      "syntheticOnly": true,
+      "screenshotHeight": 5000,
+      "bubbles": 5,
+      "exactTextMatch": true,
+      "noCustomerRecordsSaved": true
+    }
+  ]
+}

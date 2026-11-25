@@ -3,7 +3,7 @@ const fs = require("node:fs"),
   path = require("node:path"),
   http = require("node:http"),
   { spawn } = require("node:child_process");
-const out = path.resolve("output/ui-regression");
+const out = path.resolve(process.env.UI_OUTPUT_DIR || "output/ui-regression");
 fs.mkdirSync(out, { recursive: true });
 for (const file of ["failure.txt", "results.json"])
   fs.rmSync(path.join(out, file), { force: true });
@@ -92,6 +92,7 @@ function command(args) {
   await command(["open", "about:blank", "--config", config]);
   if (process.env.UI_AUTH_URL) await command(["goto", process.env.UI_AUTH_URL]);
   async function run(name, file) {
+    if(file==="live-vision-quality.js"&&process.env.LIVE_VISION!=="1")throw Error("Live provider tests require explicit LIVE_VISION=1");
     let code = fs
       .readFileSync("tests/ui/" + file, "utf8")
       .trim()
@@ -128,6 +129,10 @@ function command(args) {
   await run("unified customer profile/followup/policies", "customer-detail.js");
   await run("fixture reset", "setup.js");
   await run("AI configuration and connected analysis", "ai-settings.js");
+  await run("fixture reset", "setup.js");
+  await run("vision tiles, retry and full-bubble review", "vision-import.js");
+  await run("fixture reset", "setup.js");
+  await run("timeline, colors, date and motion", "followup-presentation.js");
   await run("component acceptance", "acceptance.js");
   fs.writeFileSync(
     path.join(out, "results.json"),

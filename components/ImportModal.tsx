@@ -5,6 +5,7 @@ import Field from "./ui/Field";
 import Input, { Textarea } from "./ui/Input";
 import Select from "./ui/Select";
 import SystemTag from "./ui/Tag";
+import {customerTagTone,categoryTagTone} from "../services/tagAppearance";
 import type {Category} from "../types";
 import {categoryIds} from "../services/contactIdentity";
 const InlineProfileShell=({children}:{children?:React.ReactNode;[key:string]:unknown})=><div className="customer-inline-profile">{children}</div>;
@@ -871,7 +872,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
                     onClick={() => setShowTagSuggestions(true)}
                   >
                     {formData.tags.map((t) => (
-                      <SystemTag key={t} onRemove={()=>setFormData({...formData,tags:formData.tags.filter(x=>x!==t)})}>{t}</SystemTag>
+                      <SystemTag key={t} tone={customerTagTone(t)} onRemove={()=>setFormData({...formData,tags:formData.tags.filter(x=>x!==t)})}>{t}</SystemTag>
                     ))}
                     <Input
                       type="text"
@@ -918,7 +919,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
                     )}
                 </div>
 
-                {embedded&&initialData&&<div><span className="block text-xs font-medium text-gray-700 mb-1.5">客户分类</span><div className="flex flex-wrap gap-2">{categoryIds(initialData).length?categoryIds(initialData).map(id=><SystemTag key={id}>{categories.find(c=>c.id===id)?.name||'未分类'}</SystemTag>):<SystemTag>未分类</SystemTag>}</div></div>}
+                {embedded&&initialData&&<div><span className="block text-xs font-medium text-gray-700 mb-1.5">客户分类</span><div className="flex flex-wrap gap-2">{categoryIds(initialData).length?categoryIds(initialData).map(id=><SystemTag key={id} tone={categoryTagTone(categories.find(c=>c.id===id)?.color)}>{categories.find(c=>c.id===id)?.name||'未分类'}</SystemTag>):<SystemTag>未分类</SystemTag>}</div></div>}
                 <Field className="" label={<>详细描述</>}>
                   <Textarea
                     id="contact-description"
@@ -1340,7 +1341,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
                   </label>
                   <div className="ui-token-field flex flex-wrap gap-2 p-3 min-h-[50px] border border-gray-200 rounded-lg">
                     {(formData.intentProducts || []).map((product, idx) => (
-                      <SystemTag key={idx} onRemove={()=>setFormData({...formData,intentProducts:formData.intentProducts.filter((_,i)=>i!==idx)})}>{product}</SystemTag>
+                      <SystemTag key={idx} tone={customerTagTone(product)} onRemove={()=>setFormData({...formData,intentProducts:formData.intentProducts.filter((_,i)=>i!==idx)})}>{product}</SystemTag>
                     ))}
                     <Input
                       type="text"

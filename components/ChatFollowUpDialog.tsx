@@ -12,7 +12,8 @@ import {
 } from "../services/followupDomain";
 import { summarizeDays } from "../services/followupAiClient";
 import type { FollowupWrite } from "../services/followupMutation";
-import { recognizeChatScreenshots } from "../services/chatOcr";
+import { recognizeChatImage } from "../services/chatVisionClient";
+import {mergeVisionPages} from "../services/chatVision";
 import { isChatDate } from "../services/chatAnalysis";
 import WorkspaceDialog, { WorkspaceDialogFooter } from "./WorkspaceDialog";
 import Button, { IconButton } from "./ui/Button";
@@ -61,10 +62,13 @@ export default function ChatFollowUpDialog({
     operation = useRef<AbortController | null>(null),
     busyRef = useRef(false),
     summaryRevision = useRef("");
+  const visionCache=useRef(new Map<File,ChatMessage[]>()),messageRef=useRef(messages),selectionRef=useRef(selected);
+  messageRef.current=messages;selectionRef.current=selected;
+  const [fileErrors,setFileErrors]=useState(new Map<File,string>());const errorsRef=useRef(fileErrors);errorsRef.current=fileErrors;
   useEffect(() => () => operation.current?.abort(), []);
   const picked = messages.filter((m) => selected.has(m.id)),
     invalid = picked.some(
-      (m) => !isChatDate(m.date) || m.speaker === "unknown" || !m.text.trim(),
+      (m) => !isChatDate(m.date) || m.speaker === "unknown" || !m.text.trim() || m.reviewRequired,
     );
   const grouped = groupMessages(messages),
     days = groupMessages(picked),
@@ -103,31 +107,22 @@ export default function ChatFollowUpDialog({
     setSummaries({});
     setManualOption(false);
   }
-  async function recognize(incoming: File[]) {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    setBusy("ocr");
-    setError("");
-    const ctl = new AbortController();
-    operation.current = ctl;
-    try {
-      const result = await recognizeChatScreenshots(
-        incoming,
-        setProgress,
-        ctl.signal,
-      );
-      if (!result.text) throw Error("没有读到文字，请换清晰截图或粘贴聊天。");
-      setTranscript(result.text);
-      if (result.unreadable)
-        setError(`${result.unreadable}张截图未读到文字，请核对。`);
-    } catch (e) {
-      if (!ctl.signal.aborted)
-        setError(e instanceof Error ? e.message : "识别失败，请重试。");
-    } finally {
-      busyRef.current = false;
-      setBusy("");
-      setProgress("");
-    }
+  async function recognize(incoming:File[],only?:File){
+    if(busyRef.current)return;busyRef.current=true;setBusy('ocr');setError('');
+    const ctl=new AbortController();operation.current=ctl;const failed=new Map<File,string>(errorsRef.current);
+    try{
+      for(const [i,file]of incoming.entries()){
+        if(visionCache.current.has(file)||(only&&file!==only))continue;
+        try{const rows=await recognizeChatImage(file,p=>setProgress(`第 ${i+1} / ${incoming.length} 张：${p}`),ctl.signal);visionCache.current.set(file,rows);failed.delete(file);}
+        catch(e){if(ctl.signal.aborted)return;failed.set(file,e instanceof Error?e.message:'这张截图识别失败，请重试。');}
+      }
+      ctl.signal.throwIfAborted();
+      const previous=new Map(messageRef.current.map(m=>[m.id,m]));
+      const rows=mergeVisionPages(incoming.map((file,source)=>(visionCache.current.get(file)||[]).map(m=>({...(previous.get(m.id)||m),source}))));
+      setMessages(rows);setSelected(new Set(rows.filter(m=>!previous.has(m.id)||selectionRef.current.has(m.id)).map(m=>m.id)));setSummaries({});setManualOption(false);
+      const visibleErrors=new Map([...failed].filter(([file])=>incoming.includes(file)));setFileErrors(visibleErrors);
+      if(visibleErrors.size)setError(`${visibleErrors.size} 张截图识别失败，可在截图旁重试。已识别的内容已保留。`);
+    }finally{busyRef.current=false;setBusy('');setProgress('');}
   }
   function addFiles(list: File[]) {
     const valid = list.filter(
@@ -247,7 +242,7 @@ export default function ChatFollowUpDialog({
                 value={m.text}
                 onChange={(e) => patch(m.id, { text: e.target.value })}
               />
-              <Button size="sm" onClick={() => setEditing(null)}>
+              <Button size="sm" onClick={() => {patch(m.id,{reviewRequired:false});setEditing(null);}}>
                 完成核对
               </Button>
             </div>
@@ -263,6 +258,8 @@ export default function ChatFollowUpDialog({
           )}
         </div>
         <div className="chat-message-meta">
+          {m.reviewRequired&&<span className="text-amber-700">原文待核对</span>}
+          {!m.date&&m.dateLabel&&<span>{m.dateLabel}</span>}
           <span>
             {m.speaker === "self"
               ? "我"
@@ -334,6 +331,7 @@ export default function ChatFollowUpDialog({
                     e.target.value = "";
                   }}
                 />
+                <p className="text-xs text-gray-500">截图临时发送给 DeepSeek Flash 识别，系统只保存确认后的文字。</p>
                 {files.map((file, i) => (
                   <div key={file.name + i} className="chat-source-file">
                     <Button
@@ -378,7 +376,7 @@ export default function ChatFollowUpDialog({
                           const remaining = files.filter((_, x) => x !== i);
                           setFiles(remaining);
                           setActiveFile(0);
-                          setTranscript("");
+                          visionCache.current.delete(file);
                           if (remaining.length) void recognize(remaining);
                           else setTranscript("");
                         }}
@@ -386,6 +384,7 @@ export default function ChatFollowUpDialog({
                         <X size={14} />
                       </IconButton>
                     </div>
+                    {fileErrors.has(file)&&<div className="mt-2 text-xs"><p role="alert" className="text-danger-600">{fileErrors.get(file)}</p><Button variant="text" onClick={()=>void recognize(files,file)}>重试这张</Button></div>}
                   </div>
                 ))}
                 <Button onClick={() => upload.current?.click()}>
@@ -393,7 +392,7 @@ export default function ChatFollowUpDialog({
                   添加截图
                 </Button>
                 {files.length > 0 && (
-                  <Button onClick={() => recognize(files)}>重新识别</Button>
+                  <Button onClick={() => {if(messages.length&&!window.confirm("重新识别会替换已校对内容，继续？"))return;visionCache.current.clear();void recognize(files);}}>重新识别</Button>
                 )}
                 <Button
                   variant="plain"
@@ -594,7 +593,7 @@ export default function ChatFollowUpDialog({
                   : ""}
                 {invalid && (
                   <span className="block text-amber-700">
-                    请先核对日期和说话人
+                    请核对原文、日期和说话人
                   </span>
                 )}
               </div>

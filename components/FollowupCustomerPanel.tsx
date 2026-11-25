@@ -20,6 +20,7 @@ import WorkspaceDialog from "./WorkspaceDialog";
 import Button, { IconButton } from "./ui/Button";
 import Input from "./ui/Input";
 import Tag from "./ui/Tag";
+import {isTaskOverdue,groupHistoryYears,channelLabel} from "../services/followupPresentation";
 import type { BundleSave } from "./FollowupDialogs";
 export function FollowupAvatar({ contact }: { contact: Contact }) {
   return (
@@ -40,7 +41,9 @@ export function FollowupTaskDate({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const running = useRef(false);
-  const overdue = task.date && task.date < chinaDate();
+  const [today,setToday]=useState(chinaDate);
+  useEffect(()=>{const update=()=>setToday(chinaDate());const timer=setInterval(update,30000);window.addEventListener('focus',update);return()=>{clearInterval(timer);window.removeEventListener('focus',update);};},[]);
+  const overdue = isTaskOverdue(task,today);
   async function changeDate(date: string) {
     if (running.current || !isChatDate(date) || date === task.date) return;
     running.current = true;
@@ -499,19 +502,19 @@ export default function FollowupCustomerPanel({
               {!history.length && (
                 <p className="text-sm text-gray-500 py-6">暂无跟进记录</p>
               )}
-              {(all ? history : history.slice(0, 8)).map((record) => (
+              {groupHistoryYears(all ? history : history.slice(0,8)).map(group=><section className="followup-history-year" key={group.year}><h4>{group.year}</h4>{group.records.map((record) => (
                 <article
                   id={"history-" + record.id}
                   key={record.id}
                   className="followup-history-row"
                   data-highlight={record.id === evidenceRecordId}
+                  data-latest={record.id===history[0]?.id}
                 >
+                  <time dateTime={record.date}>{record.date.slice(5).replace("-","月")}日</time>
                   <span className="followup-history-mark" aria-hidden="true" />
-                  <time>{record.date}</time>
                   <div>
                     <p>{record.content}</p>
-                    {record.channel === "attempt" && <small>联系尝试</small>}
-                    {record.channel === "internal" && <small>内部工作</small>}
+                    {channelLabel(record)&&<div className="followup-history-channel"><Tag>{channelLabel(record)}</Tag></div>}
                     {record.chat?.transcript && (
                       <details open={record.id === evidenceRecordId}>
                         <summary>查看原话</summary>
@@ -542,7 +545,7 @@ export default function FollowupCustomerPanel({
                     )}
                   </div>
                 </article>
-              ))}
+              ))}</section>)}
               {history.length > 8 && !all && (
                 <Button variant="text" onClick={() => setAll(true)}>
                   查看全部 {history.length} 条记录

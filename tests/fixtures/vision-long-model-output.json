@@ -1,0 +1,106 @@
+{
+  "messages": [
+    {
+      "text": "我现在有公司的团险，\n但是不清楚住院报销范围。\n想确认是否还要补医疗险。",
+      "speaker": "customer",
+      "date": "2026-11-24",
+      "time": "10:30",
+      "dateLabel": "2026年11月24日",
+      "reviewRequired": false,
+      "image": 0,
+      "box": [
+        120,
+        48,
+        665,
+        140
+      ],
+      "continuesBefore": false,
+      "continuesAfter": false
+    },
+    {
+      "text": "可以，先把保障表发我。\n我核对保障范围后，",
+      "speaker": "self",
+      "date": "2026-11-24",
+      "time": "10:30",
+      "dateLabel": "2026年11月24日",
+      "reviewRequired": true,
+      "image": 0,
+      "box": [
+        192,
+        855,
+        663,
+        1000
+      ],
+      "continuesBefore": false,
+      "continuesAfter": true
+    },
+    {
+      "text": "可以，先把保障表发我。\n我核对保障范围后，\n再回复重复保障和缺口。",
+      "speaker": "self",
+      "date": "2026-11-24",
+      "time": "10:30",
+      "dateLabel": "2026年11月24日",
+      "reviewRequired": false,
+      "image": 1,
+      "box": [
+        192,
+        113,
+        663,
+        281
+      ],
+      "continuesBefore": false,
+      "continuesAfter": false
+    },
+    {
+      "text": "这周预算大概五千元，\n先不要给我太复杂的方案。",
+      "speaker": "customer",
+      "date": "2026-11-25",
+      "time": "09:15",
+      "dateLabel": "2026年11月25日",
+      "reviewRequired": false,
+      "image": 1,
+      "box": [
+        120,
+        478,
+        672,
+        543
+      ],
+      "continuesBefore": false,
+      "continuesAfter": false
+    },
+    {
+      "text": "收到，我先按预算整理，\n周五发你两版方案比较。",
+      "speaker": "self",
+      "date": "2026-11-25",
+      "time": "09:15",
+      "dateLabel": "2026年11月25日",
+      "reviewRequired": false,
+      "image": 2,
+      "box": [
+        192,
+        140,
+        663,
+        249
+      ],
+      "continuesBefore": false,
+      "continuesAfter": false
+    },
+    {
+      "text": "好的，谢谢。",
+      "speaker": "customer",
+      "date": "2026-11-25",
+      "time": "09:15",
+      "dateLabel": "2026年11月25日",
+      "reviewRequired": false,
+      "image": 2,
+      "box": [
+        120,
+        755,
+        381,
+        821
+      ],
+      "continuesBefore": false,
+      "continuesAfter": false
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import type {MingyaFinancial} from './services/mingyaFinancial';
 
 export interface ChatMessage {
-  id: string; date: string; time: string; speaker: 'customer' | 'self' | 'unknown'; text: string; confidence?: number; source?: number;
+  id: string; date: string; time: string; speaker: 'customer' | 'self' | 'unknown'; text: string; confidence?: number; source?: number; reviewRequired?:boolean; dateLabel?:string;
 }
 
 export interface FollowupAnalysis {

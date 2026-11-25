@@ -518,7 +518,7 @@ select.input { padding-right: 32px; }
   .followup-history-row:last-of-type:before {display:none;}
   .followup-history-mark {position:relative;width:9px;height:9px;margin-top:6px;}
   .followup-history-mark:after {content:"";position:absolute;left:2px;top:2px;width:5px;height:5px;border-radius:50%;background:#c9c9c9;}
-  .followup-history-row:first-of-type .followup-history-mark:after {background:#171717;}
+  .followup-history-row[data-latest=true] .followup-history-mark:after {background:#171717;}
   .followup-history-row>time {font-size:12px;color:#737373;white-space:nowrap;}
   .followup-history-row p {font-size:13px;line-height:21px;white-space:pre-wrap;overflow-wrap:anywhere;}
   .followup-history-row small {font-size:12px;color:#737373;}
@@ -624,3 +624,19 @@ select.input { padding-right: 32px; }
   @media(hover:none) {.followup-detail-dialog .followup-date-icon{opacity:1;}}
   @media(max-width:767px){.customer-inline-profile fieldset {padding:16px;}.customer-followup-status{width:112px;}.customer-followup-status .ui-select {min-width:112px;}.customer-followup-status [role=alert]{max-width:120px;}}
 }
+
+@layer components {
+  .followup-history-year>h4 {font-size:12px;line-height:20px;font-weight:500;color:#737373;margin:8px 0 4px;}
+  .followup-history-year+.followup-history-year {margin-top:20px;}
+  .followup-history-row {grid-template-columns:64px 9px minmax(0,1fr);gap:12px;}
+  .followup-history-row:before {left:80px;}
+  .followup-history-channel {margin-top:6px;}
+  .followup-history-channel>span {font-size:12px;}
+  .followup-ai-card {background:linear-gradient(#fff,#fff) padding-box,linear-gradient(var(--followup-border-angle,140deg),#47bad980,#8c5cd980,#f2c76b80,#fa8f7380,#47bad980) border-box;animation:followup-border-flow 32s linear infinite;}
+  .followup-ai-glow>span {animation-name:followup-glow-flow;animation-duration:32s;animation-timing-function:ease-in-out;animation-direction:normal;}
+  @keyframes followup-border-flow {to{--followup-border-angle:500deg;}}
+  @keyframes followup-glow-flow {0%{translate:-100px 0;opacity:.2;}20%{opacity:.85;}65%{opacity:.75;}95%{translate:330px 10px;opacity:0;}100%{translate:330px 10px;opacity:0;}}
+  @media(prefers-reduced-motion:reduce){.followup-ai-card,.followup-ai-glow>span{animation:none;}}
+  @media(max-width:767px){.followup-history-row{grid-template-columns:54px 9px minmax(0,1fr);gap:10px;}.followup-history-row:before{left:68px;}}
+}
+@property --followup-border-angle {syntax:'<angle>';initial-value:140deg;inherits:false;}
