@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Sparkles,
   ChevronDown,
@@ -146,6 +146,7 @@ export default function FollowupCustomerPanel({
     [basis, setBasis] = useState(false),
     [all, setAll] = useState(Boolean(evidenceRecordId)),
     [error, setError] = useState("");
+  const stageScroll = useRef<HTMLDivElement>(null);
   const a = contact.followupAnalysis,
     stale = !a || a.revision !== revision(contact),
     history = notes(contact),
@@ -171,6 +172,16 @@ export default function FollowupCustomerPanel({
     );
     return () => clearTimeout(timer);
   }, [evidenceRecordId, contact.id]);
+  useEffect(() => {
+    const host = stageScroll.current;
+    const current = host?.querySelector<HTMLElement>('[aria-current="step"]');
+    if (host && current && host.scrollWidth > host.clientWidth) {
+      host.scrollLeft =
+        current.offsetLeft -
+        host.offsetLeft -
+        (host.clientWidth - current.offsetWidth) / 2;
+    }
+  }, [stageIndex]);
   return (
     <WorkspaceDialog
       title={contact.remarkName || contact.nickname}
@@ -243,15 +254,26 @@ export default function FollowupCustomerPanel({
         </div>
       )}
       <div className="followup-stage-track">
-        {STAGES.map((stage, i) => (
-          <span
-            key={stage}
-            data-active={i === stageIndex}
-            data-passed={stageIndex >= 0 && i < stageIndex}
-          >
-            {stage}
-          </span>
-        ))}
+        <div ref={stageScroll} className="followup-stage-scroll" tabIndex={0}>
+          <ol className="followup-stage-sequence" aria-label="客户跟进阶段">
+            {STAGES.map((stage, i) => (
+              <React.Fragment key={stage}>
+                <li
+                  className="followup-stage-node"
+                  data-active={i === stageIndex}
+                  data-passed={stageIndex >= 0 && i < stageIndex}
+                  aria-current={i === stageIndex ? "step" : undefined}
+                >
+                  <span className="followup-stage-marker" aria-hidden="true" />
+                  <span>{stage}</span>
+                </li>
+                {i < STAGES.length - 1 && (
+                  <li className="followup-stage-connector" aria-hidden="true" />
+                )}
+              </React.Fragment>
+            ))}
+          </ol>
+        </div>
         <small>
           {stageIndex >= 0
             ? "第 " + (stageIndex + 1) + " / 5 阶段"
@@ -261,6 +283,11 @@ export default function FollowupCustomerPanel({
       <div className="followup-detail-grid">
         <aside className="followup-judgment">
           <section className="followup-ai-card">
+            <div className="followup-ai-glow" aria-hidden="true">
+              <span className="followup-ai-glow-cyan" />
+              <span className="followup-ai-glow-orange" />
+              <span className="followup-ai-glow-purple" />
+            </div>
             <div className="followup-ai-heading">
               <span>
                 <Sparkles size={14} />
@@ -423,6 +450,7 @@ export default function FollowupCustomerPanel({
               className="followup-history-row"
               data-highlight={record.id === evidenceRecordId}
             >
+              <span className="followup-history-mark" aria-hidden="true" />
               <time>{record.date}</time>
               <div>
                 <p>{record.content}</p>
