@@ -49,12 +49,14 @@ export default function FollowupWorkspace({
   onEdit,
   renderCategories,
   onManageCategories,
+  onOpenCustomer,
 }: {
   contacts: Contact[];
   onSave: BundleSave;
   onImport: (id?: string) => void;
   onEdit: (c: Contact) => void;
   onManageCategories: () => void;
+  onOpenCustomer?: (c: Contact, evidenceId?: string) => void;
   renderCategories: (open: (c: Contact) => void) => React.ReactNode;
 }) {
   const [tab, setTab] = useState<"leads" | "categories">("leads"),
@@ -210,6 +212,10 @@ export default function FollowupWorkspace({
     };
   }, [today]);
   function open(c: Contact, id?: string) {
+    if (onOpenCustomer) {
+      onOpenCustomer(c, id);
+      return;
+    }
     setEvidenceId(id);
     setCustomerId(c.id);
   }
@@ -391,7 +397,6 @@ export default function FollowupWorkspace({
               >
                 {busy ? "更新中…" : "更新线索"}
               </Button>
-
             </>
           }
         />
@@ -416,9 +421,19 @@ export default function FollowupWorkspace({
           </Button>
         </div>
         <div className="followup-tabs-tools">
-          <small>截至{today}{lastUpdate ? "　" + lastUpdate + "更新" : ""}</small>
-          <Button variant="plain" className="followup-rules-action" onClick={() => tab === "leads" ? setShowRules(true) : onManageCategories()}>
-            <Settings2 size={16} />{tab === "leads" ? "提醒规则" : "管理分类"}
+          <small>
+            截至{today}
+            {lastUpdate ? "　" + lastUpdate + "更新" : ""}
+          </small>
+          <Button
+            variant="plain"
+            className="followup-rules-action"
+            onClick={() =>
+              tab === "leads" ? setShowRules(true) : onManageCategories()
+            }
+          >
+            <Settings2 size={16} />
+            {tab === "leads" ? "提醒规则" : "管理分类"}
           </Button>
         </div>
       </div>

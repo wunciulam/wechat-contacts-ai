@@ -122,6 +122,8 @@ function command(args) {
   await run("contact basic information", "contact-basics.js");
   await run("fixture reset", "setup.js");
   await run("chat OCR, evidence, archive and tasks", "chat-followup.js");
+  await run("fixture reset", "setup.js");
+  await run("unified customer profile/followup/policies", "customer-detail.js");
   await run("component acceptance", "acceptance.js");
   fs.writeFileSync(
     path.join(out, "results.json"),

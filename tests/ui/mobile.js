@@ -2,7 +2,12 @@ async (page) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.setViewportSize({ width: 390, height: 844 });
-  const d = page.getByRole("dialog", { name: "编辑联系人资料", exact: true });
+  await page.getByRole("dialog", {name:"编辑联系人资料",exact:true}).getByRole("button",{name:"取消",exact:true}).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button",{name:"打开菜单",exact:true}).click();
+  await page.getByRole("button",{name:/添加 \/ 导入/}).click();
+  await page.getByRole("dialog",{name:"添加 / 导入",exact:true}).getByRole("button",{name:"手动录入",exact:true}).click();
+  const d = page.getByRole("dialog", { name: "添加 / 导入", exact: true });
   const scroll = d.locator("[data-contact-scroll]");
   await scroll.evaluate((e) => (e.scrollTop = 0));
   const searchState = await page

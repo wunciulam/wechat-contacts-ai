@@ -1,17 +1,18 @@
 import Button from './ui/Button';
-import React, {useEffect,useState} from 'react';
+import React, {useEffect,useRef,useState} from 'react';
 import type {Contact,Policy} from '../types';
 import type {ManagedPolicy} from '../services/renewal';
 import {key} from '../services/renewal';
 import WorkspaceDialog,{WorkspaceDialogFooter} from './WorkspaceDialog';
 import PolicyFieldsForm from './PolicyFieldsForm';
 const blank = ():ManagedPolicy=>({id:'',productName:'',policyNumber:'',company:'',premium:'',effectiveDate:'',status:'正式保单',applicant:'',insured:'',payments:[]});
-export default function ManualPolicyModal({isOpen,onClose,contacts,onSave}:{isOpen:boolean;onClose:()=>void;contacts:Contact[];onSave:(contactId:string,policy:Policy)=>void}) {
+export default function ManualPolicyModal({isOpen,onClose,contacts,onSave,initialContactId}:{initialContactId?:string;isOpen:boolean;onClose:()=>void;contacts:Contact[];onSave:(contactId:string,policy:Policy)=>void}) {
   const [draft,setDraft]=useState(blank);
   const [error,setError]=useState('');
-  useEffect(()=>{if(isOpen){setDraft(blank());setError('');}},[isOpen]);
+  const baseline=useRef(JSON.stringify(blank()));
+  useEffect(()=>{if(isOpen){const c=contacts.find(c=>c.id===initialContactId);const initial=c?{...blank(),applicantId:c.id,applicant:c.remarkName||c.nickname}:blank();baseline.current=JSON.stringify(initial);setDraft(initial);setError('');}},[isOpen,initialContactId]);
   if(!isOpen)return null;
-  const dirty=Boolean(JSON.stringify(draft)!==JSON.stringify(blank()));
+  const dirty=Boolean(JSON.stringify(draft)!==baseline.current);
   const close=()=>{if(!dirty||window.confirm('资料尚未保存，确认放弃修改？'))onClose();};
   const save=()=>{
     if(!draft.applicantId||!draft.productName.trim())return;

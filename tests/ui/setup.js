@@ -207,5 +207,6 @@ async (page) => {
   await page.setViewportSize({ width: 1304, height: 880 });
   await page.goto("__BASE_URL__/");
   await page.getByRole("heading", { name: "示例客户", exact: true }).click();
+  await page.getByRole("dialog", {name:"示例客户的客户详情",exact:true}).getByRole("button", {name:"编辑资料",exact:true}).click();
   return { loaded: true };
 };

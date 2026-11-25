@@ -2,7 +2,8 @@ async (page) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const d = page.getByRole("dialog", { name: "编辑联系人资料", exact: true });
-  await d.getByRole("button", { name: "管理保单", exact: true }).click();
+  await d.getByRole("button", { name: "取消", exact: true }).click();
+  await page.getByRole("tab", {name:"保单",exact:true}).click();
   const table = page.locator("table").first();
   await table.waitFor();
   if ((await table.locator("tbody tr").count()) !== 3)
@@ -35,8 +36,10 @@ async (page) => {
   await page.getByRole("button", { name: "录入保单", exact: true }).click();
   const manual = page.getByRole("dialog", { name: "录入新保单", exact: true });
   await manual.getByLabel(/^产品名称/).fill("UI验证保单");
-  await manual.getByLabel(/^投保人/).click();
-  await page.getByRole("option", { name: "示例客户", exact: true }).click();
+  if(await manual.getByLabel(/^投保人/).innerText()!=="示例客户"){
+    await manual.getByLabel(/^投保人/).click();
+    await page.getByRole("option", { name: "示例客户", exact: true }).click();
+  }
   await manual.getByLabel("生效日期", { exact: true }).fill("2026-02-30");
   await manual.getByRole("button", { name: "保存保单", exact: true }).click();
   if (

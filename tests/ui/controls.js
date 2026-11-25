@@ -1,7 +1,11 @@
 async (page) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  const d = page.getByRole("dialog", { name: "编辑联系人资料", exact: true });
+  await page.getByRole("dialog", {name:"编辑联系人资料",exact:true}).getByRole("button",{name:"取消",exact:true}).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button",{name:/添加 \/ 导入/}).click();
+  await page.getByRole("dialog",{name:"添加 / 导入",exact:true}).getByRole("button",{name:"手动录入",exact:true}).click();
+  const d = page.getByRole("dialog", { name: "添加 / 导入", exact: true });
   await d.getByRole("button", { name: "添加保单", exact: true }).click();
   const date = d.getByLabel("生效日期", { exact: true });
   await date.waitFor();
