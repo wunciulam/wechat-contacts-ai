@@ -4,6 +4,10 @@ import WorkspaceDialog, { WorkspaceDialogFooter } from "./WorkspaceDialog";
 import Field from "./ui/Field";
 import Input, { Textarea } from "./ui/Input";
 import Select from "./ui/Select";
+import SystemTag from "./ui/Tag";
+import type {Category} from "../types";
+import {categoryIds} from "../services/contactIdentity";
+const InlineProfileShell=({children}:{children?:React.ReactNode;[key:string]:unknown})=><div className="customer-inline-profile">{children}</div>;
 import { readPolicyNumber } from "../services/policyIdentity";
 import {
   excludedPolicyImport,
@@ -48,6 +52,10 @@ import { mergePolicies } from "../services/renewal";
 interface ImportModalProps {
   isOpen: boolean;
   profileOnly?: boolean;
+  saveFeedback?:string;
+  embedded?:boolean;
+  categories?:Category[];
+  registerCanLeave?:(handler:(()=>boolean)|null)=>void;
   onMingyaImport?: () => void;
   onPolicyImport?: (files: FileList) => void;
   relatedPolicies?: Policy[];
@@ -69,6 +77,10 @@ interface ImportModalProps {
 
 const ImportModal: React.FC<ImportModalProps> = ({
   profileOnly = false,
+  saveFeedback,
+  embedded=false,
+  categories=[],
+  registerCanLeave,
   isOpen,
   onMingyaImport,
   onPolicyImport,
@@ -98,17 +110,17 @@ const ImportModal: React.FC<ImportModalProps> = ({
       })),
       [],
     ).filter((p) => !excludedPolicyImport(p.status));
-  const profileBaseline = useRef<NewContact | null>(null);
+  const profileBaseline = useRef<NewContact | null>(initialData?{...initialData,policies:initialData.policies||[],progressHistory:initialData.progressHistory||[]}:null);
   const [activeTab, setActiveTab] = useState<
     "manual" | "ai" | "table" | "policies"
-  >("ai");
+  >(initialData?"manual":"ai");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [extractedList, setExtractedList] = useState<NewContact[]>([]);
   const [extractedTableData, setExtractedTableData] =
     useState<ExtractedTableData | null>(null);
 
-  const [formData, setFormData] = useState<NewContact>({
+  const [formData, setFormData] = useState<NewContact>(initialData?{...initialData,policies:initialData.policies||[],progressHistory:initialData.progressHistory||[]}:{
     wxid: "",
     nickname: "",
     remarkName: "",
@@ -439,6 +451,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
         JSON.stringify(formData) !== JSON.stringify(profileBaseline.current));
     return !dirty || window.confirm("有尚未保存的资料，确认放弃并离开？");
   };
+  useEffect(()=>{registerCanLeave?.(canLeave);return()=>registerCanLeave?.(null);});
   const requestClose = () => {
     if (canLeave()) onClose();
   };
@@ -694,9 +707,9 @@ const ImportModal: React.FC<ImportModalProps> = ({
   };
 
   if (!isOpen) return null;
-
+  const Shell=embedded?InlineProfileShell:WorkspaceDialog;
   return (
-    <WorkspaceDialog
+    <Shell
       title={initialData ? "编辑联系人资料" : "添加 / 导入"}
       size={!initialData && activeTab === "policies" ? "import" : "contact"}
       onClose={requestClose}
@@ -761,7 +774,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
             </section>
           )}
           {activeTab === "manual" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className={profileOnly?"grid grid-cols-1 gap-6":"grid grid-cols-1 lg:grid-cols-2 gap-6"}>
               {/* 左侧：基础信息 */}
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
@@ -858,25 +871,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
                     onClick={() => setShowTagSuggestions(true)}
                   >
                     {formData.tags.map((t) => (
-                      <span
-                        key={t}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700"
-                      >
-                        {t}
-                        <IconButton
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFormData({
-                              ...formData,
-                              tags: formData.tags.filter((x) => x !== t),
-                            });
-                          }}
-                          className="hover:text-gray-900 transition-colors"
-                          aria-label="关闭"
-                        >
-                          <X size={10} strokeWidth={3} />
-                        </IconButton>
-                      </span>
+                      <SystemTag key={t} onRemove={()=>setFormData({...formData,tags:formData.tags.filter(x=>x!==t)})}>{t}</SystemTag>
                     ))}
                     <Input
                       type="text"
@@ -923,6 +918,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
                     )}
                 </div>
 
+                {embedded&&initialData&&<div><span className="block text-xs font-medium text-gray-700 mb-1.5">客户分类</span><div className="flex flex-wrap gap-2">{categoryIds(initialData).length?categoryIds(initialData).map(id=><SystemTag key={id}>{categories.find(c=>c.id===id)?.name||'未分类'}</SystemTag>):<SystemTag>未分类</SystemTag>}</div></div>}
                 <Field className="" label={<>详细描述</>}>
                   <Textarea
                     id="contact-description"
@@ -1344,26 +1340,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
                   </label>
                   <div className="ui-token-field flex flex-wrap gap-2 p-3 min-h-[50px] border border-gray-200 rounded-lg">
                     {(formData.intentProducts || []).map((product, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 border border-blue-100 rounded-full text-xs font-medium text-blue-700"
-                      >
-                        {product}
-                        <IconButton
-                          onClick={() => {
-                            const newProducts = [...formData.intentProducts];
-                            newProducts.splice(idx, 1);
-                            setFormData({
-                              ...formData,
-                              intentProducts: newProducts,
-                            });
-                          }}
-                          className="hover:text-red-600 transition-colors"
-                          aria-label="关闭"
-                        >
-                          <X size={10} strokeWidth={3} />
-                        </IconButton>
-                      </span>
+                      <SystemTag key={idx} onRemove={()=>setFormData({...formData,intentProducts:formData.intentProducts.filter((_,i)=>i!==idx)})}>{product}</SystemTag>
                     ))}
                     <Input
                       type="text"
@@ -1390,7 +1367,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
               </div>
 
               {/* 右侧：跟进状态和历史 */}
-              <div className="space-y-3 border-t lg:border-t-0 lg:border-l border-gray-100 lg:pl-6 pt-4 lg:pt-0">
+              {!profileOnly&&<div className="space-y-3 border-t lg:border-t-0 lg:border-l border-gray-100 lg:pl-6 pt-4 lg:pt-0">
                 {/* 跟进状态 */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -1639,7 +1616,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
                     </div>
                   </>
                 )}
-              </div>
+              </div>}
             </div>
           )}
 
@@ -1844,6 +1821,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
       {/* 底部操作区 - 仅在手动录入时显示 */}
       {(activeTab === "manual" || initialData) && (
         <WorkspaceDialogFooter>
+          {!error&&saveFeedback&&<span role="status" className="mr-auto text-sm">{saveFeedback}</span>}
           {error && (
             <p role="alert" className="mr-auto text-sm text-danger-600">
               {error}
@@ -1868,7 +1846,7 @@ const ImportModal: React.FC<ImportModalProps> = ({
           </Button>
         </WorkspaceDialogFooter>
       )}
-    </WorkspaceDialog>
+    </Shell>
   );
 };
 

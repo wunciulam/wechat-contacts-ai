@@ -1,7 +1,7 @@
 async (page) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.getByRole("dialog", {name:"编辑联系人资料",exact:true}).getByRole("button",{name:"取消",exact:true}).click();
+  await page.getByRole("dialog", {name:"示例客户的客户详情",exact:true}).getByRole("button",{name:"取消",exact:true}).click();
   await page.keyboard.press("Escape");
   await page.getByRole("button",{name:/添加 \/ 导入/}).click();
   await page.getByRole("dialog",{name:"添加 / 导入",exact:true}).getByRole("button",{name:"手动录入",exact:true}).click();
@@ -60,11 +60,12 @@ async (page) => {
     bounds.y + bounds.height > 880
   )
     throw Error("calendar clipping");
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/calendar-desktop.png",
   });
   await page.keyboard.press("Escape");
+  if(page._dialogs.length)throw Error("unexpected confirmation: "+page._dialogs.join(","));
   return {
     value: await date.inputValue(),
     status: await status.innerText(),

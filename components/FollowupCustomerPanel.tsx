@@ -31,8 +31,10 @@ export function FollowupAvatar({ contact }: { contact: Contact }) {
 export function FollowupTaskDate({
   task,
   onDate,
+  showOverdue=true,
 }: {
   task: ProgressRecord;
+  showOverdue?:boolean;
   onDate: (date: string) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false),
@@ -74,7 +76,7 @@ export function FollowupTaskDate({
           }}
         />
       </div>
-      {overdue && (
+      {overdue && showOverdue && (
         <span className="text-danger-600">
           逾期{" "}
           {Math.floor(
@@ -109,7 +111,13 @@ export default function FollowupCustomerPanel({
   profileContent,
   policyContent,
   feedback,
+  followupStatusControl,
+  closeDisabled,
+  onOpenAiSettings,
 }: {
+  onOpenAiSettings?:()=>void;
+  followupStatusControl?:React.ReactNode;
+  closeDisabled?:boolean;
   contact: Contact;
   onClose: () => void;
   onEdit: () => void;
@@ -226,6 +234,7 @@ export default function FollowupCustomerPanel({
       className="followup-detail-dialog"
       bodyClassName="min-h-0 overflow-y-auto p-0"
       onClose={onClose}
+      closeDisabled={closeDisabled}
     >
       {onTabChange && (
         <div
@@ -250,11 +259,8 @@ export default function FollowupCustomerPanel({
               {label}
             </Button>
           ))}
-          {activeTab === "profile" && (
-            <Button size="sm" className="ml-auto" onClick={onEdit}>
-              编辑资料
-            </Button>
-          )}
+          {activeTab==='followup'&&followupStatusControl}
+
         </div>
       )}
       {activeTab === "profile" ? (
@@ -405,7 +411,7 @@ export default function FollowupCustomerPanel({
                 {a?.evidence.length > 0 && (
                   <div className="followup-ai-evidence">
                     <Button
-                      variant="plain"
+                      variant="text"
                       onClick={() => setBasis(!basis)}
                       aria-expanded={basis}
                     >
@@ -417,7 +423,7 @@ export default function FollowupCustomerPanel({
                         <div key={i}>
                           <blockquote>{e.quote}</blockquote>
                           <Button
-                            variant="plain"
+                            variant="text"
                             onClick={() => {
                               setAll(true);
                               setTimeout(
@@ -464,6 +470,7 @@ export default function FollowupCustomerPanel({
                       </label>
                       <FollowupTaskDate
                         task={task}
+                    showOverdue={false}
                         onDate={(date) =>
                           onSave(contact.id, {
                             writes: [
@@ -537,7 +544,7 @@ export default function FollowupCustomerPanel({
                 </article>
               ))}
               {history.length > 8 && !all && (
-                <Button variant="plain" onClick={() => setAll(true)}>
+                <Button variant="text" onClick={() => setAll(true)}>
                   查看全部 {history.length} 条记录
                 </Button>
               )}

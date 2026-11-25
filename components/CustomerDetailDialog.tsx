@@ -9,7 +9,8 @@ import {
 import { analyzeCustomer } from "../services/followupAiClient";
 import { revision, tasks } from "../services/followupDomain";
 import { categoryIds } from "../services/contactIdentity";
-import Tag from "./ui/Tag";
+import ImportModal from "./ImportModal";
+import Select from "./ui/Select";
 import Button from "./ui/Button";
 export type CustomerTab = "followup" | "profile" | "policies";
 export type CustomerRequest = {
@@ -26,6 +27,8 @@ export default function CustomerDetailDialog({
   onEdit,
   onImport,
   onSave,
+  onSaveProfile,
+  onOpenAiSettings,
   renderPolicies,
 }: {
   key?: string;
@@ -37,6 +40,8 @@ export default function CustomerDetailDialog({
   onEdit: () => void;
   onImport: () => void;
   onSave: BundleSave;
+  onSaveProfile: (input: Contact, expected: Contact) => Promise<Contact>;
+  onOpenAiSettings: () => void;
   renderPolicies: () => React.ReactNode;
 }) {
   const [tab, setTab] = useState(initialTab),
@@ -48,6 +53,48 @@ export default function CustomerDetailDialog({
     } | null>(null),
     [notice, setNotice] = useState(""),
     [undoId, setUndoId] = useState<string | null>(null);
+  const [profileSnapshot, setProfileSnapshot] = useState(contact),
+    [profileVersion, setProfileVersion] = useState(0),
+    [profileNotice,setProfileNotice]=useState(""),
+    [statusBusy, setStatusBusy] = useState(false),
+    [statusError, setStatusError] = useState("");
+  const canLeaveProfile = useRef<(() => boolean) | null>(null),
+    profileSaved = useRef<Contact | null>(null);
+  const registerCanLeave = React.useCallback((fn: (() => boolean) | null) => {
+    canLeaveProfile.current = fn;
+  }, []);
+  const guard = () =>
+    !statusBusy &&
+    (tab !== "profile" ||
+      !canLeaveProfile.current ||
+      canLeaveProfile.current());
+  const switchTab = (next: CustomerTab) => {
+    if (next === tab || !guard()) return;
+    if (next === "profile") setProfileSnapshot(live.current);
+    setTab(next);
+  };
+  useEffect(()=>{if(!profileNotice)return;const timer=setTimeout(()=>setProfileNotice(""),4000);return()=>clearTimeout(timer);},[profileNotice]);
+  const resetProfile = () => {
+    setProfileNotice(profileSaved.current?"已保存":"");
+    setProfileSnapshot(profileSaved.current || live.current);
+    profileSaved.current = null;
+    setProfileVersion((v) => v + 1);
+  };
+  async function changeStatus(value: string) {
+    if (statusBusy || value === contact.followUpStatus) return;
+    setStatusBusy(true);
+    setStatusError("");
+    try {
+      await onSaveProfile(
+        { ...live.current, followUpStatus: value as "idle" | "following" },
+        live.current,
+      );
+    } catch (e) {
+      setStatusError(e instanceof Error ? e.message : "状态未保存，请重试。");
+    } finally {
+      setStatusBusy(false);
+    }
+  }
   const live = useRef(contact),
     analysisRunning = useRef(false),
     undoRunning = useRef(false);
@@ -119,81 +166,38 @@ export default function CustomerDetailDialog({
     }
     setSchedule({ text, source });
   }
-  const data = [
-    ["昵称", contact.nickname],
-    ["微信号", contact.wxid],
-    ["手机号", contact.phoneNumber],
-    ["生日", contact.birthday],
-    ["证件号", contact.idCard],
-    ["地址", contact.address],
-  ];
   const profile = (
-    <div className="customer-profile-view">
-      <div className="customer-profile-grid">
-        {data.map(([label, value]) => (
-          <div key={String(label)}>
-            <small>{label}</small>
-            <p>{String(value || "待补充")}</p>
-          </div>
-        ))}
-      </div>
-      <div className="customer-profile-grid customer-profile-groups">
-        <div>
-          <small>标签</small>
-          <div className="customer-profile-tags">
-            {contact.tags.length ? (
-              contact.tags.map((tag) => <Tag key={tag}>{tag}</Tag>)
-            ) : (
-              <span>暂无标签</span>
-            )}
-          </div>
-        </div>
-        <div>
-          <small>客户分类</small>
-          <div className="customer-profile-tags">
-            {categoryIds(contact).length ? (
-              categoryIds(contact).map((id) => (
-                <Tag key={id}>
-                  {categories.find((c) => c.id === id)?.name || "未分类"}
-                </Tag>
-              ))
-            ) : (
-              <Tag>未分类</Tag>
-            )}
-          </div>
-        </div>
-        <div>
-          <small>意向产品</small>
-          <div className="customer-profile-tags">
-            {contact.intentProducts?.length ? (
-              contact.intentProducts.map((p) => <Tag key={p}>{p}</Tag>)
-            ) : (
-              <span>待补充</span>
-            )}
-          </div>
-        </div>
-        <div>
-          <small>跟进状态</small>
-          <p>
-            {contact.followUpStatus === "following" ? "跟进中" : "暂未跟进"}
-          </p>
-        </div>
-      </div>
-      <div>
-        <small>详细备注</small>
-        <p className="whitespace-pre-wrap">{contact.remarkInfo || "待补充"}</p>
-      </div>
-    </div>
+    <ImportModal
+      key={profileVersion}
+      embedded
+      saveFeedback={profileNotice}
+      profileOnly
+      isOpen
+      initialData={profileSnapshot}
+      categories={categories}
+      allTags={contact.tags}
+      registerCanLeave={registerCanLeave}
+      onClose={resetProfile}
+      onSave={async (rows) => {
+        const saved = await onSaveProfile(
+          { ...profileSnapshot, ...rows[0] },
+          profileSnapshot,
+        );
+        profileSaved.current = saved;
+      }}
+    />
   );
   return (
     <>
       <FollowupCustomerPanel
         contact={contact}
         activeTab={tab}
-        onTabChange={setTab}
+        onTabChange={switchTab}
         profileContent={profile}
         policyContent={tab === "policies" ? renderPolicies() : null}
-        onClose={onClose}
+        onClose={() => {
+          if (guard()) onClose();
+        }}
         onEdit={onEdit}
         onImport={onImport}
         onWrite={() => setResult({})}
@@ -203,12 +207,32 @@ export default function CustomerDetailDialog({
         onSave={onSave}
         analyzing={analyzing}
         evidenceRecordId={evidenceId}
+        closeDisabled={statusBusy}
+        onOpenAiSettings={onOpenAiSettings}
+        followupStatusControl={
+          <div className="customer-followup-status">
+            <Select
+              aria-label="跟进状态"
+              value={contact.followUpStatus || "idle"}
+              disabled={statusBusy}
+              onValueChange={changeStatus}
+            >
+              <option value="following">跟进中</option>
+              <option value="idle">暂未跟进</option>
+            </Select>
+            {statusError && (
+              <span role="alert" className="text-xs text-danger-600">
+                {statusError}
+              </span>
+            )}
+          </div>
+        }
         feedback={
           notice ? (
             <div className="followup-success">
               <span role="status">{notice}</span>
               {undoId && (
-                <Button variant="plain" disabled={undoBusy} onClick={undo}>
+                <Button variant="text" disabled={undoBusy} onClick={undo}>
                   {undoBusy ? "撤销中…" : "撤销完成"}
                 </Button>
               )}

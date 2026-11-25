@@ -21,7 +21,7 @@ async (page) => {
   )
     throw Error("search did not filter");
   await search.fill("");
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/contact-search-desktop.png",
   });

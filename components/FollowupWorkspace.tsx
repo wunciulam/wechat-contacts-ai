@@ -50,12 +50,14 @@ export default function FollowupWorkspace({
   renderCategories,
   onManageCategories,
   onOpenCustomer,
+  onOpenAiSettings,
 }: {
   contacts: Contact[];
   onSave: BundleSave;
   onImport: (id?: string) => void;
   onEdit: (c: Contact) => void;
   onManageCategories: () => void;
+  onOpenAiSettings?:()=>void;
   onOpenCustomer?: (c: Contact, evidenceId?: string) => void;
   renderCategories: (open: (c: Contact) => void) => React.ReactNode;
 }) {
@@ -320,8 +322,8 @@ export default function FollowupWorkspace({
           <h3>{c.followupAnalysis?.nextAction}</h3>
           <p>{c.followupAnalysis?.opportunity?.reason}</p>
           <Button
-            variant="plain"
-            className="followup-text-action"
+            variant="text"
+            className="mt-1"
             onClick={() => setEvidence(c)}
           >
             查看依据
@@ -386,6 +388,7 @@ export default function FollowupWorkspace({
           className="followup-page-header"
           actionButton={
             <>
+              <Button size="sm" onClick={onOpenAiSettings}>AI 设置</Button>
               <Button size="sm" onClick={() => onImport()}>
                 导入聊天
               </Button>
@@ -445,7 +448,7 @@ export default function FollowupWorkspace({
         <div className="followup-home-content">
           {error && (
             <p role="alert" className="text-sm text-danger-600">
-              {error}
+              {error}{onOpenAiSettings&&<Button variant="text" onClick={onOpenAiSettings}>AI 设置</Button>}
             </p>
           )}
           <div className="followup-stats">
@@ -679,7 +682,7 @@ export default function FollowupWorkspace({
                 </small>
                 <blockquote>{e.quote}</blockquote>
                 <Button
-                  variant="plain"
+                  variant="text"
                   onClick={() => {
                     open(evidence, e.recordId);
                     setEvidence(null);

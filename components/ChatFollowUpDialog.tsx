@@ -33,7 +33,9 @@ export default function ChatFollowUpDialog({
   initialContactId,
   onSave,
   onClose,
+  onOpenAiSettings,
 }: {
+  onOpenAiSettings?:()=>void;
   contacts: Contact[];
   initialContactId?: string;
   onSave: (id: string, writes: FollowupWrite[]) => Promise<void>;
@@ -557,6 +559,7 @@ export default function ChatFollowUpDialog({
           {error && (
             <p role="alert" className="mb-2 text-sm text-danger-600">
               {error}
+              {onOpenAiSettings&&<Button variant="text" onClick={onOpenAiSettings}>AI 设置</Button>}
             </p>
           )}
           {busy && (

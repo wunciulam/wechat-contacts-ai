@@ -20,7 +20,7 @@ async (page) => {
     exact: true,
   });
   await modal.waitFor();
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/sample-modal-desktop.png",
   });
@@ -34,7 +34,7 @@ async (page) => {
   const b = await modal.boundingBox();
   if (b.x < 0 || b.x + b.width > 390 || b.y < 0 || b.y + b.height > 844)
     throw Error("sample mobile modal clipped");
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/sample-modal-mobile.png",
   });

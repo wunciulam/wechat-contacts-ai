@@ -1,6 +1,6 @@
 import React from "react";
 type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost" | "danger" | "plain";
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "plain" | "text";
   size?: "default" | "sm";
   validate?: boolean;
 };
@@ -21,7 +21,7 @@ const Button = React.forwardRef<HTMLButtonElement, Props>(function Button(
       {...props}
       ref={ref}
       type={type}
-      className={`${variant === "plain" ? "ui-action" : `btn btn-${variant} ${size === "sm" ? "btn-sm" : "text-sm"}`} ${className}`}
+      className={`${variant === "text" ? "ui-text-button" : variant === "plain" ? "ui-action" : `btn btn-${variant} ${size === "sm" ? "btn-sm" : "text-sm"}`} ${className}`}
       onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
         if (validate) {
           const host = e.currentTarget.closest('form,dialog,[role="dialog"]');

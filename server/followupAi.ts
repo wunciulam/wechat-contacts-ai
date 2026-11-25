@@ -27,6 +27,7 @@ export async function runFollowupAi(
           },
         ],
         response_format: { type: "json_object" },
+        thinking: {type:"disabled"},
         max_tokens: 4000,
       }),
       signal: AbortSignal.timeout(60000),

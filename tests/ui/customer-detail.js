@@ -2,7 +2,7 @@ async (page) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page
-    .getByRole("dialog", { name: "编辑联系人资料", exact: true })
+    .getByRole("dialog", { name: "示例客户的客户详情", exact: true })
     .getByRole("button", { name: "取消", exact: true })
     .click();
   page._follow.contacts[0].progressHistory.push({id:'unified-task',kind:'task',date:'2026-11-22',content:'统一详情待办',completed:false});
@@ -27,7 +27,7 @@ async (page) => {
     !((await tag.getAttribute("class")) || "").includes("rounded px-2 py-0.5")
   )
     throw Error("profile did not reuse Tag");
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/customer-profile-desktop.png",
   });
@@ -50,7 +50,7 @@ async (page) => {
       throw Error("missing full policy column " + name);
   if ((await table.locator("tbody tr").count()) !== 3)
     throw Error("customer policy scope/status filter");
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/customer-policies-desktop.png",
   });
@@ -71,25 +71,26 @@ async (page) => {
     .boundingBox();
   if (!action || action.x < 0 || action.x + action.width > 390)
     throw Error("policy fixed actions not accessible");
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/customer-policies-mobile.png",
   });
   await detail.getByRole("tab", { name: "资料", exact: true }).click();
   await detail
-    .locator(".customer-profile-view")
-    .getByText("保留备注", { exact: true })
+    .getByLabel("详细描述", { exact: true })
     .scrollIntoViewIfNeeded();
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/customer-profile-mobile-scroll.png",
   });
   await detail.getByRole("tab", { name: "跟进", exact: true }).click();
   await detail.getByText("原有记录", { exact: true }).waitFor();
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/customer-followup-mobile.png",
   });
+  const status=detail.getByRole('combobox',{name:'跟进状态',exact:true});page._follow.profileFail=true;await status.click();await page.getByRole('option',{name:'暂未跟进',exact:true}).click();await detail.getByRole('alert').filter({hasText:'客户资料已在另一页面修改'}).waitFor();if(await status.innerText()!=='跟进中')throw Error('failed status changed UI');page._follow.profileFail=false;await status.click();await page.getByRole('option',{name:'暂未跟进',exact:true}).click();await page.waitForTimeout(250);if(page._follow.contacts[0].followUpStatus!=='idle')throw Error('status did not persist');await status.click();await page.getByRole('option',{name:'跟进中',exact:true}).click();await page.waitForTimeout(250);
+  await page.setViewportSize({width:1304,height:880});await page.mouse.move(0,0);const date=detail.locator('.followup-customer-task .followup-date-icon');if(await date.evaluate(e=>getComputedStyle(e).opacity)!=='0')throw Error('date icon visible without hover');await detail.locator('.followup-customer-task').hover();if(await date.evaluate(e=>getComputedStyle(e).opacity)!=='1')throw Error('date icon missing on hover');if(await detail.locator('.followup-customer-tasks').getByText(/逾期/).count())throw Error('detail overdue badge remains');await page.screenshot({timeout:30000,path:'output/ui-regression/customer-followup-controls-desktop.png'});
   const task=detail.getByRole('checkbox',{name:'完成待办：统一详情待办',exact:true});await task.click();
   const result=page.getByRole('dialog',{name:'记录跟进结果',exact:true});await result.getByLabel('沟通结果',{exact:true}).fill('统一详情已回复客户');await result.getByRole('button',{name:'保存结果并完成',exact:true}).click();await result.waitFor({state:'hidden'});await task.waitFor({state:'hidden'});
   page._follow.fail=true;await detail.getByRole('button',{name:'撤销完成',exact:true}).click();await detail.getByRole('alert').filter({hasText:'测试保存失败'}).waitFor();page._follow.fail=false;await detail.getByRole('button',{name:'撤销完成',exact:true}).click();await task.waitFor();if(!page._follow.contacts[0].progressHistory.some(r=>r.content==='统一详情已回复客户'))throw Error('undo removed communication');
@@ -108,9 +109,9 @@ async (page) => {
     throw Error("workbench did not open followup");
   await detail.getByRole("tab", { name: "资料", exact: true }).click();
   await tag.waitFor();
-  await detail.getByRole("button", { name: "编辑资料", exact: true }).click();
+
   const edit = page.getByRole("dialog", {
-    name: "编辑联系人资料",
+    name: "示例客户的客户详情",
     exact: true,
   });
   if (
@@ -121,6 +122,7 @@ async (page) => {
   )
     throw Error("profile editor duplicates domain tabs");
   await edit.getByLabel("地址", { exact: true }).fill("统一客户详情回归地址");
+  page._autoDismissDialogs=false;page.once('dialog',d=>d.dismiss());await detail.getByRole('tab',{name:'跟进',exact:true}).click();page._autoDismissDialogs=true;if(await detail.getByRole('tab',{name:'资料',exact:true}).getAttribute('aria-selected')!=='true'||await edit.getByLabel('地址',{exact:true}).inputValue()!=='统一客户详情回归地址')throw Error('unsaved profile navigation lost draft');
   page._follow.profileFail = true;
   await edit.getByRole("button", { name: "保存", exact: true }).click();
   await edit.getByRole("alert").waitFor();
@@ -131,8 +133,8 @@ async (page) => {
     throw Error("profile failure lost input");
   page._follow.profileFail = false;
   await edit.getByRole("button", { name: "保存", exact: true }).click();
-  await edit.waitFor({ state: "hidden" });
-  await detail.getByText("统一客户详情回归地址", { exact: true }).waitFor();
+  await page.waitForTimeout(250);
+  if(await detail.getByLabel("地址",{exact:true}).inputValue()!=="统一客户详情回归地址")throw Error("profile save not reflected");
   await page.keyboard.press("Escape");
   if (
     (await page

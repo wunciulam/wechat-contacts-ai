@@ -1,3 +1,4 @@
+import AiSettingsDialog from "./components/AiSettingsDialog";
 import CustomerDetailDialog, {
   type CustomerRequest,
 } from "./components/CustomerDetailDialog";
@@ -222,6 +223,7 @@ const App: React.FC = () => {
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [aiSettingsOpen,setAiSettingsOpen]=useState(false);
   const [customerDetail, setCustomerDetail] = useState<CustomerRequest | null>(
     null,
   );
@@ -1416,6 +1418,7 @@ const App: React.FC = () => {
       case "followups":
         return (
           <FollowupWorkspace
+            onOpenAiSettings={()=>setAiSettingsOpen(true)}
             onOpenCustomer={(c, evidenceId) =>
               setCustomerDetail({ id: c.id, tab: "followup", evidenceId })
             }
@@ -1615,6 +1618,7 @@ const App: React.FC = () => {
         onLoad={loadMingyaSnapshot}
         onApply={applyMingyaImport}
       />
+      {aiSettingsOpen&&<AiSettingsDialog onClose={()=>setAiSettingsOpen(false)} onSaved={()=>window.dispatchEvent(new Event("ai-settings-changed"))}/>}
       {customerDetail && contacts.find((c) => c.id === customerDetail.id) && (
         <CustomerDetailDialog
           key={customerDetail.id}
@@ -1635,6 +1639,11 @@ const App: React.FC = () => {
             const saved = await saveFollowupBundle(id, bundle);
             acceptSavedFollowup(saved);
             return saved;
+          }}
+          onOpenAiSettings={()=>setAiSettingsOpen(true)}
+          onSaveProfile={async(input,expected)=>{
+            if(contactsRef.current.some(c=>c.id!==input.id&&contactKey(c)===contactKey(input)))throw Error('同名联系人已存在，请检查备注名。');
+            const saved=await saveCustomerProfile(input,expected);acceptSavedFollowup(saved);return saved;
           }}
           renderPolicies={() => (
             <RenewalWorkspace
@@ -1705,6 +1714,7 @@ const App: React.FC = () => {
 
       {chatImport && (
         <ChatFollowUpDialog
+          onOpenAiSettings={()=>setAiSettingsOpen(true)}
           contacts={contacts}
           initialContactId={chatImport.contactId}
           onSave={saveChatFollowup}

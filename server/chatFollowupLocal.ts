@@ -1,6 +1,8 @@
 import { revision, addDays } from '../services/followupDomain';
 import { chinaDate } from '../services/chatAnalysis';
 import { runFollowupAi } from './followupAi';
+import {createDeepseekSettings} from './deepseekSettings';
+import {mergeCustomerProfile} from '../services/customerProfileMutation';
 import { applyFollowupBundle } from '../services/followupMutation';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';
@@ -107,6 +109,7 @@ export function chatFollowupLocal(env: Record<string, string>): Plugin {
     name: 'followup-workbench-local',
     configureServer(server) {
       let data = loadPreview();
+      const aiSettings=createDeepseekSettings(env);
       const save = (nextData: typeof data) => {
         writeFileSync('.followup-workbench-data.tmp.local', JSON.stringify(nextData), { mode: 0o600 });
         renameSync('.followup-workbench-data.tmp.local', '.followup-workbench-data.local');
@@ -114,19 +117,26 @@ export function chatFollowupLocal(env: Record<string, string>): Plugin {
       };
       server.middlewares.use(async (req, res, next) => {
         const url = new URL(req.url || '/', CHAT_PREVIEW_URL);
+        const settingsRequest=url.pathname==='/api/ai-settings';
         const analysis = url.pathname === '/api/chat-followup' || url.pathname === '/api/followup-ai';
-        if (!analysis && !url.pathname.startsWith('/rest/v1/')) return next();
+        if (!analysis && !settingsRequest && !url.pathname.startsWith('/rest/v1/')) return next();
         if (req.headers.host !== new URL(CHAT_PREVIEW_URL).host ||
           (req.headers.origin && req.headers.origin !== CHAT_PREVIEW_URL) ||
           req.headers['sec-fetch-site'] === 'cross-site') return send(res, 403, { message: '仅在本机预览地址可用。' });
         try {
+          if(settingsRequest){
+            if(req.method==='GET')return send(res,200,aiSettings.status());
+            if(req.method!=='POST'||!req.headers['content-type']?.startsWith('application/json'))return send(res,405,{message:'请求格式有误。'});
+            return send(res,200,await aiSettings.update(await readJson(req)));
+          }
           if (analysis) {
-            if (url.pathname === '/api/followup-ai' && req.method === 'GET') return send(res, 200, { configured: Boolean(env.DEEPSEEK_API_KEY) });
+            const activeEnv=aiSettings.effective();
+            if (url.pathname === '/api/followup-ai' && req.method === 'GET') return send(res, 200, { configured: Boolean(activeEnv.DEEPSEEK_API_KEY) });
             if (req.method !== 'POST' || !req.headers['content-type']?.startsWith('application/json')) {
               return send(res, 405, { message: '请求格式有误。' });
             }
-            if (!env.DEEPSEEK_API_KEY) return send(res, 503, { message: '尚未配置 DeepSeek Key。可以先保存对话。' });
-            return send(res, 200, url.pathname === '/api/followup-ai' ? await runFollowupAi(await readJson(req), env) : await analyze(await readJson(req), env));
+            if (!activeEnv.DEEPSEEK_API_KEY) return send(res, 503, { message: '尚未配置 DeepSeek Key。可以先保存对话。' });
+            return send(res, 200, url.pathname === '/api/followup-ai' ? await runFollowupAi(await readJson(req), activeEnv) : await analyze(await readJson(req), activeEnv));
           }
           const kind = url.searchParams.get('data_type') || '';
           const type = kind.replace(/^eq\./, '');
@@ -181,10 +191,11 @@ export function chatFollowupLocal(env: Record<string, string>): Plugin {
             const contact = body.p_contact as Contact;
             const contacts = nextData.contacts as Contact[];
             const previous = contacts.find(item => item.id === contact.id);
-            if (previous) contact.progressHistory = previous.progressHistory;
-            nextData.contacts = [contact, ...contacts.filter(item => item.id !== contact.id)];
+            let saved:Contact;
+            try{saved=mergeCustomerProfile(previous,contact,body.p_expected);}catch(e){return send(res,409,{message:e instanceof Error?e.message:'客户资料已变化，请刷新后重试。'});}
+            nextData.contacts = [saved, ...contacts.filter(item => item.id !== saved.id)];
             save(nextData);
-            return send(res, 200, contact);
+            return send(res, 200, saved);
           }
           if (url.pathname === '/rest/v1/app_data') {
             for (const entry of Array.isArray(body) ? body : [body]) {
@@ -198,7 +209,7 @@ export function chatFollowupLocal(env: Record<string, string>): Plugin {
         } catch (error) {
           const message = error instanceof Error && !['SyntaxError', 'TimeoutError'].includes(error.name)
             ? error.message : '处理失败，请重试。';
-          return send(res, 502, { message: analysis ? message : '本地保存失败，请重试。' });
+          return send(res, 502, { message: (analysis||settingsRequest) ? message : '本地保存失败，请重试。' });
         }
       });
     },

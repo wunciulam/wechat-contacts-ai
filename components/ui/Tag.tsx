@@ -1,4 +1,6 @@
 import React from "react";
+import { X } from "lucide-react";
+import { IconButton } from "./Button";
 const tones = {
   neutral: "bg-gray-100 text-gray-600",
   blue: "bg-blue-100 text-blue-700",
@@ -12,17 +14,22 @@ export default function Tag({
   tone = "neutral",
   children,
   className = "",
+  onRemove,
+  removeLabel,
 }: {
   tone?: TagTone;
   children: React.ReactNode;
   className?: string;
   key?: React.Key;
+  onRemove?:()=>void;
+  removeLabel?:string;
 }) {
   return (
     <span
       className={`inline-flex whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${tones[tone]} ${className}`}
     >
       {children}
+      {onRemove&&<IconButton className="ui-tag-remove" aria-label={removeLabel||`移除${String(children)}`} onClick={e=>{e.stopPropagation();onRemove();}}><X size={12}/></IconButton>}
     </span>
   );
 }

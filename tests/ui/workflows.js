@@ -1,7 +1,7 @@
 async (page) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  const d = page.getByRole("dialog", { name: "编辑联系人资料", exact: true });
+  const d = page.getByRole("dialog", { name: "示例客户的客户详情", exact: true });
   await d.getByRole("button", { name: "取消", exact: true }).click();
   await page.getByRole("tab", {name:"保单",exact:true}).click();
   const table = page.locator("table").first();
@@ -27,7 +27,7 @@ async (page) => {
   if (count !== 16) throw Error("detail fields count " + count);
   await detail.getByLabel("缴费方式", { exact: true }).click();
   await page.getByRole("option", { name: "期交-年", exact: true }).click();
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/policy-edit-desktop.png",
   });
@@ -58,7 +58,7 @@ async (page) => {
     .getByRole("button", { name: "保存保单", exact: true })
     .boundingBox();
   if (save.y + save.height > 844) throw Error("new policy footer");
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/new-policy-mobile.png",
   });
@@ -75,7 +75,7 @@ async (page) => {
   await categories
     .getByRole("button", { name: "新增类目", exact: true })
     .click();
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/categories-desktop.png",
   });
@@ -94,7 +94,7 @@ async (page) => {
       e.parentElement.querySelector("svg").getBoundingClientRect().right,
   );
   if (gap < 8) throw Error("category search overlaps");
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/category-search-desktop.png",
   });
@@ -112,7 +112,7 @@ async (page) => {
     exact: true,
   });
   await mingya.waitFor();
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/mingya-import-desktop.png",
   });

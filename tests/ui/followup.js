@@ -1,5 +1,5 @@
 async (page) => {
-  await page.getByRole('dialog',{name:'编辑联系人资料',exact:true}).getByRole('button',{name:'取消',exact:true}).click();
+  await page.getByRole('dialog',{name:'示例客户的客户详情',exact:true}).getByRole('button',{name:'取消',exact:true}).click();
   const customer=page.getByRole('dialog',{name:'示例客户的客户详情',exact:true});
   await customer.getByRole('tab',{name:'跟进',exact:true}).click();
   await customer.getByRole('button',{name:'写跟进',exact:true}).click();
@@ -13,6 +13,6 @@ async (page) => {
   await page.reload();await page.getByRole('heading',{name:'示例客户',exact:true}).click();
   await customer.getByRole('tab',{name:'跟进',exact:true}).click();
   await customer.getByText('回归检查：保留输入并重试',{exact:true}).waitFor();
-  await page.screenshot({animations:'disabled',path:'output/ui-regression/followup-saved.png'});
+  await page.screenshot({timeout:30000,animations:'disabled',path:'output/ui-regression/followup-saved.png'});
   return {passed:true,failedInputRetained:true,retryPersistedAfterReload:true};
 };

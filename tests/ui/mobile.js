@@ -2,7 +2,7 @@ async (page) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("dialog", {name:"编辑联系人资料",exact:true}).getByRole("button",{name:"取消",exact:true}).click();
+  await page.getByRole("dialog", {name:"示例客户的客户详情",exact:true}).getByRole("button",{name:"取消",exact:true}).click();
   await page.keyboard.press("Escape");
   await page.getByRole("button",{name:"打开菜单",exact:true}).click();
   await page.getByRole("button",{name:/添加 \/ 导入/}).click();
@@ -39,7 +39,7 @@ async (page) => {
   const b = await popup.boundingBox();
   if (b.x < 0 || b.y < 0 || b.x + b.width > 390 || b.y + b.height > 844)
     throw Error("mobile calendar clipped");
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/calendar-mobile.png",
   });
@@ -57,7 +57,7 @@ async (page) => {
     .getByRole("button", { name: "保存", exact: true })
     .boundingBox();
   if (!save || save.y + save.height > 844) throw Error("footer inaccessible");
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/contact-mobile-scroll.png",
   });
@@ -71,7 +71,7 @@ async (page) => {
   await page.keyboard.press("Tab");
   if (!(await drawer.evaluate((e) => e.contains(document.activeElement))))
     throw Error("drawer lost focus");
-  await page.screenshot({
+  await page.screenshot({timeout:30000,
     animations: "disabled",
     path: "output/ui-regression/navigation-mobile.png",
   });

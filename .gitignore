@@ -36,3 +36,5 @@ output/ui-contract-report.json
 
 .followup-workbench-data.local
 .followup-workbench-data.tmp.local
+
+.deepseek-settings.local.*.tmp

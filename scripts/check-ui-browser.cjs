@@ -98,6 +98,7 @@ function command(args) {
       .replace(/;$/, "")
       .replaceAll("__BASE_URL__", base.replace(/\/$/, ""));
     let output;try {output=await command(["run-code", code]);}catch(e){await command(["screenshot","--filename",path.join(out,"failure.png")]).catch(()=>{});const state=await command(["run-code", 'async page => ({body:await page.locator("body").innerText(), requests:page._follow?.requests})']).catch(()=>"");fs.writeFileSync(path.join(out,"failure-state.txt"),state);throw e;}
+    if(!output.includes("### Result")){const state=await command(["run-code",'async page=>({body:await page.locator("body").innerText(),dialogs:page._dialogs})']).catch(()=>"unable to read");fs.writeFileSync(path.join(out,"missing-result-state.txt"),state);}
     const match = output.match(/### Result\s*\n([^\n]+)/);
     if (!match)
       throw Error(name + ": missing result: " + output.slice(0, 1200));
@@ -107,6 +108,7 @@ function command(args) {
     results.push({ name, ...result });
     console.log("PASS " + name);
   }
+  if(process.env.UI_SCENARIO){await run("fixture load","setup.js");await run(process.env.UI_SCENARIO,process.env.UI_SCENARIO);fs.writeFileSync(path.join(out,"results.json"),JSON.stringify({passed:true,results},null,2));return;}
   await run("fixture load", "setup.js");
   await run("desktop date/select/keyboard", "controls.js");
   await run("fixture reset", "setup.js");
@@ -124,6 +126,8 @@ function command(args) {
   await run("chat OCR, evidence, archive and tasks", "chat-followup.js");
   await run("fixture reset", "setup.js");
   await run("unified customer profile/followup/policies", "customer-detail.js");
+  await run("fixture reset", "setup.js");
+  await run("AI configuration and connected analysis", "ai-settings.js");
   await run("component acceptance", "acceptance.js");
   fs.writeFileSync(
     path.join(out, "results.json"),
