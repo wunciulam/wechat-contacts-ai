@@ -40,7 +40,7 @@ export function lastEffective(c: Contact, today = chinaDate()) {
       (r) =>
         r.date <= today && r.channel !== "attempt" && r.channel !== "internal",
     )?.date ||
-    (isChatDate(c.lastDate || "") && c.lastDate! <= today ? c.lastDate : "")
+    ((c as Contact&{progressDeletedIds?:string[]}).progressDeletedIds?.length?"":isChatDate(c.lastDate || "") && c.lastDate! <= today ? c.lastDate : "")
   );
 }
 export function revision(c: Contact) {

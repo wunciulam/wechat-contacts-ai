@@ -1640,6 +1640,7 @@ const App: React.FC = () => {
             acceptSavedFollowup(saved);
             return saved;
           }}
+          onMutateHistory={async(kind,record,expected)=>{const saved=await saveFollowup(customerDetail.id,kind,record,expected);acceptSavedFollowup(saved);return saved;}}
           onOpenAiSettings={()=>setAiSettingsOpen(true)}
           onSaveProfile={async(input,expected)=>{
             if(contactsRef.current.some(c=>c.id!==input.id&&contactKey(c)===contactKey(input)))throw Error('同名联系人已存在，请检查备注名。');

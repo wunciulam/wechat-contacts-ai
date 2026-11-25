@@ -20,6 +20,9 @@ import Button, { IconButton } from "./ui/Button";
 import Input, { Textarea } from "./ui/Input";
 import Select from "./ui/Select";
 import Field from "./ui/Field";
+import ChatScreenshotViewer from "./ChatScreenshotViewer";
+import useChatMarquee from "./useChatMarquee";
+import {summarySelection} from "../services/chatSelection";
 function Screenshot({ file }: { file: File }) {
   const [url, setUrl] = useState("");
   useEffect(() => {
@@ -52,7 +55,8 @@ export default function ChatFollowUpDialog({
     [paste, setPaste] = useState(""),
     [showPaste, setShowPaste] = useState(false),
     [editing, setEditing] = useState<string | null>(null),
-    [activeFile, setActiveFile] = useState(0);
+    [activeFile, setActiveFile] = useState(0),
+    [zoomFile,setZoomFile]=useState<File|null>(null);
   const [busy, setBusy] = useState(""),
     [error, setError] = useState(""),
     [progress, setProgress] = useState(""),
@@ -66,12 +70,11 @@ export default function ChatFollowUpDialog({
   messageRef.current=messages;selectionRef.current=selected;
   const [fileErrors,setFileErrors]=useState(new Map<File,string>());const errorsRef=useRef(fileErrors);errorsRef.current=fileErrors;
   useEffect(() => () => operation.current?.abort(), []);
-  const picked = messages.filter((m) => selected.has(m.id)),
-    invalid = picked.some(
-      (m) => !isChatDate(m.date) || m.speaker === "unknown" || !m.text.trim() || m.reviewRequired,
-    );
-  const grouped = groupMessages(messages),
-    days = groupMessages(picked),
+  const {picked,ready,skipped}=summarySelection(messages,selected);
+  const invalid=!ready.length;
+  const reviewRef=useRef<HTMLElement|null>(null);
+  const marquee=useChatMarquee(reviewRef,selected,setSelected,()=>setSummaries({}),step==='review'&&!busy&&!confirmClose);
+  const grouped=groupMessages(messages),days=groupMessages(ready),
     dirty = files.length > 0 || messages.length > 0 || Boolean(paste.trim());
   const allMerged = days.flatMap(([date, rows]) =>
     mergeMessages(
@@ -173,7 +176,7 @@ export default function ChatFollowUpDialog({
     try {
       if (summaryRevision.current !== revision(contact))
         throw Error("梗概生成后记录有变化，请返回重新生成。");
-      const writes = importRecords(contact, picked, summaries);
+      const writes = importRecords(contact, ready, summaries);
       if (!writes.length) {
         setError("这些消息已归档，没有新增内容。");
         return;
@@ -194,6 +197,7 @@ export default function ChatFollowUpDialog({
   const reviewMessage = (m: ChatMessage) => (
     <div
       key={m.id}
+      data-chat-message={m.id}
       className={
         "chat-message " + (m.speaker === "self" ? "chat-message-self" : "")
       }
@@ -212,7 +216,7 @@ export default function ChatFollowUpDialog({
           }
         >
           {editing === m.id ? (
-            <div className="space-y-2">
+            <div className="space-y-2" data-chat-editor>
               <Select
                 aria-label="说话人"
                 value={m.speaker}
@@ -250,6 +254,7 @@ export default function ChatFollowUpDialog({
             <Button
               variant="plain"
               className="text-left whitespace-pre-wrap"
+              data-message-bubble
               aria-label={"编辑消息：" + m.text}
               onClick={() => setEditing(m.id)}
             >
@@ -274,6 +279,8 @@ export default function ChatFollowUpDialog({
     </div>
   );
   return (
+    <>
+    {zoomFile&&<ChatScreenshotViewer file={zoomFile} onClose={()=>setZoomFile(null)}/>}
     <WorkspaceDialog
       title={contact?.remarkName || contact?.nickname || "选择客户"}
       subtitle={step === "review" ? "导入聊天" : "每日梗概"}
@@ -337,7 +344,7 @@ export default function ChatFollowUpDialog({
                     <Button
                       variant="plain"
                       aria-label={"查看截图 " + file.name}
-                      onClick={() => setActiveFile(i)}
+                      onClick={() => {setActiveFile(i);setZoomFile(file);}}
                       className={activeFile === i ? "chat-source-active" : ""}
                     >
                       <Screenshot file={file} />
@@ -423,7 +430,8 @@ export default function ChatFollowUpDialog({
               </>
             )}
           </aside>
-          <section className="chat-review">
+          <section className="chat-review" ref={reviewRef} data-marquee-active={Boolean(marquee.rect)} {...marquee.handlers}>
+          {marquee.rect&&<div className="chat-selection-box" aria-hidden="true" style={{left:marquee.rect.left,top:marquee.rect.top,width:marquee.rect.right-marquee.rect.left,height:marquee.rect.bottom-marquee.rect.top}}/>}
             {step === "review" ? (
               <>
                 {showPaste && (
@@ -446,7 +454,7 @@ export default function ChatFollowUpDialog({
                     </Button>
                   </div>
                 )}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <label className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
@@ -464,6 +472,7 @@ export default function ChatFollowUpDialog({
                     />
                     识别结果
                   </label>
+                  <div className="chat-marquee-tools"><Button size="sm" variant={marquee.mode==='retain'?'secondary':'ghost'} aria-pressed={marquee.mode==='retain'} onClick={()=>marquee.setMode('retain')}>框选保留</Button><Button size="sm" variant={marquee.mode==='exclude'?'secondary':'ghost'} aria-pressed={marquee.mode==='exclude'} onClick={()=>marquee.setMode('exclude')}>框选取消</Button></div>
                 </div>
                 {!messages.length && (
                   <div className="chat-empty">
@@ -591,9 +600,9 @@ export default function ChatFollowUpDialog({
                 {days.filter(([d]) => d).length > 0
                   ? "，覆盖 " + days.filter(([d]) => d).length + " 天"
                   : ""}
-                {invalid && (
+                {skipped>0 && (
                   <span className="block text-amber-700">
-                    请核对原文、日期和说话人
+                    {skipped} 条缺少日期或说话人，暂不处理
                   </span>
                 )}
               </div>
@@ -641,5 +650,6 @@ export default function ChatFollowUpDialog({
         </div>
       </WorkspaceDialogFooter>
     </WorkspaceDialog>
+    </>
   );
 }

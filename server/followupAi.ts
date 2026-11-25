@@ -80,11 +80,12 @@ export async function runFollowupAi(
       for (const chunk of chunks) {
         const d = await ask(
           rule +
-            '按日期只概括客户具体说了什么、我怎样回答，保留疑问、回应和承诺；不要阶段、销售建议或推测。JSON格式 {"summary":"自然连贯的沟通梗概"}。',
+            '按日期只概括客户具体说了什么、我怎样回答，保留疑问、回应和承诺；reviewRequired为true表示尚未校对，不得把看不清的部分补写成事实；不要阶段、销售建议或推测。JSON格式 {"summary":"自然连贯的沟通梗概"}。',
           chunk.map((m) => ({
             speaker: m.speaker,
             text: m.text,
             time: m.time,
+            reviewRequired:Boolean(m.reviewRequired),
           })),
         );
         if (typeof d.summary !== "string" || !d.summary.trim())

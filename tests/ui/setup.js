@@ -169,8 +169,10 @@ async (page) => {
         s.contacts.push(c);
       }
       const record = { ...b.p_record, updatedAt: "2026-11-22T04:00:00.000Z" };
-      if (b.p_kind === "delete")
+      if (b.p_kind === "delete"){
         c.progressHistory = c.progressHistory.filter((r) => r.id !== record.id);
+        c.progressDeletedIds=[...(c.progressDeletedIds||[]),record.id];
+      }
       else if (b.p_kind === "edit")
         c.progressHistory = c.progressHistory.map((r) =>
           r.id === record.id ? record : r,

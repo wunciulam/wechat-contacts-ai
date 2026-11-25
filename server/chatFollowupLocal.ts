@@ -6,6 +6,7 @@ import {createDeepseekSettings} from './deepseekSettings';
 import {mergeCustomerProfile} from '../services/customerProfileMutation';
 import { applyFollowupBundle } from '../services/followupMutation';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import {isDeepStrictEqual} from 'node:util';
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import type { Plugin } from 'vite';
 import type { Contact, ProgressRecord } from '../types';
@@ -178,13 +179,16 @@ export function chatFollowupLocal(env: Record<string, string>): Plugin {
               }
               return send(res, 200, contact);
             }
-            if (body.p_kind !== 'add' && (!exists || exists.updatedAt !== body.p_expected?.updatedAt)) {
+            if (body.p_kind !== 'add' && (!exists || !isDeepStrictEqual(exists,body.p_expected))) {
               return send(res, 409, { message: '这条跟进已变化，请刷新后重试。' });
             }
             const stamped = { ...record, updatedAt: new Date().toISOString() };
             contact.progressHistory = body.p_kind === 'delete' ? history.filter(item => item.id !== record.id)
               : body.p_kind === 'edit' ? history.map(item => item.id === record.id ? stamped : item) : [stamped, ...history];
-            if (body.p_kind !== 'delete') contact.lastDate = record.date;
+            if(body.p_kind==='delete'){
+              const deleted=contact as Contact&{progressDeletedIds?:string[]};deleted.progressDeletedIds=[...new Set([...(deleted.progressDeletedIds||[]),record.id])];
+            }
+            const dates=(contact.progressHistory||[]).filter(r=>r.kind!=='task'&&r.channel!=='attempt'&&r.channel!=='internal'&&isChatDate(r.date)).map(r=>r.date).sort();contact.lastDate=dates.at(-1)||'';
             if (body.p_kind === 'add') contact.followUpStatus = 'following';
             if (!contacts.includes(contact)) contacts.push(contact);
             save(nextData);

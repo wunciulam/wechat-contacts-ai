@@ -133,6 +133,8 @@ function command(args) {
   await run("vision tiles, retry and full-bubble review", "vision-import.js");
   await run("fixture reset", "setup.js");
   await run("timeline, colors, date and motion", "followup-presentation.js");
+  await run("fixture reset", "setup.js");
+  await run("record edit/delete, zoom, marquee and partial drafts", "history-import-actions.js");
   await run("component acceptance", "acceptance.js");
   fs.writeFileSync(
     path.join(out, "results.json"),

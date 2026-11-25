@@ -6,6 +6,8 @@ import {
   RefreshCw,
   Check,
   CalendarDays,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import type { Contact, ProgressRecord } from "../types";
 import {
@@ -32,7 +34,7 @@ export function FollowupAvatar({ contact }: { contact: Contact }) {
 export function FollowupTaskDate({
   task,
   onDate,
-  showOverdue=true,
+  showOverdue=false,
 }: {
   task: ProgressRecord;
   showOverdue?:boolean;
@@ -117,8 +119,12 @@ export default function FollowupCustomerPanel({
   followupStatusControl,
   closeDisabled,
   onOpenAiSettings,
+  onHistoryEdit,
+  onHistoryDelete,
 }: {
   onOpenAiSettings?:()=>void;
+  onHistoryEdit?:(record:ProgressRecord)=>void;
+  onHistoryDelete?:(record:ProgressRecord)=>void;
   followupStatusControl?:React.ReactNode;
   closeDisabled?:boolean;
   contact: Contact;
@@ -513,7 +519,7 @@ export default function FollowupCustomerPanel({
                   <time dateTime={record.date}>{record.date.slice(5).replace("-","月")}日</time>
                   <span className="followup-history-mark" aria-hidden="true" />
                   <div>
-                    <p>{record.content}</p>
+                    <div className="followup-history-copy"><p>{record.content}</p>{onHistoryEdit&&onHistoryDelete&&<div className="followup-record-actions"><IconButton aria-label={'编辑跟进记录：'+record.content} title="编辑记录" onClick={()=>onHistoryEdit(record)}><Pencil size={14}/></IconButton><IconButton aria-label={'删除跟进记录：'+record.content} title="删除记录" onClick={()=>onHistoryDelete(record)}><Trash2 size={14}/></IconButton></div>}</div>
                     {channelLabel(record)&&<div className="followup-history-channel"><Tag>{channelLabel(record)}</Tag></div>}
                     {record.chat?.transcript && (
                       <details open={record.id === evidenceRecordId}>
@@ -530,7 +536,7 @@ export default function FollowupCustomerPanel({
                                         ? "客户"
                                         : "待核对"}
                                   </strong>
-                                  <time>{m.time}</time>
+                                  <time>{m.time}</time>{m.reviewRequired&&<Tag tone="amber">原文待核对</Tag>}
                                 </header>
                                 <p>{m.text}</p>
                               </div>

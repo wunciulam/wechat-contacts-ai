@@ -11,6 +11,7 @@ import { revision, tasks } from "../services/followupDomain";
 import { categoryIds } from "../services/contactIdentity";
 import ImportModal from "./ImportModal";
 import Select from "./ui/Select";
+import FollowupRecordDialog,{type MutateHistory} from "./FollowupRecordDialog";
 import Button from "./ui/Button";
 export type CustomerTab = "followup" | "profile" | "policies";
 export type CustomerRequest = {
@@ -30,7 +31,9 @@ export default function CustomerDetailDialog({
   onSaveProfile,
   onOpenAiSettings,
   renderPolicies,
+  onMutateHistory,
 }: {
+  onMutateHistory:MutateHistory;
   key?: string;
   contact: Contact;
   initialTab: CustomerTab;
@@ -44,6 +47,7 @@ export default function CustomerDetailDialog({
   onOpenAiSettings: () => void;
   renderPolicies: () => React.ReactNode;
 }) {
+  const [historyAction,setHistoryAction]=useState<{record:ProgressRecord;mode:"edit"|"delete"}|null>(null);
   const [tab, setTab] = useState(initialTab),
     [analyzing, setAnalyzing] = useState(false),
     [result, setResult] = useState<{ task?: ProgressRecord } | null>(null),
@@ -200,6 +204,8 @@ export default function CustomerDetailDialog({
         }}
         onEdit={onEdit}
         onImport={onImport}
+        onHistoryEdit={record=>setHistoryAction({record,mode:"edit"})}
+        onHistoryDelete={record=>setHistoryAction({record,mode:"delete"})}
         onWrite={() => setResult({})}
         onResult={(task) => setResult({ task })}
         onSchedule={arranged}
@@ -241,6 +247,7 @@ export default function CustomerDetailDialog({
           ) : null
         }
       />
+      {historyAction&&<FollowupRecordDialog record={historyAction.record} mode={historyAction.mode} onMutate={onMutateHistory} onClose={()=>setHistoryAction(null)} onSaved={()=>{setNotice(historyAction.mode==="delete"?"记录已删除":"记录已更新");setUndoId(null);setHistoryAction(null);}}/>}
       {result && (
         <FollowupResultDialog
           contact={contact}
