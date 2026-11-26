@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Contact, ProgressRecord } from '../types';
-import { X, Edit2, Trash2, Plus, Calendar, Tag, User, Target, ShoppingBag, Clock, RotateCcw, CheckCircle2, CircleDashed, AlertCircle, Gift, ArrowRight, Send, Shield, FileText } from 'lucide-react';
+import { Contact, ProgressRecord, SopSession } from '../types';
+import { X, Edit2, Trash2, Plus, Calendar, Tag, User, Target, ShoppingBag, Clock, RotateCcw, CheckCircle2, CircleDashed, AlertCircle, Gift, ArrowRight, Send, Shield, FileText, ClipboardList, Save } from 'lucide-react';
 
 interface ContactDetailSidebarProps {
   contact: Contact | null;
@@ -10,7 +10,7 @@ interface ContactDetailSidebarProps {
   onDelete: (id: string) => void;
   onAddProgress: (contactId: string) => void;
   onDeleteProgress: (contactId: string, progressId: string) => void;
-  onUpdateStatus: (contactId: string, newStatus: 'idle' | 'following' | 'contacted') => void;
+  onUpdateStatus: (contactId: string, newStatus: 'idle' | 'following') => void;
   onAddToFollowing: (contactId: string) => void;
   onRemoveTag: (contactId: string, tag: string) => void;
   showAddToFollowing?: boolean;
@@ -18,6 +18,8 @@ interface ContactDetailSidebarProps {
   onAddPolicy?: (contactId: string) => void;
   onDeletePolicy?: (contactId: string, policyId: string) => void;
   onEditPolicy?: (contactId: string, policy: any) => void;
+  onStartSop?: (contactId: string) => void;
+  sopSessions?: SopSession[];
 }
 
 const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
@@ -35,7 +37,9 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
   onQuickAddProgress,
   onAddPolicy,
   onDeletePolicy,
-  onEditPolicy
+  onEditPolicy,
+  onStartSop,
+  sopSessions = []
 }) => {
   const [copiedWxid, setCopiedWxid] = useState<string | null>(null);
   
@@ -43,6 +47,15 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [progressContent, setProgressContent] = useState('');
   const [progressDate, setProgressDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isEditingInline, setIsEditingInline] = useState(false);
+  const [editForm, setEditForm] = useState({
+    remarkName: '',
+    nickname: '',
+    wxid: '',
+    phoneNumber: '',
+    birthday: '',
+    remarkInfo: ''
+  });
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // 自动调整文本框高度 - 必须在条件判断之前
@@ -59,10 +72,36 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
       setProgressContent('');
       setIsInputFocused(false);
       setProgressDate(new Date().toISOString().split('T')[0]);
+      setIsEditingInline(false);
     }
   }, [isOpen]);
 
   if (!contact || !isOpen) return null;
+
+  const startInlineEdit = () => {
+    setEditForm({
+      remarkName: contact.remarkName || '',
+      nickname: contact.nickname || '',
+      wxid: contact.wxid || '',
+      phoneNumber: contact.phoneNumber || '',
+      birthday: contact.birthday || '',
+      remarkInfo: contact.remarkInfo || ''
+    });
+    setIsEditingInline(true);
+  };
+
+  const saveInlineEdit = () => {
+    onEdit({
+      ...contact,
+      remarkName: editForm.remarkName.trim(),
+      nickname: editForm.nickname.trim(),
+      wxid: editForm.wxid.trim(),
+      phoneNumber: editForm.phoneNumber.trim(),
+      birthday: editForm.birthday.trim(),
+      remarkInfo: editForm.remarkInfo.trim()
+    });
+    setIsEditingInline(false);
+  };
 
   const handleSubmitProgress = () => {
     if (!progressContent.trim() || !onQuickAddProgress) return;
@@ -122,6 +161,18 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
   };
 
   const birthdaySoon = isBirthdaySoon();
+  const contactSopSessions = sopSessions.filter(session => session.contactId === contact.id);
+  const profile = contact.sopProfile;
+  const profileFields = [
+    { label: '客户来源', value: profile?.source },
+    { label: '主动动机', value: profile?.motivation },
+    { label: '原资金去向', value: profile?.originalFundDestination },
+    { label: '可放期限', value: profile?.availableDuration },
+    { label: '核心需求', value: profile?.coreNeeds?.join('、') },
+    { label: '最大顾虑', value: profile?.mainConcern },
+    { label: '决策人', value: profile?.decisionMakers },
+    { label: '下一步动作', value: profile?.nextAction }
+  ].filter(item => item.value);
 
   return (
     <>
@@ -132,7 +183,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
       />
       
       {/* Sidebar */}
-      <div className="fixed right-0 top-0 h-full w-[500px] bg-white shadow-lg z-50 flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="fixed right-0 top-0 h-full w-[680px] max-w-full bg-white shadow-lg z-50 flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
           <div className="flex items-center gap-3">
@@ -140,22 +191,50 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
               {contact.remarkName?.[0] || contact.nickname?.[0] || '?'}
             </div>
             <div>
-              <h2 className="text-lg font-medium text-gray-900">
-                {contact.remarkName || contact.nickname || "未知名称"}
-              </h2>
-              {contact.remarkName && contact.nickname && contact.remarkName !== contact.nickname && (
+              {isEditingInline ? (
+                <input
+                  value={editForm.remarkName}
+                  onChange={e => setEditForm(prev => ({ ...prev, remarkName: e.target.value }))}
+                  className="input input-sm w-52 font-medium"
+                  placeholder="客户备注名"
+                />
+              ) : (
+                <h2 className="text-lg font-medium text-gray-900">
+                  {contact.remarkName || contact.nickname || "未知名称"}
+                </h2>
+              )}
+              {!isEditingInline && contact.remarkName && contact.nickname && contact.remarkName !== contact.nickname && (
                 <p className="text-xs text-gray-400">{contact.nickname}</p>
               )}
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => onEdit(contact)}
-              className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
-              title="编辑联系人"
-            >
-              <Edit2 size={18} />
-            </button>
+            {isEditingInline ? (
+              <>
+                <button
+                  onClick={saveInlineEdit}
+                  className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                  title="保存编辑"
+                >
+                  <Save size={18} />
+                </button>
+                <button
+                  onClick={() => setIsEditingInline(false)}
+                  className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                  title="取消编辑"
+                >
+                  <X size={18} />
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={startInlineEdit}
+                className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                title="编辑联系人"
+              >
+                <Edit2 size={18} />
+              </button>
+            )}
             <button
               onClick={() => {
                 onDelete(contact.id);
@@ -183,22 +262,6 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
             <div className="flex items-center gap-4">
               {/* Follow-up Status */}
               <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
-                  contact.followUpStatus === 'following' 
-                    ? 'bg-gray-900 text-white' 
-                    : contact.followUpStatus === 'contacted'
-                    ? 'bg-gray-100 text-gray-700'
-                    : 'bg-gray-50 text-gray-400'
-                }`}>
-                  {contact.followUpStatus === 'following' ? (
-                    <><Clock size={12} /> 跟进中</>
-                  ) : contact.followUpStatus === 'contacted' ? (
-                    <><CheckCircle2 size={12} /> 已沟通</>
-                  ) : (
-                    <><CircleDashed size={12} /> 暂未跟进</>
-                  )}
-                </span>
-                
                 {/* Status Toggle Buttons */}
                 <div className="flex items-center gap-1">
                   <button
@@ -210,16 +273,6 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                     }`}
                   >
                     跟进中
-                  </button>
-                  <button
-                    onClick={() => onUpdateStatus(contact.id, 'contacted')}
-                    className={`text-xs px-2 py-1 rounded transition-colors ${
-                      contact.followUpStatus === 'contacted'
-                        ? 'bg-gray-900 text-white'
-                        : 'text-gray-400 hover:text-gray-900 hover:bg-gray-100'
-                    }`}
-                  >
-                    已沟通
                   </button>
                   <button
                     onClick={() => onUpdateStatus(contact.id, 'idle')}
@@ -258,6 +311,79 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                 <RotateCcw size={12} />
                 添加到待跟进
               </button>
+            )}
+            {onStartSop && (
+              <button
+                onClick={() => onStartSop(contact.id)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-gray-900 text-white hover:bg-gray-800 transition-colors"
+              >
+                <ClipboardList size={12} />
+                开始展业 SOP
+              </button>
+            )}
+          </div>
+
+          {/* SOP Profile Section */}
+          <div className="p-6 border-b border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                <ClipboardList size={16} className="text-gray-900" />
+                展业画像
+                {contactSopSessions.length > 0 && (
+                  <span className="text-xs font-normal text-gray-400">({contactSopSessions.length} 次问卷)</span>
+                )}
+              </h3>
+              {onStartSop && (
+                <button
+                  onClick={() => onStartSop(contact.id)}
+                  className="text-xs flex items-center gap-1 text-gray-600 hover:text-gray-900"
+                >
+                  <Plus size={14} />
+                  新问卷
+                </button>
+              )}
+            </div>
+
+            {profileFields.length > 0 ? (
+              <div className="bg-gray-50 border border-gray-100 rounded-lg p-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {profileFields.map(field => (
+                    <div key={field.label} className={field.label === '下一步动作' ? 'col-span-2' : ''}>
+                      <div className="text-[10px] font-medium text-gray-400 mb-1">{field.label}</div>
+                      <div className="text-sm font-medium text-gray-800 leading-relaxed">{field.value}</div>
+                    </div>
+                  ))}
+                </div>
+                {profile?.materialsToPrepare && profile.materialsToPrepare.length > 0 && (
+                  <div className="pt-3 mt-3 border-t border-gray-200">
+                    <div className="text-[10px] font-medium text-gray-400 mb-2">需准备材料</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {profile.materialsToPrepare.map(item => (
+                        <span key={item} className="px-2 py-0.5 rounded bg-white border border-gray-200 text-[11px] text-gray-600">{item}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {profile?.updatedAt && (
+                  <div className="text-[10px] text-gray-400 mt-3">
+                    最近更新：{new Date(profile.updatedAt).toLocaleString('zh-CN')}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 border border-dashed border-gray-200 rounded-lg bg-gray-50">
+                <ClipboardList size={22} className="mx-auto text-gray-300 mb-2" />
+                <p className="text-sm text-gray-500 font-medium">暂无展业画像</p>
+                <p className="text-xs text-gray-400 mt-1">完成一份 SOP 问卷后，会在这里结构化展示</p>
+                {onStartSop && (
+                  <button
+                    onClick={() => onStartSop(contact.id)}
+                    className="mt-4 px-3 py-1.5 rounded-md bg-gray-900 text-white text-xs font-medium hover:bg-gray-800"
+                  >
+                    开始展业 SOP
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -377,8 +503,60 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
             </h3>
             
             <div className="space-y-4">
+              {isEditingInline && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-gray-400 block mb-1.5">昵称</label>
+                      <input
+                        value={editForm.nickname}
+                        onChange={e => setEditForm(prev => ({ ...prev, nickname: e.target.value }))}
+                        className="input"
+                        placeholder="昵称"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-400 block mb-1.5">微信号</label>
+                      <input
+                        value={editForm.wxid}
+                        onChange={e => setEditForm(prev => ({ ...prev, wxid: e.target.value }))}
+                        className="input"
+                        placeholder="微信号"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-400 block mb-1.5">手机号</label>
+                      <input
+                        value={editForm.phoneNumber}
+                        onChange={e => setEditForm(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                        className="input"
+                        placeholder="手机号"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-400 block mb-1.5">生日</label>
+                      <input
+                        value={editForm.birthday}
+                        onChange={e => setEditForm(prev => ({ ...prev, birthday: e.target.value }))}
+                        className="input"
+                        placeholder="MM-DD 或 YYYY-MM-DD"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-400 block mb-1.5">备注</label>
+                    <textarea
+                      value={editForm.remarkInfo}
+                      onChange={e => setEditForm(prev => ({ ...prev, remarkInfo: e.target.value }))}
+                      className="input min-h-[88px] resize-none"
+                      placeholder="客户备注"
+                    />
+                  </div>
+                </>
+              )}
+
               {/* WeChat ID */}
-              {contact.wxid && (
+              {!isEditingInline && contact.wxid && (
                 <div className="flex items-start gap-3">
                   <span className="text-xs font-medium text-gray-400 w-16 shrink-0 pt-1">微信号</span>
                   <div 
@@ -397,8 +575,15 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                 </div>
               )}
 
+              {!isEditingInline && contact.phoneNumber && (
+                <div className="flex items-start gap-3">
+                  <span className="text-xs font-medium text-gray-400 w-16 shrink-0 pt-1">手机号</span>
+                  <span className="text-sm text-gray-700">{contact.phoneNumber}</span>
+                </div>
+              )}
+
               {/* Birthday */}
-              {contact.birthday && (
+              {!isEditingInline && contact.birthday && (
                 <div className="flex items-start gap-3">
                   <span className="text-xs font-medium text-gray-400 w-16 shrink-0 pt-1">生日</span>
                   <div className="flex items-center gap-2">
@@ -495,7 +680,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
               )}
 
               {/* Remark Info */}
-              {contact.remarkInfo && (
+              {!isEditingInline && contact.remarkInfo && (
                 <div className="flex items-start gap-3">
                   <span className="text-xs font-medium text-gray-400 w-16 shrink-0 pt-1">备注</span>
                   <p className="text-sm text-gray-700 leading-relaxed flex-1">

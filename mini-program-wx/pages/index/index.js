@@ -12,7 +12,6 @@ Page({
     loading: false,
     statusText: {
       following: '跟进中',
-      contacted: '已沟通',
       idle: '暂未跟进'
     }
   },

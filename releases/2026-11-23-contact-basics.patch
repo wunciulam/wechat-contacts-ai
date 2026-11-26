@@ -1,0 +1,64 @@
+diff --git a/components/ImportModal.tsx b/components/ImportModal.tsx
+index 8375dd6..def01bf 100644
+--- a/components/ImportModal.tsx
++++ b/components/ImportModal.tsx
+@@ -412,7 +412,16 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+                   </Field>
+                   <Field className="" label={<>手机号</>}>
+ 
+-                    <Input type="text" className="" value={formData.phoneNumber || ''} onChange={e => setFormData({...formData, phoneNumber: e.target.value})} placeholder="请输入手机号" />
++                    <Input type="text" className="" value={String(formData.phoneNumber || '')} onChange={e => setFormData({...formData, phoneNumber: e.target.value})} placeholder="请输入手机号" />
++                  </Field>
++                  <Field label="证件号">
++                    <Input value={String(formData.idCard || '')} onChange={e => setFormData({...formData, idCard:e.target.value})} />
++                  </Field>
++                  <Field label="生日">
++                    <Input type="date" value={String(formData.birthday || '')} onChange={e => setFormData({...formData, birthday:e.target.value})} />
++                  </Field>
++                  <Field className="sm:col-span-2" label="地址">
++                    <Input value={String(formData.address || '')} onChange={e => setFormData({...formData, address:e.target.value})} />
+                   </Field>
+                 </div>
+ 
+diff --git a/docs/2026-11-23-contact-basics.md b/docs/2026-11-23-contact-basics.md
+new file mode 100644
+index 0000000..ac0a8bb
+--- /dev/null
++++ b/docs/2026-11-23-contact-basics.md
+@@ -0,0 +1,7 @@
++# 联系人基础信息
++
++联系人资料表单补齐证件号、生日、地址；手机号沿用已有字段，不重复展示。证件号以文本处理，生日复用公共日期组件，地址桌面跨两列、手机单列。已有明亚导入逻辑已经将这些资料填入Contact，本次不改导入合并规则或批量回写数据，已有手动值保留。
++
++59项业务测试、网页类型、组件规则、构建及浏览器回归通过。新增回归检查已有四字段显示、手动地址保存后刷新读取、证件号文本、原有跟进/全部保单保持及手机宽度。测试使用虚拟资料，无真实记录写入。
++
++文案只增加证件号、生日、地址三个字段名用于定位填写；手机号只保留原有一处，无额外说明卡片。桌面和手机截图位于output/ui-regression/contact-basics-*.png。发布核验见《线上正式版说明.md》。
+diff --git a/scripts/check-ui-browser.cjs b/scripts/check-ui-browser.cjs
+index dff565b..3abb83f 100644
+--- a/scripts/check-ui-browser.cjs
++++ b/scripts/check-ui-browser.cjs
+@@ -118,6 +118,8 @@ function command(args) {
+   await run("business entry regression", "workflows.js");
+   await run("fixture reset", "setup.js");
+   await run("density and customer search", "density.js");
++  await run("fixture reset", "setup.js");
++  await run("contact basic information", "contact-basics.js");
+   await run("component acceptance", "acceptance.js");
+   fs.writeFileSync(
+     path.join(out, "results.json"),
+diff --git a/tests/ui/contact-basics.js b/tests/ui/contact-basics.js
+new file mode 100644
+index 0000000..a6db55e
+--- /dev/null
++++ b/tests/ui/contact-basics.js
+@@ -0,0 +1,10 @@
++async(page)=>{
++ // Reload fixtures with stored profile values to verify display and persistence.
++ const c=page._follow.contacts[0];c.idCard='TEST-ID-001-X';c.phoneNumber='13800000000';c.birthday='1990-01-01';c.address='示例地址 A座';await page.reload();await page.getByRole('heading',{name:'示例客户',exact:true}).click();
++ const d=page.getByRole('dialog',{name:'编辑联系人资料',exact:true});
++ for(const [label,value] of [['证件号',c.idCard],['手机号',c.phoneNumber],['生日',c.birthday],['地址',c.address]])if(await d.getByLabel(label,{exact:true}).inputValue()!==value)throw Error('missing profile field '+label);
++ await page.screenshot({animations:'disabled',path:'output/ui-regression/contact-basics-desktop.png'});
++ await d.getByLabel('地址',{exact:true}).fill('手动修改后的地址 B座');await d.getByRole('button',{name:'保存',exact:true}).click();await d.waitFor({state:'hidden'});await page.reload();await page.getByRole('heading',{name:'示例客户',exact:true}).click();if(await d.getByLabel('地址',{exact:true}).inputValue()!=='手动修改后的地址 B座')throw Error('profile address not persisted');if(page._follow.contacts[0].progressHistory.length!==1||page._follow.contacts[0].policies.length!==6)throw Error('profile save changed records');
++ await page.setViewportSize({width:390,height:844});await d.getByLabel('证件号',{exact:true}).scrollIntoViewIfNeeded();const address=await d.getByLabel('地址',{exact:true}).boundingBox();if(address.x<0||address.x+address.width>390)throw Error('mobile address overflow');await page.screenshot({animations:'disabled',path:'output/ui-regression/contact-basics-mobile.png'});await d.getByRole('button',{name:'取消',exact:true}).click();
++ return {passed:true,storedFieldsDisplayed:true,addressPersistedAfterReload:true,historyAndPoliciesPreserved:true,mobileFits:true};
++}

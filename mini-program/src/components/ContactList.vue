@@ -55,13 +55,6 @@
       </view>
       <view
         class="status-item"
-        :class="{ active: followUpFilter === 'contacted' }"
-        @click="setFollowUpFilter('contacted')"
-      >
-        <text>已沟通</text>
-      </view>
-      <view
-        class="status-item"
         :class="{ active: followUpFilter === 'idle' }"
         @click="setFollowUpFilter('idle')"
       >
@@ -196,7 +189,6 @@ const displayContacts = computed(() => {
 const getStatusText = (status?: string) => {
   const statusMap: Record<string, string> = {
     'following': '跟进中',
-    'contacted': '已沟通',
     'idle': '暂未跟进'
   };
   return statusMap[status || 'idle'] || '暂未跟进';
@@ -214,7 +206,7 @@ const toggleTag = (tag: string) => {
   store.toggleTag(tag);
 };
 
-const setFollowUpFilter = (filter: 'idle' | 'following' | 'contacted' | null) => {
+const setFollowUpFilter = (filter: 'idle' | 'following' | null) => {
   store.followUpFilter = filter;
 };
 
@@ -464,11 +456,6 @@ const loadMore = () => {
 .status-badge.following {
   background-color: #e6f7ff;
   color: #1890ff;
-}
-
-.status-badge.contacted {
-  background-color: #f6ffed;
-  color: #52c41a;
 }
 
 .status-badge.idle {

@@ -1,0 +1,1339 @@
+diff --git a/App.tsx b/App.tsx
+index 5a6b914..5d08b32 100644
+--- a/App.tsx
++++ b/App.tsx
+@@ -1,3 +1,4 @@
++import {saveFollowup,saveCustomerProfile} from './services/followupStorage';
+ import { rememberRenewalSnapshot } from './services/renewalCache';
+ import { migrate, projectContacts, mergePolicies } from './services/renewal';
+ import RenewalWorkspace from './components/RenewalWorkspace';
+@@ -72,10 +73,17 @@ const applyAutoTags = (contact: Contact): Contact => {
+ 
+ const generateId = () => Math.random().toString(36).substr(2, 9);
+ 
++const cacheContactsLocally = (value:Contact[]) => {
++  try {const raw=JSON.stringify(value);localStorage.setItem('wechat-contacts',raw);localStorage.setItem('wechat-contacts-backup',raw);}
++  catch { console.warn('本地备份不可写，继续使用数据库数据'); }
++};
++
+ const App: React.FC = () => {
+   const [policyImportFiles, setPolicyImportFiles] = useState<FileList | null>(null);
+   const [contacts, setContacts] = useState<Contact[]>([]);
+   const contactsRef = useRef(contacts); contactsRef.current = contacts;
++  const [contactsSyncError,setContactsSyncError]=useState('');
++  const contactsWriteFailedRef=useRef(false);
+   const contactsWriteRef = useRef<Promise<unknown>>(Promise.resolve());
+   const skipImportSyncRef = useRef<Contact[] | null>(null);
+   const importSavingRef = useRef(false);
+@@ -175,7 +183,7 @@ const App: React.FC = () => {
+     skipImportSyncRef.current = saved;
+     setContacts(saved);
+   };
+-  const beforePolicySave = () => contactsWriteRef.current;
++  const beforePolicySave = async () => { await contactsWriteRef.current;if(contactsWriteFailedRef.current)throw new Error("客户资料尚未同步成功，请先重试保存。"); };
+ 
+   const loadMingyaSnapshot = async (): Promise<ContactImportSnapshot> => {
+     await contactsWriteRef.current;
+@@ -233,8 +241,7 @@ const App: React.FC = () => {
+             });
+             skipImportSyncRef.current = migratedData;
+             setContacts(migratedData);
+-            localStorage.setItem('wechat-contacts', JSON.stringify(migratedData));
+-            localStorage.setItem('wechat-contacts-backup', JSON.stringify(migratedData));
++            cacheContactsLocally(migratedData);
+             setIsLoaded(true);
+             console.log('从云端加载成功，联系人数量:', cloudData.length);
+             return;
+@@ -269,8 +276,7 @@ const App: React.FC = () => {
+ 
+             console.log('旧版 contacts 表恢复成功，联系人数量:', migratedData.length);
+             setContacts(migratedData);
+-            localStorage.setItem('wechat-contacts', JSON.stringify(migratedData));
+-            localStorage.setItem('wechat-contacts-backup', JSON.stringify(migratedData));
++            cacheContactsLocally(migratedData);
+ 
+             // 写回新同步表，避免下次再丢
+             await saveToCloud('contacts', migratedData);
+@@ -325,7 +331,7 @@ const App: React.FC = () => {
+           if (Array.isArray(parsedData) && parsedData.length > 0) {
+             console.log('从备份恢复数据...');
+             setContacts(parsedData);
+-            localStorage.setItem('wechat-contacts', JSON.stringify(parsedData));
++            cacheContactsLocally(parsedData);
+             setIsLoaded(true);
+             console.log('从备份恢复数据...');
+             return;
+@@ -345,17 +351,14 @@ const App: React.FC = () => {
+   // 2. Save Data - 强制保存到云端
+   useEffect(() => {
+     if (isLoaded && contacts.length > 0) {
+-      // 保存到本地
+-      localStorage.setItem('wechat-contacts', JSON.stringify(contacts));
+-      localStorage.setItem('wechat-contacts-backup', JSON.stringify(contacts));
+-      
++      cacheContactsLocally(contacts);
+       if (skipImportSyncRef.current === contacts) { skipImportSyncRef.current = null; return; }
+-      // 强制保存到云端
+       if (isSupabaseConfigured()) {
+-        console.log('正在强制保存到云端，联系人数量:', contacts.length);
+-        contactsWriteRef.current = saveToCloud('contacts', contacts).then(success => {
+-          console.log('云端保存结果:', success ? '成功' : '失败');
+-        }).catch(e => console.log('云端同步失败:', e));
++        contactsWriteRef.current=contactsWriteRef.current.catch(()=>{}).then(async()=>{
++          const success=await saveToCloud('contacts',contacts);
++          contactsWriteFailedRef.current=!success;
++          setContactsSyncError(success?'':'客户资料未保存到数据库，请重试。');
++        }).catch(()=>{contactsWriteFailedRef.current=true;setContactsSyncError('客户资料未保存到数据库，请重试。');});
+       }
+     }
+   }, [contacts, isLoaded]);
+@@ -444,33 +447,14 @@ const App: React.FC = () => {
+     }
+   };
+ 
+-  const handleSaveContact = (newContactDataArray: NewContact[]) => {
+-    if (editingContact && newContactDataArray.length === 1) {
+-      const newContactData = newContactDataArray[0];
+-      setContacts(prev => prev.map(c => {
+-        if (c.id === editingContact.id) {
+-            const updated = { ...c, ...newContactData, policies:[...(c.policies||[]),...(newContactData.policies||[]).filter(p=>!c.policies?.some(x=>x.id===p.id))], dealProducts:Array.from(new Set([...(c.dealProducts||[]),...(newContactData.dealProducts||[])])) };
+-            return applyAutoTags(updated);
+-        }
+-        return c;
+-      }));
+-      setEditingContact(null);
+-    } else {
+-      const newContacts: Contact[] = newContactDataArray.map(data => {
+-        // 手动录入新客户时，如果没有其他标签，自动添加"潜在客户"
+-        const tags = data.tags && data.tags.length > 0 ? data.tags : ['潜在客户'];
+-        const c: Contact = {
+-          ...data,
+-          tags,
+-          id: generateId(),
+-          addedAt: Date.now(),
+-          followUpStatus: 'following',
+-          policies: data.policies || []
+-        };
+-        return applyAutoTags(c);
+-      });
+-      setContacts(prev => [...newContacts, ...prev]);
++  const handleSaveContact = async (newContactDataArray:NewContact[],requestId?:string) => {
++    for(const [index,data] of newContactDataArray.entries()){
++      const previous=editingContact&&newContactDataArray.length===1?editingContact:undefined;
++      const input:Contact=previous?{...previous,...data,id:previous.id}:applyAutoTags({...data,id:requestId?`${requestId}-${index}`:crypto.randomUUID(),addedAt:Date.now(),tags:data.tags?.length?data.tags:['潜在客户'],followUpStatus:'following',policies:data.policies||[]});
++      const saved=await saveCustomerProfile(input,previous);
++      acceptSavedFollowup(saved);
+     }
++    setEditingContact(null);
+   };
+ 
+   const handleManualAddPolicy = (contactId: string, policy: Policy) => {
+@@ -681,103 +665,31 @@ const App: React.FC = () => {
+       alert(`导入完成！\n新增联系人: ${newContactsCount}\n更新联系人: ${updatedContactsCount}\n新增保单: ${newPoliciesCount}`);
+   };
+ 
+-  const handleQuickAddProgress = (
+-    contactId: string | null, 
+-    date: string, 
+-    content: string, 
+-    newStatus: 'following' | 'contacted',
+-    newContactName?: string,
+-    existingRecordId?: string,
+-    completed?: boolean
+-  ) => {
+-    if (contactId) {
+-      setContacts(prev => prev.map(c => {
+-        if (c.id === contactId) {
+-           let updatedHistory;
+-           if (existingRecordId) {
+-              // 编辑现有记录：保持当前状态不变
+-              updatedHistory = (c.progressHistory || []).map(r => 
+-                 r.id === existingRecordId ? { ...r, date, content, completed: completed ?? r.completed } : r
+-              );
+-              const updated = {
+-                ...c,
+-                progressHistory: updatedHistory,
+-                lastDate: date
+-              };
+-              return updated;
+-           } else {
+-              // 添加新记录：自动设为跟进中
+-              const newRecord: ProgressRecord = {
+-                id: generateId(),
+-                date: date,
+-                content: content,
+-                completed: completed ?? false
+-              };
+-              updatedHistory = [newRecord, ...(c.progressHistory || [])];
+-              const updated = {
+-                ...c,
+-                progressHistory: updatedHistory,
+-                lastDate: date,
+-                followUpStatus: 'following'  // 自动设为跟进中
+-              };
+-              return updated;
+-           }
+-        }
+-        return c;
+-      }));
+-    } else if (newContactName) {
+-      // 创建新联系人并添加跟进记录
+-      const newRecord: ProgressRecord = {
+-         id: generateId(),
+-         date: date,
+-         content: content,
+-         completed: completed ?? false
+-      };
+-      const newContact: Contact = {
+-        id: generateId(),
+-        addedAt: Date.now(),
+-        wxid: '',
+-        nickname: newContactName,
+-        remarkName: newContactName,
+-        remarkInfo: '快速创建',
+-        tags: [],
+-        dealProducts: [],
+-        intentProducts: [],
+-        progressHistory: [newRecord],
+-        lastDate: date,
+-        followUpStatus: 'following',  // 自动设为跟进中
+-        policies: []
+-      };
+-      setContacts(prev => [newContact, ...prev]);
+-    }
++  const acceptSavedFollowup = (contact: Contact) => {
++    setContacts(current=>{
++      const next=current.some(c=>c.id===contact.id)?current.map(c=>c.id===contact.id?contact:c):[contact,...current];
++      skipImportSyncRef.current=next;return next;
++    });
+   };
+-
+-  const handleToggleProgress = (contactId: string, progressId: string) => {
+-      setContacts(prev => prev.map(c => {
+-          if (c.id === contactId) {
+-              const updatedHistory = (c.progressHistory || []).map(p => 
+-                  p.id === progressId ? { ...p, completed: !p.completed } : p
+-              );
+-              return { ...c, progressHistory: updatedHistory };
+-          }
+-          return c;
+-      }));
++  const handleQuickAddProgress: import('./types').FollowUpSave = async (contactId,date,content,newStatus,newContactName,existingRecordId,completed,requestId,newContactId) => {
++    const id=contactId||newContactId||crypto.randomUUID();
++    const current=contactsRef.current.find(c=>c.id===id);
++    const expected=existingRecordId?current?.progressHistory?.find(r=>r.id===existingRecordId):undefined;
++    if(existingRecordId&&!expected)throw new Error('原记录已变化，请刷新后重试。');
++    const record:ProgressRecord={...expected,id:existingRecordId||requestId||crypto.randomUUID(),date,content,completed:completed??expected?.completed??false};
++    const newContact:Contact|undefined=!current&&newContactName?{id,addedAt:Date.now(),wxid:'',nickname:newContactName,remarkName:newContactName,remarkInfo:'快速创建',tags:[],dealProducts:[],intentProducts:[],policies:[],progressHistory:[],followUpStatus:'following'}:undefined;
++    const saved=await saveFollowup(id,existingRecordId?'edit':'add',record,expected,newContact);
++    acceptSavedFollowup(saved);return saved.id;
+   };
+ 
+-  const handleDeleteProgress = (contactId: string, progressId: string) => {
+-      setContacts(prev => prev.map(c => {
+-          if (c.id === contactId) {
+-              const newProgressHistory = c.progressHistory?.filter(p => p.id !== progressId);
+-              const hasRemainingRecords = (newProgressHistory && newProgressHistory.length > 0) || c.progress;
+-              const updatedContact = {
+-                  ...c,
+-                  progressHistory: newProgressHistory
+-              };
+-              return applyAutoTags(updatedContact);
+-          }
+-          return c;
+-      }));
++  const changeProgress = async (contactId:string,progressId:string,remove:boolean) => {
++    const record=contactsRef.current.find(c=>c.id===contactId)?.progressHistory?.find(r=>r.id===progressId);
++    if(!record)return;
++    try {const saved=await saveFollowup(contactId,remove?'delete':'edit',remove?record:{...record,completed:!record.completed},record);acceptSavedFollowup(saved);}
++    catch(e){window.alert(e instanceof Error?e.message:'跟进记录未保存，请重试。');}
+   };
++  const handleToggleProgress=(contactId:string,progressId:string)=>{void changeProgress(contactId,progressId,false);};
++  const handleDeleteProgress=(contactId:string,progressId:string)=>{void changeProgress(contactId,progressId,true);};
+ 
+   const handleDeleteContact = (id: string) => {
+     setConfirmModal({
+@@ -791,7 +703,7 @@ const App: React.FC = () => {
+         localStorage.setItem('wechat-contacts', JSON.stringify(updatedContacts));
+         localStorage.setItem('wechat-contacts-backup', JSON.stringify(updatedContacts));
+         if (isSupabaseConfigured() && updatedContacts.length > 0) {
+-          saveToCloud('contacts', updatedContacts);
++
+         }
+         if (selectedContactIds.has(id)) {
+             const newSet = new Set(selectedContactIds);
+@@ -918,7 +830,7 @@ const App: React.FC = () => {
+             localStorage.setItem('wechat-contacts', JSON.stringify(updatedContacts));
+             localStorage.setItem('wechat-contacts-backup', JSON.stringify(updatedContacts));
+             if (isSupabaseConfigured() && updatedContacts.length > 0) {
+-              saveToCloud('contacts', updatedContacts);
++
+             }
+             handleDeselectAll();
+             setConfirmModal(prev => ({ ...prev, isOpen: false }));
+@@ -1149,6 +1061,7 @@ const App: React.FC = () => {
+         </div>
+ 
+         <div className="flex-1 h-full overflow-hidden relative">
++          {contactsSyncError&&<div role="alert" className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-3 text-sm text-danger-600"><span>{contactsSyncError}</span><button className="btn btn-secondary btn-sm" onClick={()=>setContacts([...contactsRef.current])}>重试保存</button></div>}
+           {renderContent()}
+         </div>
+ 
+@@ -1201,6 +1114,7 @@ const App: React.FC = () => {
+         isOpen={isModalOpen}
+         onClose={() => setIsModalOpen(false)}
+         onSave={handleSaveContact}
++        onPersistFollowup={async(contactId,kind,record,expected)=>{const saved=await saveFollowup(contactId,kind,record,expected);acceptSavedFollowup(saved);return saved;}}
+         onTableSave={handleTableDataSave}
+         initialData={editingContact}
+         allTags={allTags}
+diff --git a/components/FollowUpDashboard.tsx b/components/FollowUpDashboard.tsx
+index ffb6bfd..f963b39 100644
+--- a/components/FollowUpDashboard.tsx
++++ b/components/FollowUpDashboard.tsx
+@@ -1,3 +1,4 @@
++import type {FollowUpSave} from '../types';
+ import React, { useState, useMemo, useRef, useEffect } from 'react';
+ import { Contact, ProgressRecord } from '../types';
+ import { Plus, Calendar, Clock, CheckCircle2, CircleDashed, Edit2, Trash2, ArrowRight, CheckSquare, Square, ChevronDown, ChevronUp } from 'lucide-react';
+@@ -13,7 +14,7 @@ interface FollowUpDashboardProps {
+   onDeleteProgress: (contactId: string, progressId: string) => void;
+   onToggleProgress: (contactId: string, progressId: string) => void;
+   onUpdateStatus: (contactId: string, newStatus: 'following' | 'contacted' | 'idle') => void;
+-  onSaveQuickFollowUp: (contactId: string | null, date: string, content: string, status: 'following' | 'contacted', newContactName?: string, existingRecordId?: string, completed?: boolean) => void;
++  onSaveQuickFollowUp: FollowUpSave;
+   onEditProgressRecord?: (contactId: string, record: ProgressRecord) => void;
+ }
+ 
+diff --git a/components/ImportModal.tsx b/components/ImportModal.tsx
+index 823a154..4d98538 100644
+--- a/components/ImportModal.tsx
++++ b/components/ImportModal.tsx
+@@ -1,3 +1,5 @@
++import PolicyStatus from './PolicyStatus';
++import {formatMoney} from './PolicyPaymentSummary';
+ import React, { useState, useRef, useEffect, useMemo } from 'react';
+ import { X, Upload, Check, AlertCircle, Plus, FileSpreadsheet, ShoppingBag, Trash2, Sparkles, Shield, Clock, Tag, Edit2, FileText, UserCheck } from 'lucide-react';
+ import { extractContactsFromMedia, extractTableFromMedia } from '../services/geminiService';
+@@ -12,13 +14,16 @@ interface ImportModalProps {
+   relatedPolicies?: Policy[];
+   onPolicyDetail?: (p: Policy) => void;
+   onClose: () => void;
+-  onSave: (contacts: NewContact[]) => void;
++  onSave: (contacts: NewContact[],requestId?:string) => Promise<void>;
++  onPersistFollowup?: (contactId:string,kind:'add'|'edit'|'delete',record:ProgressRecord,expected?:ProgressRecord)=>Promise<Contact>;
+   onTableSave?: (data: ExtractedTableData) => void;
+   initialData?: Contact | null;
+   allTags?: string[];
+ }
+ 
+-const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPolicyImport, onClose, onSave, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail }) => {
++const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPolicyImport, onClose, onSave, onPersistFollowup, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail }) => {
++  const [historyBusy,setHistoryBusy]=useState(false),[profileBusy,setProfileBusy]=useState(false),[historyError,setHistoryError]=useState(''),[historySaved,setHistorySaved]=useState('');
++  const historyBusyRef=useRef(false),historyRequestId=useRef(crypto.randomUUID()),profileRequestId=useRef(crypto.randomUUID());
+   const displayedPolicies = () => Array.from(new Map([...(formData.policies || []), ...relatedPolicies].map(p => [policyKey(p), p])).values());
+   const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'table' | 'policies'>('ai');
+   const [loading, setLoading] = useState(false);
+@@ -54,6 +59,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+ 
+   useEffect(() => {
+     if (isOpen) {
++      profileRequestId.current=crypto.randomUUID();historyRequestId.current=crypto.randomUUID();setHistoryError('');setHistorySaved('');
+       if (initialData) {
+         setFormData({
+           ...initialData,
+@@ -213,9 +219,17 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+     return String(dateValue);
+   };
+ 
+-  const handleManualSave = () => {
++  const handleManualSave = async () => {
++    if(profileBusy||historyBusy)return;
+     if (!formData.remarkName && !formData.nickname) { setError("请填写姓名或昵称"); return; }
+-    onSave([formData]); onClose();
++    if(historyForm.content?.trim()){setError('还有未保存的跟进内容，请先保存或取消该条记录。');return;}
++    setProfileBusy(true);setError(null);
++    try{await onSave([formData],profileRequestId.current);onClose();}catch(e){setError(e instanceof Error?e.message:'客户资料未保存，请重试。');}finally{setProfileBusy(false);}
++  };
++  const requestClose = () => {
++    if(historyBusy||profileBusy)return;
++    if(historyForm.content?.trim()&&!window.confirm('跟进内容尚未保存，确认放弃？'))return;
++    onClose();
+   };
+ 
+   const addTag = (tag: string) => {
+@@ -227,51 +241,34 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+     setShowTagSuggestions(false);
+   };
+ 
+-  const handleAddHistory = () => {
+-    if (historyForm.content?.trim()) {
+-      const newRecord: ProgressRecord = {
+-        id: Math.random().toString(36).substr(2, 9),
+-        date: historyForm.date || new Date().toISOString().split('T')[0],
+-        content: historyForm.content.trim(),
+-        completed: false
+-      };
+-      setFormData(prev => ({
+-        ...prev,
+-        progressHistory: [newRecord, ...(prev.progressHistory || [])],
+-        lastDate: newRecord.date
+-      }));
+-      setHistoryForm({ date: new Date().toISOString().split('T')[0], content: '' });
+-      setShowHistoryAdd(false);
+-    }
++  const persistHistory = async (kind:'add'|'edit'|'delete',record:ProgressRecord,expected?:ProgressRecord) => {
++    if(historyBusyRef.current)return false;
++    historyBusyRef.current=true;setHistoryBusy(true);setHistoryError('');setHistorySaved('');
++    try{
++      if(initialData&&onPersistFollowup){
++        const saved=await onPersistFollowup(initialData.id,kind,record,expected);
++        setFormData(prev=>({...prev,progressHistory:saved.progressHistory,lastDate:saved.lastDate,followUpStatus:saved.followUpStatus}));
++      }else{
++        setFormData(prev=>({...prev,progressHistory:kind==='add'?[record,...(prev.progressHistory||[])]:kind==='delete'?(prev.progressHistory||[]).filter(r=>r.id!==record.id):(prev.progressHistory||[]).map(r=>r.id===record.id?record:r),lastDate:record.date}));
++      }
++      setHistorySaved(initialData?'跟进记录已保存到数据库。':'记录已加入草稿，保存客户后写入数据库。');
++      return true;
++    }catch(e){setHistoryError(e instanceof Error?e.message:'跟进记录未保存，请重试。');return false;}
++    finally{historyBusyRef.current=false;setHistoryBusy(false);}
+   };
+-
+-  const handleEditHistory = (id: string) => {
+-    const record = formData.progressHistory?.find(r => r.id === id);
+-    if (record) {
+-      setEditingHistoryId(id);
+-      setHistoryForm({ date: record.date, content: record.content });
+-    }
++  const handleAddHistory = async () => {
++    if(!historyForm.content?.trim())return;
++    const record:ProgressRecord={id:historyRequestId.current,date:historyForm.date||new Date().toISOString().slice(0,10),content:historyForm.content.trim(),completed:false};
++    if(await persistHistory('add',record)){historyRequestId.current=crypto.randomUUID();setHistoryForm({date:new Date().toISOString().slice(0,10),content:''});setShowHistoryAdd(false);}
+   };
+-
+-  const handleSaveEditHistory = () => {
+-    if (editingHistoryId && historyForm.content?.trim()) {
+-      setFormData(prev => ({
+-        ...prev,
+-        progressHistory: (prev.progressHistory || []).map(r =>
+-          r.id === editingHistoryId ? { ...r, date: historyForm.date!, content: historyForm.content! } : r
+-        )
+-      }));
+-      setEditingHistoryId(null);
+-      setHistoryForm({ date: new Date().toISOString().split('T')[0], content: '' });
+-    }
++  const handleEditHistory = (id:string) => {
++    const record=formData.progressHistory?.find(r=>r.id===id);if(record){setEditingHistoryId(id);setHistoryForm({...record});}
+   };
+-
+-  const handleDeleteHistory = (id: string) => {
+-    setFormData(prev => ({
+-      ...prev,
+-      progressHistory: (prev.progressHistory || []).filter(r => r.id !== id)
+-    }));
++  const handleSaveEditHistory = async () => {
++    const previous=formData.progressHistory?.find(r=>r.id===editingHistoryId);if(!previous||!historyForm.content?.trim())return;
++    if(await persistHistory('edit',{...previous,date:historyForm.date!,content:historyForm.content.trim()},previous)){setEditingHistoryId(null);setHistoryForm({date:new Date().toISOString().slice(0,10),content:''});}
+   };
++  const handleDeleteHistory = async (id:string) => {const record=formData.progressHistory?.find(r=>r.id===id);if(record)await persistHistory('delete',record,record);};
+ 
+   // 保单管理
+   const handleAddPolicy = () => {
+@@ -366,7 +363,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+       <div className={`bg-white shadow-2xl w-full ${!initialData&&activeTab==='policies'?'max-w-3xl':'max-w-5xl'} overflow-hidden flex flex-col max-h-[90vh] rounded-2xl border border-gray-200`}>
+         <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+           <h2 className="text-base font-semibold text-gray-800">{initialData ? '编辑联系人资料' : '添加 / 导入'}</h2>
+-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
++          <button disabled={profileBusy||historyBusy} onClick={requestClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
+             <X size={20} />
+           </button>
+         </div>
+@@ -378,8 +375,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+             <button onClick={() => setActiveTab('manual')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'manual' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>手动录入</button>
+           </div>
+         )}
+-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+-          {error && <div className="p-4 bg-red-50 text-red-700 rounded-xl flex gap-2 text-sm border border-red-100"><AlertCircle size={18} />{error}</div>}
++        <fieldset disabled={profileBusy} className="min-w-0 flex-1 overflow-y-auto p-5 space-y-4">
++          {error && activeTab!=='manual' && <div className="p-4 bg-red-50 text-red-700 rounded-xl flex gap-2 text-sm border border-red-100"><AlertCircle size={18} />{error}</div>}
+ 
+           {activeTab === 'policies' && onMingyaImport && (
+             <section>
+@@ -558,8 +555,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+ 
+                   {/* 保单列表 */}
+                   {displayedPolicies().length > 0 ? (
+-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+-                      <table className="w-full text-xs">
++                    <div className="max-w-full border border-gray-200 rounded-lg overflow-x-auto">
++                      <table className="w-full min-w-[904px] table-fixed text-sm">
++                        <colgroup>{[260,160,120,112,130,120].map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup>
+                         <thead className="bg-gray-50 border-b border-gray-200">
+                           <tr>
+                             <th className="text-left px-3 py-2 font-medium text-gray-600">产品名称</th>
+@@ -567,7 +565,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+                             <th className="text-left px-3 py-2 font-medium text-gray-600">保费</th>
+                             <th className="text-left px-3 py-2 font-medium text-gray-600">状态</th>
+                             <th className="text-left px-3 py-2 font-medium text-gray-600">生效日期</th>
+-                            <th className="text-right px-3 py-2 font-medium text-gray-600">操作</th>
++                            <th className="sticky right-0 z-20 border-l border-gray-200 bg-gray-50 text-right px-3 py-2 font-medium text-gray-600 whitespace-nowrap">操作</th>
+                           </tr>
+                         </thead>
+                         <tbody className="divide-y divide-gray-100">
+@@ -587,7 +585,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+                                     </select>
+                                   </td>
+                                   <td className="px-3 py-2"><input type="date" className="input text-xs py-1 w-28" value={policyForm.effectiveDate} onChange={e => setPolicyForm({...policyForm, effectiveDate: e.target.value})} /></td>
+-                                  <td className="px-3 py-2 text-right">
++                                  <td className="sticky right-0 z-10 border-l border-gray-200 bg-white px-3 py-2 text-right whitespace-nowrap">
+                                     <button onClick={handleSaveEditPolicy} className="text-primary-600 hover:bg-primary-50 px-2 py-1 rounded text-xs">保存</button>
+                                     <button onClick={() => { setEditingPolicyId(null); }} className="text-gray-500 hover:bg-gray-100 px-2 py-1 rounded text-xs ml-1">取消</button>
+                                   </td>
+@@ -598,14 +596,10 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+                                   <td className="px-3 py-2 text-gray-600">{policy.company || '-'}</td>
+                                   <td className="px-3 py-2 text-gray-600">{policy.premium ? `¥${policy.premium}` : '-'}</td>
+                                   <td className="px-3 py-2">
+-                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+-                                      policy.status === '正式保单' ? 'bg-green-100 text-green-700' :
+-                                      policy.status === '待生效' ? 'bg-amber-100 text-amber-700' :
+-                                      'bg-gray-100 text-gray-600'
+-                                    }`}>{policy.status || '正式保单'}</span>
++                                    <PolicyStatus status={policy.status}/>
+                                   </td>
+                                   <td className="px-3 py-2 text-gray-500">{policy.effectiveDate || '-'}</td>
+-                                  <td className="px-3 py-2 text-right">
++                                  <td className="sticky right-0 z-10 border-l border-gray-200 bg-white px-3 py-2 text-right whitespace-nowrap">
+                                     <button onClick={() => onPolicyDetail && initialData ? onPolicyDetail(policy) : handleEditPolicy(policy.id)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded"><Edit2 size={12} /></button>
+                                     {!(onPolicyDetail && initialData) && <button onClick={() => handleDeletePolicy(policy.id)} className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1 rounded ml-1"><Trash2 size={12} /></button>}
+                                   </td>
+@@ -685,30 +679,32 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+                 <div className="flex items-center justify-between">
+                   <div className="flex items-center gap-2 text-sm font-medium text-gray-700"><Clock size={16} strokeWidth={2}/> 跟进历史</div>
+                   <button
+-                    onClick={() => setShowHistoryAdd(!showHistoryAdd)}
++                    disabled={historyBusy||profileBusy} onClick={() => setShowHistoryAdd(!showHistoryAdd)}
+                     className="text-xs font-medium text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                   >
+                     <Plus size={14} /> 新增记录
+                   </button>
+                 </div>
+ 
++                {historyError&&<p role="alert" className="text-sm text-danger-600">{historyError}</p>}
++                {historySaved&&!historyError&&!historyBusy&&<p role="status" className="text-xs text-gray-500">{historySaved}</p>}
+                 {showHistoryAdd && (
+                   <div className="p-4 bg-gray-50 rounded-lg space-y-3 animate-fade-in">
+                     <input
+                       type="date"
+                       className="input"
+-                      value={historyForm.date}
++                      readOnly={historyBusy} value={historyForm.date}
+                       onChange={e => setHistoryForm({...historyForm, date: e.target.value})}
+                     />
+                     <textarea
+-                      placeholder="记录本次沟通..."
++                      disabled={historyBusy} aria-label="跟进内容" placeholder="记录本次沟通..."
+                       className="input min-h-[80px] resize-none"
+-                      value={historyForm.content}
++                      readOnly={historyBusy} value={historyForm.content}
+                       onChange={e => setHistoryForm({...historyForm, content: e.target.value})}
+                     />
+                     <div className="flex justify-end gap-2">
+-                      <button onClick={() => setShowHistoryAdd(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">取消</button>
+-                      <button onClick={handleAddHistory} className="btn btn-primary text-sm">确认保存</button>
++                      <button disabled={historyBusy} onClick={() => {setShowHistoryAdd(false);setHistoryForm({date:new Date().toISOString().slice(0,10),content:''});}} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">取消</button>
++                      <button disabled={historyBusy||profileBusy} onClick={handleAddHistory} className="btn btn-primary text-sm">{historyBusy?'正在保存…':initialData?'保存到数据库':'添加到客户草稿'}</button>
+                     </div>
+                   </div>
+                 )}
+@@ -721,17 +717,17 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+                            <input
+                             type="date"
+                             className="input"
+-                            value={historyForm.date}
++                            readOnly={historyBusy} value={historyForm.date}
+                             onChange={e => setHistoryForm({...historyForm, date: e.target.value})}
+                           />
+                           <textarea
+                             className="input min-h-[70px] resize-none"
+-                            value={historyForm.content}
++                            readOnly={historyBusy} value={historyForm.content}
+                             onChange={e => setHistoryForm({...historyForm, content: e.target.value})}
+                           />
+                           <div className="flex justify-end gap-2">
+-                             <button onClick={() => setEditingHistoryId(null)} className="text-sm text-gray-500">取消</button>
+-                             <button onClick={handleSaveEditHistory} className="btn btn-primary text-sm">保存修改</button>
++                             <button disabled={historyBusy} onClick={() => {setEditingHistoryId(null);setHistoryForm({date:new Date().toISOString().slice(0,10),content:''});}} className="text-sm text-gray-500">取消</button>
++                             <button disabled={historyBusy||profileBusy} onClick={handleSaveEditHistory} className="btn btn-primary text-sm">{historyBusy?'正在保存…':'保存修改'}</button>
+                           </div>
+                         </div>
+                       ) : (
+@@ -741,8 +737,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+                           </div>
+                           <p className="text-sm text-gray-800 mt-2 leading-relaxed pr-8">{record.content}</p>
+                           <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+-                             <button onClick={() => handleEditHistory(record.id)} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors cursor-pointer"><Edit2 size={14}/></button>
+-                             <button onClick={() => handleDeleteHistory(record.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"><Trash2 size={14}/></button>
++                             <button disabled={historyBusy||profileBusy} aria-label="编辑跟进记录" onClick={() => handleEditHistory(record.id)} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors cursor-pointer"><Edit2 size={14}/></button>
++                             <button disabled={historyBusy||profileBusy} aria-label="删除跟进记录" onClick={() => handleDeleteHistory(record.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"><Trash2 size={14}/></button>
+                           </div>
+                         </>
+                       )}
+@@ -778,7 +774,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+             <div className="space-y-4 animate-fade-in">
+               <div className="flex items-center justify-between"><div className="font-medium text-gray-900">成功识别 {extractedList.length} 位联系人</div><button onClick={() => setExtractedList([])} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">取消</button></div>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{extractedList.map((c, i) => <div key={i} className="p-4 bg-gray-50 rounded-lg flex gap-3 items-center border border-gray-100"><div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center font-medium text-primary-700 text-lg">{c.remarkName?.[0]}</div><div className="flex-1 min-w-0"><div className="font-medium text-gray-900 truncate">{c.remarkName}</div><div className="text-xs text-gray-500 font-mono mt-0.5">{c.wxid || '无微信号'}</div></div></div>)}</div>
+-              <button onClick={() => (onSave(extractedList), onClose())} className="w-full btn btn-primary">确认并立即导入</button>
++              <button disabled={profileBusy} onClick={async()=>{setProfileBusy(true);setError(null);try{await onSave(extractedList,profileRequestId.current);onClose();}catch(e){setError(e instanceof Error?e.message:'导入未保存，请重试。');}finally{setProfileBusy(false);}}} className="w-full btn btn-primary">{profileBusy?'正在保存…':'确认并立即导入'}</button>
+             </div>
+           )}
+ 
+@@ -819,13 +815,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+                 </button>
+              </div>
+            )}
+-         </div>
++         </fieldset>
+ 
+          {/* 底部操作区 - 仅在手动录入时显示 */}
+          {(activeTab === 'manual' || initialData) && (
+-           <div className="px-5 py-4 border-t border-gray-100 bg-white flex justify-end gap-2 shrink-0">
+-             <button onClick={onClose} className="btn btn-secondary text-xs py-2">取消</button>
+-             <button onClick={handleManualSave} className="btn btn-primary text-xs py-2">保存</button>
++           <div className="px-5 py-4 border-t border-gray-100 bg-white flex flex-wrap items-center justify-end gap-2 shrink-0">
++             {error&&<p role="alert" className="mr-auto text-sm text-danger-600">{error}</p>}
++             <button disabled={profileBusy||historyBusy} onClick={requestClose} className="btn btn-secondary text-xs py-2">取消</button>
++             <button disabled={profileBusy||historyBusy} onClick={handleManualSave} className="btn btn-primary text-sm">{profileBusy?'正在保存…':'保存'}</button>
+            </div>
+          )}
+        </div>
+diff --git a/components/PolicyDashboard.tsx b/components/PolicyDashboard.tsx
+index 74ff647..66e8c9b 100644
+--- a/components/PolicyDashboard.tsx
++++ b/components/PolicyDashboard.tsx
+@@ -1,3 +1,4 @@
++import PolicyStatus from './PolicyStatus';
+ import CustomerTags from './CustomerTags';
+ import PolicyPaymentSummary, { formatMoney } from './PolicyPaymentSummary';
+ import {ManagedPolicy, dueItems, nextPayment, today} from '../services/renewal';
+@@ -167,35 +168,34 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
+                 </div>
+                 {isExpanded && (
+                   <div className="border-t border-gray-100 bg-gray-50 p-4 animate-in slide-in-from-top-2">
+-                    <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto no-scrollbar">
+-                      <table className="w-full text-left text-sm min-w-[1120px]">
++                    <div className="max-w-full bg-white rounded-lg border border-gray-200 overflow-x-auto">
++                      <table className="w-full min-w-[1660px] table-fixed text-left text-sm">
++                        <colgroup>{[280,240,140,160,260,180,130,120,128].map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup>
+                         <thead className="bg-gray-50 text-gray-500 font-medium text-xs  border-b border-gray-200">
+                           <tr className="divide-x divide-gray-100">
+                             <th className="px-4 py-3">险种名称</th>
+                             <th className="px-4 py-3">保单号</th>
+                             <th className="px-4 py-3 text-right">保费</th>
+-                            <th className="px-4 py-3">缴费方式 / 期间</th><th className="px-4 py-3">下次缴费 / 应缴金额</th>
++                            <th className="px-4 py-3 whitespace-nowrap">缴费方式 / 期间</th><th className="px-4 py-3">下次缴费 / 应缴金额</th>
+                             <th className="px-4 py-3">投保人/被保人</th>
+                             <th className="px-4 py-3">生效日期</th>
+                             <th className="px-4 py-3">状态</th>
+-                            <th className="px-4 py-3 text-right">操作</th>
++                            <th className="sticky right-0 z-20 border-l border-gray-200 bg-gray-50 px-4 py-3 text-right whitespace-nowrap">操作</th>
+                           </tr>
+                         </thead>
+                         <tbody className="divide-y divide-gray-100">
+                           {contact.policies?.map(policy => { const managed={...policy,payments:(policy as ManagedPolicy).payments||[]}; const next=nextPayment(managed);const reminders=dueItems([managed]);return (
+-                            <tr key={policy.id} className="hover:bg-gray-50 transition-colors">
+-                              <td className="px-4 py-3 font-medium text-gray-700"><button className="text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)}>{policy.productName}</button></td>
+-                              <td className="px-4 py-3 tabular-nums text-gray-500 text-xs">{policy.policyNumber}</td>
++                            <tr key={policy.id} className="group hover:bg-gray-50 transition-colors">
++                              <td className="px-4 py-3 font-medium text-gray-700"><button className="max-w-full break-words text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)}>{policy.productName}</button></td>
++                              <td title={policy.policyNumber} className="overflow-hidden text-ellipsis px-4 py-3 whitespace-nowrap tabular-nums text-gray-500 text-xs">{policy.policyNumber}</td>
+                               <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums font-medium text-gray-900">{formatMoney(policy.premium, policy.mingya?.currency)}</td>
+-                              <td className="px-4 py-3 text-gray-500 text-xs">{policy.paymentFrequency || '待补充'} / {policy.paymentYears || '待补充'}</td><td className="px-4 py-3 text-xs"><PolicyPaymentSummary policy={managed}/></td>
+-                              <td className="px-4 py-3 text-gray-600">{policy.applicant} / {policy.insured}</td>
++                              <td className="px-4 py-3 text-gray-500 text-xs"><span className="block whitespace-nowrap">{policy.paymentFrequency || '待补充'}</span><span className="mt-1 block whitespace-nowrap">{policy.paymentYears || '待补充'}</span></td><td className="px-4 py-3 text-xs"><PolicyPaymentSummary policy={managed}/></td>
++                              <td className="px-4 py-3 text-gray-600"><span className="block break-words">{policy.applicant}</span><span className="mt-1 block break-words text-gray-500">{policy.insured}</span></td>
+                               <td className="px-4 py-3 whitespace-nowrap text-gray-500 text-xs">{policy.effectiveDate}</td>
+                               <td className="px-4 py-3">
+-                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${policy.status.includes('有效') ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'}`}>
+-                                  {policy.status}
+-                                </span>
++                                <PolicyStatus status={policy.status}/>
+                               </td>
+-                              <td className="px-4 py-3 text-right">
++                              <td className="sticky right-0 z-10 border-l border-gray-200 bg-white px-4 py-3 text-right whitespace-nowrap group-hover:bg-gray-50">
+                                 <button className="btn btn-ghost btn-sm" onClick={()=>onPolicyDetail?.(policy)}>详情</button><button
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+diff --git a/components/PolicyPaymentSummary.tsx b/components/PolicyPaymentSummary.tsx
+index 0c79fda..f5eb8bf 100644
+--- a/components/PolicyPaymentSummary.tsx
++++ b/components/PolicyPaymentSummary.tsx
+@@ -33,6 +33,6 @@ export default function PolicyPaymentSummary({ policy, amount = true }: { policy
+   return <div className="space-y-2">
+     <PaymentDate date={next.date} estimated={next.estimated} />
+     {next.amountReference&&<span className="text-xs text-gray-500">应缴金额尚未生成</span>}
+-    {amount && <div className="flex items-baseline gap-2 text-sm tabular-nums"><span className="text-xs text-gray-500">{next.amountReference?'下期参考金额':'本期应缴'}</span>{formatMoney(next.amount, policy.mingya?.currency)}</div>}
++    {amount && <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm tabular-nums"><span className="shrink-0 whitespace-nowrap text-xs text-gray-500">{next.amountReference?'下期参考金额':'本期应缴'}</span><span className="whitespace-nowrap">{formatMoney(next.amount, policy.mingya?.currency)}</span></div>}
+   </div>;
+ }
+diff --git a/components/PolicyStatus.tsx b/components/PolicyStatus.tsx
+new file mode 100644
+index 0000000..04f9a8b
+--- /dev/null
++++ b/components/PolicyStatus.tsx
+@@ -0,0 +1,5 @@
++import React from 'react';
++export default function PolicyStatus({status}:{status:string}) {
++  const colors=/失效|拒保/.test(status)?'bg-rose-100 text-rose-700':/终止|退保|撤单/.test(status)?'bg-gray-100 text-gray-600':/待|核保|明亚状态/.test(status)?'bg-amber-100 text-amber-800':/正式|有效|生效/.test(status)?'bg-emerald-100 text-emerald-800':'bg-gray-100 text-gray-600';
++  return <span className={`inline-flex whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${colors}`}>{status||'待补充'}</span>;
++}
+diff --git a/components/QuickFollowUpForm.tsx b/components/QuickFollowUpForm.tsx
+index 3a6f2bf..6e8187b 100644
+--- a/components/QuickFollowUpForm.tsx
++++ b/components/QuickFollowUpForm.tsx
+@@ -1,20 +1,26 @@
++import type {FollowUpSave} from '../types';
+ import React, { useState, useMemo, useEffect, useRef } from 'react';
++import {WorkspaceDialogFooter} from './WorkspaceDialog';
+ import { Calendar, Search, Check, UserPlus, Plus, User, ChevronUp, ChevronDown, X, Trash2, CheckSquare, Square } from 'lucide-react';
+ import { Contact, ProgressRecord } from '../types';
+ 
+ interface QuickFollowUpFormProps {
+   contacts: Contact[];
+-  onSave: (contactId: string | null, date: string, content: string, status: 'following' | 'contacted', newContactName?: string, existingRecordId?: string, completed?: boolean) => void;
++  onSave: FollowUpSave;
+   initialContactId?: string;
+   initialRecord?: ProgressRecord;
+   onCancel?: () => void;
++  onSaved?: () => void;
++  onSavingChange?: (saving:boolean)=>void;
+   className?: string;
+   variant?: 'default' | 'compact';
+ }
+ 
+ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({ 
+-  contacts, onSave, initialContactId, initialRecord, onCancel, className = '', variant = 'default'
++  contacts, onSave, initialContactId, initialRecord, onCancel, onSaved, onSavingChange, className = '', variant = 'default'
+ }) => {
++  const [saving,setSaving]=useState(false),[saveError,setSaveError]=useState('');
++  const savingRef=useRef(false),requestIds=useRef(new Map<string,string>()),newCustomerId=useRef(crypto.randomUUID());
+   const [selectedContactId, setSelectedContactId] = useState<string>(initialContactId || '');
+   const [date, setDate] = useState(initialRecord?.date || new Date().toISOString().split('T')[0]);
+   
+@@ -30,7 +36,7 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
+   const [newContactName, setNewContactName] = useState('');
+   const [isExpanded, setIsExpanded] = useState(!!initialRecord);
+   
+-  const containerRef = useRef<HTMLDivElement>(null);
++  const containerRef = useRef<HTMLFieldSetElement>(null);
+   const dropdownRef = useRef<HTMLDivElement>(null);
+   const triggerRef = useRef<HTMLButtonElement>(null);
+ 
+@@ -88,32 +94,22 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
+     }
+   };
+ 
+-  const handleSave = () => {
+-    if ((selectedContactId || (isCreatingNew && newContactName.trim())) && todoItems.some(t => t.text.trim())) {
+-      todoItems.filter(t => t.text.trim()).forEach(todo => {
+-        onSave(
+-          isCreatingNew ? null : selectedContactId, 
+-          date, 
+-          todo.text.trim(), 
+-          selectedContact?.followUpStatus || 'following',
+-          isCreatingNew ? newContactName.trim() : undefined,
+-          initialRecord ? todo.id : undefined,
+-          todo.completed
+-        );
+-      });
+-      
+-      if (!initialRecord) {
+-        setTodoItems([{ id: '1', text: '', completed: false }]);
+-        if (!initialContactId) {
+-            setSelectedContactId('');
+-            setSearchTerm('');
+-            setIsCreatingNew(false);
+-            setNewContactName('');
+-            if (variant === 'compact') setIsExpanded(false);
+-        }
++  const handleSave = async () => {
++    if(savingRef.current||!((selectedContactId||(isCreatingNew&&newContactName.trim()))&&todoItems.some(t=>t.text.trim())))return;
++    savingRef.current=true;setSaving(true);onSavingChange?.(true);setSaveError('');
++    try {
++      let target=isCreatingNew?newCustomerId.current:selectedContactId;
++      for(const todo of todoItems.filter(t=>t.text.trim())) {
++        if(!requestIds.current.has(todo.id))requestIds.current.set(todo.id,crypto.randomUUID());
++        target=await onSave(isCreatingNew?null:target,date,todo.text.trim(),selectedContact?.followUpStatus||'following',isCreatingNew?newContactName.trim():undefined,initialRecord?todo.id:undefined,todo.completed,requestIds.current.get(todo.id),target);
+       }
+-    }
++      requestIds.current.clear();newCustomerId.current=crypto.randomUUID();
++      if(!initialRecord){setTodoItems([{id:'1',text:'',completed:false}]);if(!initialContactId){setSelectedContactId('');setSearchTerm('');setIsCreatingNew(false);setNewContactName('');if(variant==='compact')setIsExpanded(false);}}
++      onSaved?.();
++    } catch(e){setSaveError(e instanceof Error?e.message:String(e));}
++    finally{savingRef.current=false;setSaving(false);onSavingChange?.(false);}
+   };
++  const feedback=saveError?<p role="alert" className="text-sm text-danger-600">{saveError}</p>:saving?<p role="status" className="text-sm text-gray-500">正在保存到数据库…</p>:null;
+ 
+   const renderTodoItems = () => (
+     <div className="space-y-1.5 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
+@@ -169,7 +165,8 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
+ 
+   if (variant === 'compact') {
+       return (
+-          <div ref={containerRef} className={`bg-white border shadow-md rounded-lg transition-all duration-300 w-full overflow-visible ${isExpanded ? 'p-3 md:p-3.5 border-gray-300' : 'p-2 border-gray-200'}`}>
++          <fieldset disabled={saving} ref={containerRef} className={`min-w-0 bg-white border shadow-md rounded-lg transition-all duration-300 w-full overflow-visible ${isExpanded ? 'p-3 md:p-3.5 border-gray-300' : 'p-2 border-gray-200'}`}>
++            {feedback}
+               <div className="flex flex-col gap-2.5 md:gap-3">
+                   <div className={`flex items-center gap-1.5 md:gap-2 ${!isExpanded && !selectedContactId ? 'hidden' : 'flex animate-in fade-in slide-in-from-bottom-2 duration-300'}`}>
+                        <div className="relative">
+@@ -222,10 +219,10 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
+                             </div>
+                             <button 
+                               onClick={handleSave} 
+-                              disabled={(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim())} 
++                              disabled={saving || (!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim())}
+                               className={`shrink-0 px-4 md:px-8 py-2 md:py-2.5 rounded-md text-xs md:text-sm font-medium transition-all ${(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim()) ? 'bg-gray-200 text-gray-400' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
+                             >
+-                              立即录入
++                              {saving?'正在保存…':'立即录入'}
+                             </button>
+                           </div>
+                        )}
+@@ -235,20 +232,21 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
+                            )}
+                            <button 
+                              onClick={handleSave} 
+-                             disabled={(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim())} 
++                             disabled={saving || (!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim())}
+                              className={`shrink-0 px-6 md:px-10 py-2 md:py-2.5 rounded-md text-xs md:text-sm font-medium transition-all ${(!selectedContactId && !isCreatingNew) || !todoItems.some(t => t.text.trim()) ? 'bg-gray-200 text-gray-400' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
+                            >
+-                            {initialRecord ? '保存修改' : '立即录入'}
++                            {saving?'正在保存…':initialRecord?'保存修改':'立即录入'}
+                           </button>
+                        </div>
+                   </div>
+               </div>
+-          </div>
++          </fieldset>
+       );
+   }
+ 
+   return (
+-    <div className={`space-y-4 ${className}`}>
++    <fieldset disabled={saving} className={`min-w-0 space-y-4 ${className}`}>
++      {feedback}
+            <div className="space-y-2 relative">
+               <label className="text-xs font-medium text-gray-700 block ml-1">关联客户对象</label>
+               {isCreatingNew ? (
+@@ -307,12 +305,12 @@ export const QuickFollowUpForm: React.FC<QuickFollowUpFormProps> = ({
+                  {renderTodoItems()}
+                </div>
+             </div>
+-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+-                {onCancel && <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all">取消</button>}
+-                <button onClick={handleSave} disabled={(!selectedContactId && !newContactName) || !todoItems.some(t => t.text.trim())} className="px-6 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-md font-medium transition-all disabled:opacity-50 flex items-center gap-2">
+-                  <Check size={18} strokeWidth={3} /><span>{initialRecord ? '保存修改' : '保存记录'}</span>
++            <WorkspaceDialogFooter>
++                {onCancel && <button disabled={saving} onClick={onCancel} className="btn btn-secondary text-sm">取消</button>}
++                <button onClick={handleSave} disabled={saving || (!selectedContactId && !newContactName) || !todoItems.some(t => t.text.trim())} className="btn btn-primary text-sm">
++                  <Check size={18} strokeWidth={3} /><span>{saving?'正在保存…':initialRecord?'保存修改':'保存记录'}</span>
+                 </button>
+-            </div>
+-    </div>
++            </WorkspaceDialogFooter>
++    </fieldset>
+   );
+ };
+\ No newline at end of file
+diff --git a/components/QuickFollowUpModal.tsx b/components/QuickFollowUpModal.tsx
+index 8345347..6390c64 100644
+--- a/components/QuickFollowUpModal.tsx
++++ b/components/QuickFollowUpModal.tsx
+@@ -1,4 +1,6 @@
+-import React from 'react';
++import type {FollowUpSave} from '../types';
++import React, {useState} from 'react';
++import WorkspaceDialog from './WorkspaceDialog';
+ import { X, Clock, Edit3 } from 'lucide-react';
+ import { Contact, ProgressRecord } from '../types';
+ import { QuickFollowUpForm } from './QuickFollowUpForm';
+@@ -7,7 +9,7 @@ interface QuickFollowUpModalProps {
+   isOpen: boolean;
+   onClose: () => void;
+   contacts: Contact[];
+-  onSave: (contactId: string | null, date: string, content: string, status: 'following' | 'contacted', newContactName?: string, existingRecordId?: string, completed?: boolean) => void;
++  onSave: FollowUpSave;
+   initialContactId?: string;
+   initialRecord?: ProgressRecord;
+ }
+@@ -15,35 +17,10 @@ interface QuickFollowUpModalProps {
+ const QuickFollowUpModal: React.FC<QuickFollowUpModalProps> = ({ 
+   isOpen, onClose, contacts, onSave, initialContactId, initialRecord 
+ }) => {
++  const [saving,setSaving]=useState(false);
+   if (!isOpen) return null;
+-
+-  return (
+-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-0 sm:p-4 animate-in fade-in duration-300">
+-      <div className="bg-white rounded-none sm:rounded-lg shadow-lg w-full max-w-lg overflow-hidden transform scale-100 transition-all flex flex-col h-full sm:h-auto sm:max-h-[85vh]">
+-        <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
+-          <h3 className="text-sm sm:text-base font-medium text-gray-900 flex items-center gap-2">
+-            <div className={`p-1.5 rounded-md ${initialRecord ? 'bg-gray-100 text-gray-700' : 'bg-gray-100 text-gray-700'}`}>
+-               {initialRecord ? <Edit3 size={16} /> : <Clock size={16} />}
+-            </div>
+-            {initialRecord ? '编辑跟进记录' : '快速记录跟进'}
+-          </h3>
+-          <button onClick={onClose} className="text-gray-400 hover:text-gray-900 p-1.5 rounded-full hover:bg-gray-100 transition-all">
+-            <X size={18} />
+-          </button>
+-        </div>
+-
+-        <div className="p-4 sm:p-5 flex-1 overflow-y-auto custom-scrollbar">
+-            <QuickFollowUpForm 
+-                contacts={contacts}
+-                onSave={(...args) => { onSave(...args); onClose(); }}
+-                initialContactId={initialContactId}
+-                initialRecord={initialRecord}
+-                onCancel={onClose}
+-            />
+-        </div>
+-      </div>
+-    </div>
+-  );
++  return <WorkspaceDialog title={initialRecord?'编辑跟进记录':'快速记录跟进'} compact onClose={()=>{if(!saving)onClose();}}>
++    <QuickFollowUpForm contacts={contacts} onSave={onSave} onSaved={onClose} onSavingChange={setSaving} initialContactId={initialContactId} initialRecord={initialRecord} onCancel={onClose}/>
++  </WorkspaceDialog>;
+ };
+-
+-export default QuickFollowUpModal;
+\ No newline at end of file
++export default QuickFollowUpModal;
+diff --git a/components/RenewalWorkspace.tsx b/components/RenewalWorkspace.tsx
+index 407b755..9daac77 100644
+--- a/components/RenewalWorkspace.tsx
++++ b/components/RenewalWorkspace.tsx
+@@ -128,11 +128,11 @@ export default function RenewalWorkspace({
+     try {
+       const projected = projectContacts(baseContacts, next.policies);
+       await beforeSave?.();
+-      await saveImport(next, projected);
++      const savedContacts=await saveImport(next, projected);
+       ownSnapshot.current = next;
+-      skipContactsMerge.current = projected;
++      skipContactsMerge.current = savedContacts;
+       rememberRenewalSnapshot(next);
+-      onContacts(projected);
++      onContacts(savedContacts);
+       setData(next);
+       return true;
+     } catch (e) {
+@@ -293,10 +293,10 @@ export default function RenewalWorkspace({
+     setBusy(true);
+     try {
+       if (!cloudReady) throw new Error("请先完成续期数据同步，再确认导入。");
+-      await saveImport(next, cs);
++      const savedContacts=await saveImport(next, cs);
+       rememberRenewalSnapshot(next);
+       setData(next);
+-      onContacts(cs);
++      onContacts(savedContacts);
+       setModal("done");
+     } catch (e) {
+       setError("导入未保存：" + String(e));
+diff --git a/docs/2026-11-22-followup-recovery.md b/docs/2026-11-22-followup-recovery.md
+new file mode 100644
+index 0000000..f4b42d3
+--- /dev/null
++++ b/docs/2026-11-22-followup-recovery.md
+@@ -0,0 +1,32 @@
++# 跟进记录恢复与保存保护
++
++## 已确认的事实
++
++今天第一次保障字段校正的只读备份中有62条跟进记录，其中3条日期为2026-11-21；后续保存前的备份及当前记录降为59条。这证实昨晚的记录曾经成功入库，不能归因于未提交。逐项比较发现同一批3条丢失记录，包括用户指出的黄宇谦。仅依据快照无法确定具体是哪个窗口或哪一次网络请求提交了旧值。
++
++旧代码存在整批客户回写、不同窗口的旧快照互相覆盖，以及资料中的“确认保存”实际仅更新草稿、底部保存未等数据库确认便关闭等问题。
++
++已先保存当前数据库备份，再通过单记录事务恢复3条原始ID、日期、内容和完成状态。现有客户、保单、备注和其他记录没有整库回滚。数据库再次读取为62条，目标记录完整内容保留；再次运行只读恢复计划新增0条。
++
++私有恢复备份：/Users/apple/.codex/backups/insurance-20261122-followup-recovery/。
++
++## 保护机制
++
++- 数据库保护：整批客户保存缺少已有跟进时保留服务器记录；旧版本内容不能覆盖新时间版本；明确删除走单条事务并保存删除标记，旧快照不能把已删记录重新带回来。
++- 单条新增、修改、删除均锁定最新客户记录，保留其他资料及其他跟进；编辑有预期版本检查。每次实际变更在app_data的followup_event记录中留档。
++- 客户资料按改动字段检查并保存，不整批覆盖客户；忽略旧表单中的跟进副本。新客户及新记录使用稳定请求ID，重试不重复创建，内容不同则要求核对。
++- 已有客户“保存到数据库”需收到数据库确认后才清空输入；错误时原文保留。新客户尚未创建时写“添加到客户草稿”，保存客户后才入库。
++- 本地客户缓存写入失败不阻止数据库保存；后台整批请求按顺序执行，错误可见并可重试。保单全量保存接收数据库最终合并的客户视图，避免界面再显示旧跟进副本。
++- 保持SECURITY INVOKER和原有RLS，不新增提权。安全检查无新增提示。
++
++## 表格及文案走查
++
++保单管理表格设定各列宽度与1660px最小总宽度，容器横向滚动；操作列固定右侧。金额及状态不拆行，正式、终止、核保/待处理等状态采用不同颜色，文字保留以避免只靠颜色表达。客户资料内部保单表同样允许横向滚动。
++
++将含糊的“确认保存”改为“保存到数据库”或“添加到客户草稿”，明确两个阶段；保留一条保存结果或错误提示，用于确认是否真正入库。去掉快速记录弹窗的装饰图标，复用公共弹窗。未新增装饰编号、泛泛说明或重复状态徽章。
++
++## 验证
++
++39项既有测试、类型检查、构建通过。三个数据库回滚场景文件覆盖：陈旧全量覆盖、不同记录并发新增、旧编辑冲突、明确删除后不复活、稳定ID重试不重复、旧客户资料保存不清空跟进、历史缴费状态标记回归。测试数据全部回滚。
++
++浏览器使用虚拟客户数据，未修改真实客户用于测试。桌面1304×880及手机390×844；模拟失败保留输入、成功后刷新可见、客户资料保存冲突不关闭；单条请求257字节。预发布环境注入客户缓存不可写，仍可确认入库并刷新读取。表格横向滚动前后操作列位置不变，三种状态颜色不同，无整页横向溢出。复制真实规模数据后的缴费标记回滚测试约275ms（仅数据库端，不含公网耗时）。
+diff --git a/services/followupStorage.ts b/services/followupStorage.ts
+new file mode 100644
+index 0000000..3ce4454
+--- /dev/null
++++ b/services/followupStorage.ts
+@@ -0,0 +1,25 @@
++import {supabase} from './supabaseService';
++import type {Contact,ProgressRecord} from '../types';
++export async function saveFollowup(contactId:string,kind:'add'|'edit'|'delete',record:ProgressRecord,expected?:ProgressRecord,newContact?:Contact):Promise<Contact> {
++  const appId=import.meta.env.VITE_APP_ID;
++  if(!appId)throw new Error('缺少固定数据标识');
++  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),15000);
++  try {
++    const {data,error}=await supabase.rpc('save_followup_v1',{p_app_id:appId,p_contact_id:contactId,p_kind:kind,p_record:record,p_expected:expected||null,p_new_contact:newContact||null}).abortSignal(controller.signal);
++    if(error)throw new Error(error.message||'跟进记录未保存，请重试。');
++    if(!data?.id)throw new Error('未收到数据库保存确认，请核对后重试。');
++    return data;
++  }catch(e){if(controller.signal.aborted)throw new Error('保存超时，输入已保留，可重试。');throw e;}
++  finally{clearTimeout(timeout);}
++}
++
++export async function saveCustomerProfile(contact:Contact,expected?:Contact):Promise<Contact>{
++ const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),15000);
++ try {
++  const {data,error}=await supabase.rpc('save_customer_profile_v1',{p_app_id:import.meta.env.VITE_APP_ID,p_contact:contact,p_expected:expected||null}).abortSignal(controller.signal);
++  if(error)throw new Error(error.message||'客户资料未保存，请重试。');
++  if(!data?.id)throw new Error('未收到数据库保存确认，请核对后重试。');
++  return data;
++ }catch(e){if(controller.signal.aborted)throw new Error('保存超时，输入已保留，请核对后重试。');throw e;}
++ finally{clearTimeout(timeout);}
++}
+diff --git a/services/renewalStorage.ts b/services/renewalStorage.ts
+index b9b91c6..3bbcb2e 100644
+--- a/services/renewalStorage.ts
++++ b/services/renewalStorage.ts
+@@ -6,7 +6,7 @@ const appId = import.meta.env.VITE_APP_ID;
+ // One PostgREST insert statement commits both rows together; rejected on any constraint failure.
+ export async function saveImport(data: RenewalData, contacts: Contact[]) {
+   if (!appId) throw new Error("缺少固定数据标识，已阻止导入");
+-  const { error } = await supabase.from("app_data").upsert(
++  const { data: savedRows, error } = await supabase.from("app_data").upsert(
+     [
+       {
+         app_id: appId,
+@@ -22,8 +22,11 @@ export async function saveImport(data: RenewalData, contacts: Contact[]) {
+       },
+     ],
+     { onConflict: "app_id,data_type" },
+-  );
++  ).select("data_type,data");
+   if (error) throw error;
++  const saved=savedRows?.find(row=>row.data_type==='contacts')?.data;
++  if(!Array.isArray(saved))throw new Error('未收到客户保存确认，请刷新核对。');
++  return saved as Contact[];
+ }
+ 
+ export interface PolicyMarkResult { payments: import('./renewal').Payment[]; renewed?: boolean }
+diff --git a/supabase/migrations/20261122024337_protect_followup_records.sql b/supabase/migrations/20261122024337_protect_followup_records.sql
+new file mode 100644
+index 0000000..990d10a
+--- /dev/null
++++ b/supabase/migrations/20261122024337_protect_followup_records.sql
+@@ -0,0 +1,82 @@
++-- Guard legacy whole-contact saves and keep a per-record recovery trail.
++create or replace function public.guard_contact_followups_v1() returns trigger
++language plpgsql security invoker set search_path=public,pg_temp as $$
++declare oc jsonb; nc jsonb; oldr jsonb; newr jsonb; hist jsonb; tomb jsonb; n integer; restored boolean; change_row record;
++begin
++ if new.data_type<>'contacts' or jsonb_typeof(old.data)<>'array' or jsonb_typeof(new.data)<>'array' then return new; end if;
++ for oc in select value from jsonb_array_elements(old.data) loop
++  select value,(ordinality-1)::integer into nc,n from jsonb_array_elements(new.data) with ordinality where value->>'id'=oc->>'id';
++  if nc is null then continue; end if;
++  tomb:=coalesce(oc->'progressDeletedIds','[]'::jsonb)||coalesce(nc->'progressDeletedIds','[]'::jsonb);
++  select coalesce(jsonb_agg(distinct value),'[]'::jsonb) into tomb from jsonb_array_elements(tomb);
++  select coalesce(jsonb_agg(value order by ordinality),'[]'::jsonb) into hist from jsonb_array_elements(coalesce(nc->'progressHistory','[]'::jsonb)) with ordinality where not (tomb ? (value->>'id'));
++  restored:=false;
++  for oldr in select value from jsonb_array_elements(coalesce(oc->'progressHistory','[]'::jsonb)) loop
++   if tomb ? (oldr->>'id') then continue; end if;
++   select value into newr from jsonb_array_elements(hist) where value->>'id'=oldr->>'id';
++   if newr is null then hist:=hist||jsonb_build_array(oldr);restored:=true;
++   elsif oldr->>'updatedAt' is not null and coalesce(newr->>'updatedAt','') < oldr->>'updatedAt' then
++    select jsonb_agg(case when value->>'id'=oldr->>'id' then oldr else value end order by ordinality) into hist from jsonb_array_elements(hist) with ordinality;
++   end if;
++  end loop;
++  nc:=jsonb_set(nc,'{progressHistory}',hist);
++  if jsonb_array_length(tomb)>0 then nc:=jsonb_set(nc,'{progressDeletedIds}',tomb); end if;
++  if restored then
++   if oc ? 'lastDate' then nc:=jsonb_set(nc,'{lastDate}',oc->'lastDate'); end if;
++   if oc ? 'followUpStatus' then nc:=jsonb_set(nc,'{followUpStatus}',oc->'followUpStatus'); end if;
++  end if;
++  new.data:=jsonb_set(new.data,array[n::text],nc);
++ end loop;
++ -- Only records whose final stored value changed are archived.
++ for change_row in
++  with before_records as(select c->>'id' cid,r->>'id' rid,r from jsonb_array_elements(old.data)c cross join lateral jsonb_array_elements(coalesce(c->'progressHistory','[]'::jsonb))r),
++       after_records as(select c->>'id' cid,r->>'id' rid,r from jsonb_array_elements(new.data)c cross join lateral jsonb_array_elements(coalesce(c->'progressHistory','[]'::jsonb))r)
++  select coalesce(b.cid,a.cid) cid,coalesce(b.rid,a.rid) rid,b.r before_value,a.r after_value from before_records b full join after_records a on b.cid=a.cid and b.rid=a.rid where b.r is distinct from a.r
++ loop
++  insert into public.app_data(app_id,data_type,data,updated_at) values(new.app_id,'followup_event:'||gen_random_uuid()::text,jsonb_build_object('contactId',change_row.cid,'recordId',change_row.rid,'before',change_row.before_value,'after',change_row.after_value,'at',clock_timestamp()),clock_timestamp());
++ end loop;
++ new.updated_at:=clock_timestamp();return new;
++end $$;
++revoke all on function public.guard_contact_followups_v1() from public;
++create trigger protect_contact_followups_v1 before update of data on public.app_data for each row when(new.data_type='contacts') execute function public.guard_contact_followups_v1();
++
++create or replace function public.save_followup_v1(p_app_id text,p_contact_id text,p_kind text,p_record jsonb,p_expected jsonb default null,p_new_contact jsonb default null)
++returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
++declare row_data public.app_data%rowtype;c jsonb;hist jsonb;existing jsonb;record_value jsonb;idx integer;stamp text:=to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
++begin
++ if p_kind is null or p_kind not in('add','edit','delete') or p_record->>'id' is null then raise exception using errcode='22023',message='跟进记录格式不正确'; end if;
++ if p_kind<>'delete' and (coalesce(trim(p_record->>'content'),'')='' or coalesce(p_record->>'date','')!~'^\d{4}-\d{2}-\d{2}$') then raise exception using errcode='22023',message='请填写日期与跟进内容'; end if;
++ select * into row_data from public.app_data where app_id=p_app_id and data_type='contacts' for update;
++ if row_data.id is null then raise exception using errcode='PT409',message='客户数据尚未就绪，请刷新后重试'; end if;
++ select value,(ordinality-1)::integer into c,idx from jsonb_array_elements(row_data.data) with ordinality where value->>'id'=p_contact_id;
++ if c is null then
++  if p_kind<>'add' or p_new_contact->>'id' is distinct from p_contact_id or coalesce(trim(p_new_contact->>'remarkName'),'')='' then raise exception using errcode='PT409',message='客户已变化，请刷新后重试'; end if;
++  c:=p_new_contact||jsonb_build_object('progressHistory','[]'::jsonb);idx:=jsonb_array_length(row_data.data);
++ end if;
++ hist:=coalesce(c->'progressHistory','[]'::jsonb);
++ select value into existing from jsonb_array_elements(hist) where value->>'id'=p_record->>'id';
++ if p_kind='add' then
++  if coalesce(c->'progressDeletedIds','[]'::jsonb) ? (p_record->>'id') then raise exception using errcode='PT409',message='这条记录已删除，不能重复提交'; end if;
++  if existing is not null then
++   if (existing-'updatedAt') is distinct from (p_record-'updatedAt') then raise exception using errcode='PT409',message='记录已变化，请刷新后重试'; end if;
++   return c;
++  end if;
++ else
++  if existing is distinct from nullif(p_expected,'null'::jsonb) or existing is null then raise exception using errcode='PT409',message='这条跟进已被修改，请刷新后重试'; end if;
++ end if;
++ if p_kind='delete' then
++  select coalesce(jsonb_agg(value order by ordinality),'[]'::jsonb) into hist from jsonb_array_elements(hist) with ordinality where value->>'id'<>p_record->>'id';
++  c:=jsonb_set(c,'{progressDeletedIds}',coalesce(c->'progressDeletedIds','[]'::jsonb)||jsonb_build_array(p_record->>'id'));
++ else
++  record_value:=p_record||jsonb_build_object('updatedAt',stamp);
++  if p_kind='add' then hist:=jsonb_build_array(record_value)||hist;
++  else select jsonb_agg(case when value->>'id'=p_record->>'id' then record_value else value end order by ordinality) into hist from jsonb_array_elements(hist) with ordinality;end if;
++  c:=c||jsonb_build_object('lastDate',p_record->>'date');
++  if p_kind='add' then c:=c||jsonb_build_object('followUpStatus','following');end if;
++ end if;
++ c:=jsonb_set(c,'{progressHistory}',hist);
++ update public.app_data set data=jsonb_set(row_data.data,array[idx::text],c),updated_at=stamp::timestamptz where id=row_data.id;
++ return c;
++end $$;
++revoke all on function public.save_followup_v1(text,text,text,jsonb,jsonb,jsonb) from public;
++grant execute on function public.save_followup_v1(text,text,text,jsonb,jsonb,jsonb) to anon,authenticated;
+diff --git a/supabase/migrations/20261122025220_save_customer_profile_safely.sql b/supabase/migrations/20261122025220_save_customer_profile_safely.sql
+new file mode 100644
+index 0000000..e62bdb2
+--- /dev/null
++++ b/supabase/migrations/20261122025220_save_customer_profile_safely.sql
+@@ -0,0 +1,27 @@
++create or replace function public.save_customer_profile_v1(p_app_id text,p_contact jsonb,p_expected jsonb default null)
++returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
++declare row_data public.app_data%rowtype;c jsonb;idx integer;f record;stamp text:=to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
++begin
++ if p_contact->>'id' is null or coalesce(nullif(trim(p_contact->>'remarkName'),''),nullif(trim(p_contact->>'nickname'),''),'')='' then raise exception using errcode='22023',message='请填写客户姓名';end if;
++ select * into row_data from public.app_data where app_id=p_app_id and data_type='contacts' for update;
++ if row_data.id is null then raise exception using errcode='PT409',message='请先完成客户数据同步';end if;
++ select value,(ordinality-1)::integer into c,idx from jsonb_array_elements(row_data.data) with ordinality where value->>'id'=p_contact->>'id';
++ if p_expected is null or p_expected='null'::jsonb then
++  if c is not null then return c;end if;
++  c:=p_contact;idx:=jsonb_array_length(row_data.data);
++  if c ? 'progressHistory' then c:=jsonb_set(c,'{progressHistory}',(select coalesce(jsonb_agg(value||jsonb_build_object('updatedAt',stamp)),'[]'::jsonb) from jsonb_array_elements(c->'progressHistory')));end if;
++ else
++  if c is null then raise exception using errcode='PT409',message='客户已删除，请刷新后重试';end if;
++  for f in select * from jsonb_each(p_contact) where key not in('id','progressHistory','progressDeletedIds') loop
++   if f.value is not distinct from p_expected->f.key then continue;end if;
++   if c->f.key is distinct from p_expected->f.key and c->f.key is distinct from f.value then
++    raise exception using errcode='PT409',message='客户资料已在另一页面修改，请刷新后重试';
++   end if;
++   c:=jsonb_set(c,array[f.key],f.value);
++  end loop;
++ end if;
++ update public.app_data set data=jsonb_set(row_data.data,array[idx::text],c),updated_at=stamp::timestamptz where id=row_data.id;
++ return c;
++end $$;
++revoke all on function public.save_customer_profile_v1(text,jsonb,jsonb) from public;
++grant execute on function public.save_customer_profile_v1(text,jsonb,jsonb) to anon,authenticated;
+diff --git a/supabase/migrations/20261122030055_validate_profile_retries.sql b/supabase/migrations/20261122030055_validate_profile_retries.sql
+new file mode 100644
+index 0000000..44c3eb3
+--- /dev/null
++++ b/supabase/migrations/20261122030055_validate_profile_retries.sql
+@@ -0,0 +1,36 @@
++create or replace function public.save_customer_profile_v1(p_app_id text,p_contact jsonb,p_expected jsonb default null)
++returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
++declare row_data public.app_data%rowtype;c jsonb;idx integer;f record;stamp text:=to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
++begin
++ if p_contact->>'id' is null or coalesce(nullif(trim(p_contact->>'remarkName'),''),nullif(trim(p_contact->>'nickname'),''),'')='' then raise exception using errcode='22023',message='请填写客户姓名';end if;
++ select * into row_data from public.app_data where app_id=p_app_id and data_type='contacts' for update;
++ if row_data.id is null then raise exception using errcode='PT409',message='请先完成客户数据同步';end if;
++ select value,(ordinality-1)::integer into c,idx from jsonb_array_elements(row_data.data) with ordinality where value->>'id'=p_contact->>'id';
++ if p_expected is null or p_expected='null'::jsonb then
++  if c is not null then
++   for f in select * from jsonb_each(p_contact) where key not in('id','addedAt','progressHistory') loop
++    if c->f.key is distinct from f.value then raise exception using errcode='PT409',message='该客户已创建且资料不同，请刷新核对后编辑';end if;
++   end loop;
++   if (select coalesce(jsonb_agg(value-'updatedAt' order by ordinality),'[]'::jsonb)from jsonb_array_elements(coalesce(c->'progressHistory','[]'::jsonb))with ordinality)
++      is distinct from (select coalesce(jsonb_agg(value-'updatedAt' order by ordinality),'[]'::jsonb)from jsonb_array_elements(coalesce(p_contact->'progressHistory','[]'::jsonb))with ordinality) then
++    raise exception using errcode='PT409',message='该客户的跟进已变化，请刷新核对后编辑';
++   end if;
++   return c;
++  end if;
++  c:=p_contact;idx:=jsonb_array_length(row_data.data);
++  if c ? 'progressHistory' then c:=jsonb_set(c,'{progressHistory}',(select coalesce(jsonb_agg(value||jsonb_build_object('updatedAt',stamp)),'[]'::jsonb) from jsonb_array_elements(c->'progressHistory')));end if;
++ else
++  if c is null then raise exception using errcode='PT409',message='客户已删除，请刷新后重试';end if;
++  for f in select * from jsonb_each(p_contact) where key not in('id','progressHistory','progressDeletedIds') loop
++   if f.value is not distinct from p_expected->f.key then continue;end if;
++   if c->f.key is distinct from p_expected->f.key and c->f.key is distinct from f.value then
++    raise exception using errcode='PT409',message='客户资料已在另一页面修改，请刷新后重试';
++   end if;
++   c:=jsonb_set(c,array[f.key],f.value);
++  end loop;
++ end if;
++ update public.app_data set data=jsonb_set(row_data.data,array[idx::text],c),updated_at=stamp::timestamptz where id=row_data.id;
++ return c;
++end $$;
++revoke all on function public.save_customer_profile_v1(text,jsonb,jsonb) from public;
++grant execute on function public.save_customer_profile_v1(text,jsonb,jsonb) to anon,authenticated;
+diff --git a/supabase/migrations/20261122030239_skip_unchanged_followup_projection.sql b/supabase/migrations/20261122030239_skip_unchanged_followup_projection.sql
+new file mode 100644
+index 0000000..f8fded5
+--- /dev/null
++++ b/supabase/migrations/20261122030239_skip_unchanged_followup_projection.sql
+@@ -0,0 +1,41 @@
++-- Guard legacy whole-contact saves and keep a per-record recovery trail.
++create or replace function public.guard_contact_followups_v1() returns trigger
++language plpgsql security invoker set search_path=public,pg_temp as $$
++declare oc jsonb; nc jsonb; oldr jsonb; newr jsonb; hist jsonb; tomb jsonb; n integer; restored boolean; change_row record;
++begin
++ if new.data_type<>'contacts' or jsonb_typeof(old.data)<>'array' or jsonb_typeof(new.data)<>'array' then return new; end if;
++ for oc in select value from jsonb_array_elements(old.data) loop
++  select value,(ordinality-1)::integer into nc,n from jsonb_array_elements(new.data) with ordinality where value->>'id'=oc->>'id';
++  if nc is null then continue; end if;
++  if nc->'progressHistory' is not distinct from oc->'progressHistory' and nc->'progressDeletedIds' is not distinct from oc->'progressDeletedIds' then continue; end if;
++  tomb:=coalesce(oc->'progressDeletedIds','[]'::jsonb)||coalesce(nc->'progressDeletedIds','[]'::jsonb);
++  select coalesce(jsonb_agg(distinct value),'[]'::jsonb) into tomb from jsonb_array_elements(tomb);
++  select coalesce(jsonb_agg(value order by ordinality),'[]'::jsonb) into hist from jsonb_array_elements(coalesce(nc->'progressHistory','[]'::jsonb)) with ordinality where not (tomb ? (value->>'id'));
++  restored:=false;
++  for oldr in select value from jsonb_array_elements(coalesce(oc->'progressHistory','[]'::jsonb)) loop
++   if tomb ? (oldr->>'id') then continue; end if;
++   select value into newr from jsonb_array_elements(hist) where value->>'id'=oldr->>'id';
++   if newr is null then hist:=hist||jsonb_build_array(oldr);restored:=true;
++   elsif oldr->>'updatedAt' is not null and coalesce(newr->>'updatedAt','') < oldr->>'updatedAt' then
++    select jsonb_agg(case when value->>'id'=oldr->>'id' then oldr else value end order by ordinality) into hist from jsonb_array_elements(hist) with ordinality;
++   end if;
++  end loop;
++  nc:=jsonb_set(nc,'{progressHistory}',hist);
++  if jsonb_array_length(tomb)>0 then nc:=jsonb_set(nc,'{progressDeletedIds}',tomb); end if;
++  if restored then
++   if oc ? 'lastDate' then nc:=jsonb_set(nc,'{lastDate}',oc->'lastDate'); end if;
++   if oc ? 'followUpStatus' then nc:=jsonb_set(nc,'{followUpStatus}',oc->'followUpStatus'); end if;
++  end if;
++  new.data:=jsonb_set(new.data,array[n::text],nc);
++ end loop;
++ -- Only records whose final stored value changed are archived.
++ for change_row in
++  with before_records as(select c->>'id' cid,r->>'id' rid,r from jsonb_array_elements(old.data)c cross join lateral jsonb_array_elements(coalesce(c->'progressHistory','[]'::jsonb))r),
++       after_records as(select c->>'id' cid,r->>'id' rid,r from jsonb_array_elements(new.data)c cross join lateral jsonb_array_elements(coalesce(c->'progressHistory','[]'::jsonb))r)
++  select coalesce(b.cid,a.cid) cid,coalesce(b.rid,a.rid) rid,b.r before_value,a.r after_value from before_records b full join after_records a on b.cid=a.cid and b.rid=a.rid where b.r is distinct from a.r
++ loop
++  insert into public.app_data(app_id,data_type,data,updated_at) values(new.app_id,'followup_event:'||gen_random_uuid()::text,jsonb_build_object('contactId',change_row.cid,'recordId',change_row.rid,'before',change_row.before_value,'after',change_row.after_value,'at',clock_timestamp()),clock_timestamp());
++ end loop;
++ new.updated_at:=clock_timestamp();return new;
++end $$;
++revoke all on function public.guard_contact_followups_v1() from public;
+diff --git a/tests/customer-profile-safety.sql b/tests/customer-profile-safety.sql
+new file mode 100644
+index 0000000..55d100d
+--- /dev/null
++++ b/tests/customer-profile-safety.sql
+@@ -0,0 +1,15 @@
++begin;
++insert into app_data(app_id,data_type,data)values('test_customer_profile','contacts','[{"id":"c1","remarkName":"客户","remarkInfo":"original","progressHistory":[],"policies":[],"tags":[]}]');
++set local role anon;
++do $$ declare base jsonb;note_contact jsonb;result jsonb;begin
++ select data->0 into base from app_data where app_id='test_customer_profile'and data_type='contacts';
++ note_contact:=save_followup_v1('test_customer_profile','c1','add','{"id":"r1","date":"2026-11-21","content":"never overwrite me","completed":false}');
++ result:=save_customer_profile_v1('test_customer_profile',base||'{"remarkInfo":"edited profile"}',base);
++ if result->'progressHistory'->0->>'content'<>'never overwrite me' or result->>'remarkInfo'<>'edited profile' then raise exception 'profile overwrote followup';end if;
++ begin perform save_customer_profile_v1('test_customer_profile',base||'{"remarkInfo":"stale edit"}',base);raise exception 'stale profile accepted';exception when sqlstate 'PT409' then null;end;
++ result:=save_customer_profile_v1('test_customer_profile','{"id":"new","remarkName":"新客户","policies":[],"progressHistory":[{"id":"nr","date":"2026-11-21","content":"draft note","completed":false}]}');
++ if result->'progressHistory'->0->>'updatedAt' is null then raise exception 'new draft note unversioned';end if;
++ perform save_customer_profile_v1('test_customer_profile','{"id":"new","remarkName":"新客户","policies":[],"progressHistory":[{"id":"nr","date":"2026-11-21","content":"draft note","completed":false}]}');
++ if (select jsonb_array_length(data)from app_data where app_id='test_customer_profile'and data_type='contacts')<>2 then raise exception 'retry duplicated customer';end if;
++end $$;
++reset role;rollback;
+diff --git a/tests/followup-safety.sql b/tests/followup-safety.sql
+new file mode 100644
+index 0000000..a72e736
+--- /dev/null
++++ b/tests/followup-safety.sql
+@@ -0,0 +1,30 @@
++begin;
++insert into app_data(app_id,data_type,data) values('test_followup_safety','contacts','[{"id":"c1","remarkName":"客户","remarkInfo":"preserve","policies":[{"id":"p1","premium":"12000"}],"progressHistory":[]}]');
++set local role anon;
++do $$
++declare c jsonb;edited jsonb;r jsonb;original jsonb:='{"id":"r1","date":"2026-11-21","content":"new note","completed":false}';begin
++ c:=save_followup_v1('test_followup_safety','c1','add',original);
++ perform save_followup_v1('test_followup_safety','c1','add',original);
++ if jsonb_array_length(c->'progressHistory')<>1 then raise exception 'duplicate';end if;
++ update app_data set data='[{"id":"c1","remarkName":"客户","remarkInfo":"policy edit","policies":[{"id":"p1","premium":"900"}],"progressHistory":[]}]' where app_id='test_followup_safety' and data_type='contacts';
++ select data->0 into c from app_data where app_id='test_followup_safety'and data_type='contacts';
++ if jsonb_array_length(c->'progressHistory')<>1 or c->'policies'->0->>'premium'<>'900' then raise exception 'stale overwrite protection failed';end if;
++ r:=c->'progressHistory'->0;
++ c:=save_followup_v1('test_followup_safety','c1','edit',r||'{"content":"edited note"}',r);
++ edited:=c->'progressHistory'->0;
++ update app_data set data=jsonb_set(data,'{0,progressHistory}',jsonb_build_array(original)) where app_id='test_followup_safety' and data_type='contacts';
++ select data->0 into c from app_data where app_id='test_followup_safety'and data_type='contacts';
++ if c->'progressHistory'->0->>'content'<>'edited note' then raise exception 'stale edit won';end if;
++ begin perform save_followup_v1('test_followup_safety','c1','edit',r,r);raise exception 'stale edit accepted';exception when sqlstate 'PT409' then null;end;
++ c:=save_followup_v1('test_followup_safety','c1','delete',edited,edited);
++ update app_data set data=jsonb_set(data,'{0,progressHistory}',jsonb_build_array(original)) where app_id='test_followup_safety' and data_type='contacts';
++ select data->0 into c from app_data where app_id='test_followup_safety'and data_type='contacts';
++ if jsonb_array_length(c->'progressHistory')<>0 then raise exception 'deleted note resurrected';end if;
++ c:=save_followup_v1('test_followup_safety','c1','add','{"id":"r2","date":"2026-11-21","content":"client A","completed":false}');
++ c:=save_followup_v1('test_followup_safety','c1','add','{"id":"r3","date":"2026-11-21","content":"client B","completed":false}');
++ if jsonb_array_length(c->'progressHistory')<>2 then raise exception 'independent adds lost';end if;
++ if c->>'remarkInfo'<>'policy edit' or c->'policies'->0->>'premium'<>'900' then raise exception 'unrelated fields changed';end if;
++ if (select count(*)from app_data where app_id='test_followup_safety'and data_type like 'followup_event:%')<5 then raise exception 'audit missing';end if;
++end $$;
++reset role;
++rollback;
+diff --git a/tools/restore-followup-records.cjs b/tools/restore-followup-records.cjs
+new file mode 100644
+index 0000000..fd5fb8c
+--- /dev/null
++++ b/tools/restore-followup-records.cjs
+@@ -0,0 +1,15 @@
++const fs=require('node:fs');
++(async()=>{
++ const{loadEnv}=await import('vite'),{createClient}=await import('@supabase/supabase-js');const env=loadEnv('production',process.cwd(),'VITE_');
++ const url=env.VITE_SUPABASE_URL||'https://ulgqiixqaxxgodyowrep.supabase.co';if(new URL(url).hostname!=='ulgqiixqaxxgodyowrep.supabase.co'||env.VITE_APP_ID!=='app_yp9dq7mofjm')throw Error('Wrong target');
++ const key=env.VITE_SUPABASE_ANON_KEY||fs.readFileSync('vite.config.ts','utf8').match(/env\.VITE_SUPABASE_ANON_KEY \|\| '([^']+)'/)[1];const client=createClient(url,key,{auth:{persistSession:false}});
++ const{data:row,error}=await client.from('app_data').select('*').eq('app_id',env.VITE_APP_ID).eq('data_type','contacts').single();if(error)throw error;
++ const dir='/Users/apple/.codex/backups/insurance-20261122-followup-recovery';fs.mkdirSync(dir,{recursive:true,mode:0o700});fs.writeFileSync(dir+'/before-'+Date.now()+'.json',JSON.stringify(row),{mode:0o600});
++ const oldRows=JSON.parse(fs.readFileSync('/Users/apple/.codex/backups/insurance-20261122-coverage/before-1795314201345.json','utf8'));const old=oldRows.find(x=>x.data_type==='contacts').data;
++ const missing=old.flatMap(c=>{const current=row.data.find(x=>x.id===c.id);return current?(c.progressHistory||[]).filter(r=>!(current.progressHistory||[]).some(x=>x.id===r.id)&&!(current.progressDeletedIds||[]).includes(r.id)).map(record=>({contactId:c.id,record})):[];});
++ if(missing.some(x=>x.record.date!=='2026-11-21'))throw Error('Unexpected recovery date');
++ fs.writeFileSync(dir+'/missing.json',JSON.stringify(missing),{mode:0o600});console.log(JSON.stringify({recoverable:missing.length,beforeRecords:row.data.reduce((n,c)=>n+(c.progressHistory||[]).length,0)}));
++ if(!process.argv.includes('--apply'))return;
++ for(const m of missing){const{error}=await client.rpc('save_followup_v1',{p_app_id:env.VITE_APP_ID,p_contact_id:m.contactId,p_kind:'add',p_record:m.record});if(error)throw error;}
++ console.log('Missing follow-ups restored individually; other data preserved.');
++})().catch(e=>{console.error(e.message);process.exitCode=1;});
+diff --git a/types.ts b/types.ts
+index 7422d2d..34171fd 100644
+--- a/types.ts
++++ b/types.ts
+@@ -5,8 +5,11 @@ export interface ProgressRecord {
+   date: string;
+   content: string;
+   completed?: boolean;
++  updatedAt?: string;
+ }
+ 
++export type FollowUpSave = (contactId:string|null,date:string,content:string,status:'following'|'contacted',newContactName?:string,existingRecordId?:string,completed?:boolean,requestId?:string,newContactId?:string)=>Promise<string>;
++
+ export interface MingyaPerson {
+   name: string; idCard: string; phone: string; birthday: string; sex: string; address: string; share: string; order: string;
+ }

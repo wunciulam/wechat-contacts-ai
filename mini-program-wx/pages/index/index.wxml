@@ -47,11 +47,6 @@
           data-status="following"
         >跟进中</view>
         <view
-          class="filter-item {{statusFilter === 'contacted' ? 'active' : ''}}"
-          bindtap="filterByStatus"
-          data-status="contacted"
-        >已沟通</view>
-        <view
           class="filter-item {{statusFilter === 'idle' ? 'active' : ''}}"
           bindtap="filterByStatus"
           data-status="idle"

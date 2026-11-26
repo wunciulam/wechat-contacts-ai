@@ -1,0 +1,506 @@
+diff --git a/App.tsx b/App.tsx
+index 336c5bc..5a6b914 100644
+--- a/App.tsx
++++ b/App.tsx
+@@ -171,6 +171,12 @@ const App: React.FC = () => {
+     return () => { delete document.documentElement.dataset.mingyaImport; window.removeEventListener('message', receive); };
+   }, [isLoaded]);
+ 
++  const acceptSavedPolicyContacts = (saved: Contact[]) => {
++    skipImportSyncRef.current = saved;
++    setContacts(saved);
++  };
++  const beforePolicySave = () => contactsWriteRef.current;
++
+   const loadMingyaSnapshot = async (): Promise<ContactImportSnapshot> => {
+     await contactsWriteRef.current;
+     const localVersion = JSON.stringify(contactsRef.current);
+@@ -225,6 +231,7 @@ const App: React.FC = () => {
+               };
+               return applyAutoTags(baseContact);
+             });
++            skipImportSyncRef.current = migratedData;
+             setContacts(migratedData);
+             localStorage.setItem('wechat-contacts', JSON.stringify(migratedData));
+             localStorage.setItem('wechat-contacts-backup', JSON.stringify(migratedData));
+@@ -1078,7 +1085,7 @@ const App: React.FC = () => {
+                   <RenewalWorkspace 
+                      importFiles={policyImportFiles}
+                      onImportConsumed={() => setPolicyImportFiles(null)}
+-                     onContacts={setContacts}
++                     onContacts={acceptSavedPolicyContacts} beforeSave={beforePolicySave}
+                      contacts={contacts}
+                      filterTags={selectedTags}
+                     followUpFilter={followUpFilter}
+@@ -1178,7 +1185,7 @@ const App: React.FC = () => {
+         </div>
+       </div>
+ 
+-      {policyContactId && detailPolicyId && <RenewalWorkspace contacts={contacts} onContacts={setContacts} customerId={policyContactId} initialPolicyId={detailPolicyId} onCloseDetail={() => { setPolicyContactId(null); setDetailPolicyId(undefined); }} />}
++      {policyContactId && detailPolicyId && <RenewalWorkspace contacts={contacts} onContacts={acceptSavedPolicyContacts} beforeSave={beforePolicySave} customerId={policyContactId} initialPolicyId={detailPolicyId} onCloseDetail={() => { setPolicyContactId(null); setDetailPolicyId(undefined); }} />}
+       <MingyaImportModal
+         open={isMingyaImportOpen}
+         initialPayload={mingyaPayload}
+diff --git a/components/RenewalWorkspace.tsx b/components/RenewalWorkspace.tsx
+index 469b6b9..407b755 100644
+--- a/components/RenewalWorkspace.tsx
++++ b/components/RenewalWorkspace.tsx
+@@ -4,7 +4,7 @@ import { ArrowLeft, Settings } from 'lucide-react';
+ import PolicyDashboard from "./PolicyDashboard";
+ import { PageHeader } from "./PageHeader";
+ import PolicyDetail from "./PolicyDetail";
+-import { saveImport } from "../services/renewalStorage";
++import { saveImport, savePolicyMark } from "../services/renewalStorage";
+ import React, { useEffect, useState } from "react";
+ import { Contact } from "../types";
+ import { getRenewalSnapshot, hasFreshRenewalSnapshot, loadRenewalSnapshot, rememberRenewalSnapshot, subscribeRenewalSnapshot } from "../services/renewalCache";
+@@ -30,6 +30,7 @@ export default function RenewalWorkspace({
+   importFiles,
+   onImportConsumed,
+   onContacts,
++  beforeSave,
+   customerId,
+   initialPolicyId,
+   onCloseDetail,
+@@ -39,6 +40,7 @@ export default function RenewalWorkspace({
+   importFiles?: FileList | null;
+   onImportConsumed?: () => void;
+   onContacts: (c: Contact[]) => void;
++  beforeSave?: () => Promise<unknown>;
+   customerId?: string;
+   initialPolicyId?: string;
+   onCloseDetail?: () => void;
+@@ -49,6 +51,9 @@ export default function RenewalWorkspace({
+   onBatchDeleteContacts?: (ids: string[]) => void;
+   onDeletePolicy?: (contactId: string, policyId: string) => void;
+ }) {
++  const markPending = React.useRef(false);
++  const ownSnapshot = React.useRef<RenewalData>();
++  const skipContactsMerge = React.useRef<Contact[]>();
+   const [detailDirty, setDetailDirty] = useState(false);
+   const [remindersOpen, setRemindersOpen] = useState(Boolean(customerId));
+   const fileRef = React.useRef<HTMLInputElement>(null);
+@@ -84,7 +89,7 @@ export default function RenewalWorkspace({
+     let active = true;
+     const apply = (loaded: RenewalData) => {
+       if (!active) return;
+-      setData({ ...loaded, policies: mergePolicies(loaded.policies, migrate(contactsRef.current)) });
++      setData(loaded === ownSnapshot.current ? loaded : { ...loaded, policies: mergePolicies(loaded.policies, migrate(contactsRef.current)) });
+       setCloudReady(true);
+       setSyncError("");
+     };
+@@ -101,6 +106,7 @@ export default function RenewalWorkspace({
+     return () => { active = false; unsubscribe(); };
+   }, [retry]);
+   useEffect(() => {
++    if (skipContactsMerge.current === contacts) { skipContactsMerge.current = undefined; return; }
+     setData(current => current ? { ...current, policies: mergePolicies(current.policies, migrate(contacts)) } : current);
+   }, [contacts]);
+   useEffect(() => {
+@@ -121,7 +127,10 @@ export default function RenewalWorkspace({
+     setError("");
+     try {
+       const projected = projectContacts(baseContacts, next.policies);
++      await beforeSave?.();
+       await saveImport(next, projected);
++      ownSnapshot.current = next;
++      skipContactsMerge.current = projected;
+       rememberRenewalSnapshot(next);
+       onContacts(projected);
+       setData(next);
+@@ -297,44 +306,30 @@ export default function RenewalWorkspace({
+   }
+   async function mark(p: ManagedPolicy, kind: string, dt?: string) {
+     if (!data) return;
+-    const next = {
+-      ...data,
+-      policies: data.policies.map((x) =>
+-        x.id !== p.id
+-          ? x
+-          : {
+-              ...x,
+-              ...(kind === "renewal" ? { renewed: !x.renewed } : {}),
+-              payments: (x.payments.some((q) => q.date === dt) || !dt
+-                ? x.payments
+-                : [...x.payments, { ...nextPayment(x)!, date: dt }]
+-              ).map((q) =>
+-                q.date !== dt
+-                  ? q
+-                  : kind === "contact"
+-                    ? { ...q, contactedAt: new Date().toISOString() }
+-                    : {
+-                        ...q,
+-                        status: q.status === "已缴费" ? "未缴费" : "已缴费",
+-                        history: [
+-                          ...(q.history || []),
+-                          {
+-                            at: new Date().toISOString(),
+-                            from: q.status,
+-                            to: q.status === "已缴费" ? "未缴费" : "已缴费",
+-                            source: "人工标记",
+-                          },
+-                        ],
+-                      },
+-              ),
+-            },
+-      ),
+-    };
+-    if (await persist(next)) {
+-      setSelected(next.policies.find((x) => x.id === p.id) || null);
++    if (markPending.current || busy || !cloudReady) return false;
++    markPending.current = true;
++    setBusy(true);
++    setError("");
++    try {
++      await beforeSave?.();
++      const result = await savePolicyMark(p, kind, dt);
++      const update = (policy: ManagedPolicy): ManagedPolicy => policy.id === p.id
++        ? { ...policy, payments: result.payments, ...(kind === 'renewal' ? { renewed: result.renewed } : {}) }
++        : policy;
++      const next = { ...data, policies: data.policies.map(update) };
++      const projected = contactsRef.current.map(c => c.policies?.some(policy => policy.id === p.id)
++        ? { ...c, policies: c.policies.map(policy => update(policy as ManagedPolicy)) } : c);
++      ownSnapshot.current = next;
++      skipContactsMerge.current = projected;
++      rememberRenewalSnapshot(next);
++      onContacts(projected);
++      setData(next);
++      setSelected(next.policies.find(x => x.id === p.id) || null);
+       return true;
+-    }
+-    return false;
++    } catch (e) {
++      setError(e instanceof Error ? e.message : String(e));
++      return false;
++    } finally { markPending.current = false; setBusy(false); }
+   }
+   const syncStatus = syncing || syncError ? (
+     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-5 py-3 text-sm text-gray-600" role="status">
+@@ -373,7 +368,8 @@ export default function RenewalWorkspace({
+         search,
+       ),
+   );
+-  const daysLeft = (date: string) => Math.round((Date.parse(date + "T00:00:00Z") - Date.parse(today() + "T00:00:00Z")) / 86400000);
++  const currentDay = today();
++  const daysLeft = (date: string) => Math.round((Date.parse(date + "T00:00:00Z") - Date.parse(currentDay + "T00:00:00Z")) / 86400000);
+   const daysLabel = (date: string) => { const n = daysLeft(date); return n < 0 ? `逾期 ${-n} 天` : n === 0 ? "今天缴费" : `剩余 ${n} 天`; };
+   const remainingLabel = (p: ManagedPolicy) => { const n = remainingInstallments(p); return n === undefined ? "待补充" : `${n} 期`; };
+   const open = (p: ManagedPolicy) => {
+@@ -391,7 +387,8 @@ export default function RenewalWorkspace({
+         onChange={(e) => upload(e.target.files)}
+       />
+       {syncStatus}
+-      {error && !modal && <p role="alert" className="p-4 text-red-600">{error}</p>}
++      {busy && !modal && <p role="status" className="px-6 py-2 text-gray-600">正在保存…</p>}
++      {error && !modal && !remindersOpen && <p role="alert" className="p-4 text-red-600">{error}</p>}
+       {!remindersOpen && !customerId ? (
+         <PolicyDashboard
+           {...dashboardProps}
+@@ -458,7 +455,7 @@ export default function RenewalWorkspace({
+             />
+           </div>
+           <div className="p-6 space-y-4">
+-            {error && (
++            {error && !modal && (
+               <div role="alert" className="p-3 bg-red-50 text-red-700">
+                 {error}
+               </div>
+@@ -629,7 +626,7 @@ export default function RenewalWorkspace({
+       )}
+       {modal && (
+         <WorkspaceDialog
+-          title={modal === 'detail' ? '保单详情' : modal === 'import' ? '导入预览' : modal === 'settings' ? '通知设置' : modal === 'email' ? '邮件预览' : modal === 'done' ? '导入完成' : '确认缴费状态'}
++          title={modal === 'detail' ? '保单详情' : modal === 'import' ? '导入预览' : modal === 'settings' ? '通知设置' : modal === 'email' ? '邮件预览' : modal === 'done' ? '导入完成' : modal === 'renewed' ? '确认本次已续保' : '确认本期已缴费'}
+           compact={modal === 'settings' || modal.startsWith('paid:') || modal === 'renewed'}
+           onClose={() => {
+             if (busy) return;
+@@ -828,9 +825,6 @@ export default function RenewalWorkspace({
+             )}
+             {(modal.startsWith("paid:") || modal === "renewed") && selected && (
+               <>
+-                <h3 className="font-bold">
+-                  确认{modal === "renewed" ? "本次已续保" : "本期已缴费"}
+-                </h3>
+                 <p className="my-4">
+                   {selected.productName} · {selected.policyNumber} ·{" "}
+                   {modal.split(":")[1]}
+@@ -847,7 +841,7 @@ export default function RenewalWorkspace({
+                     if (saved) setModal("");
+                   }}
+                 >
+-                  确认标记
++                  {busy ? "正在保存…" : "确认标记"}
+                 </button>
+               </>
+             )}
+diff --git a/services/renewal.ts b/services/renewal.ts
+index 99aec1d..e2e4960 100644
+--- a/services/renewal.ts
++++ b/services/renewal.ts
+@@ -200,10 +200,9 @@ export function latestPayment(p: ManagedPolicy) {
+   )[0];
+   return latest?.status === "未缴费" ? latest : undefined;
+ }
++const shanghaiDateFormatter = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" });
+ export function today() {
+-  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" }).format(
+-    new Date(),
+-  );
++  return shanghaiDateFormatter.format(new Date());
+ }
+ export function dueItems(policies: ManagedPolicy[], now = today()) {
+   const end = new Date(`${now}T00:00:00Z`);
+@@ -315,12 +314,12 @@ export function projectContacts(
+   policies: ManagedPolicy[],
+   bothRoles = false,
+ ): Contact[] {
++  const known = new Set(policies.map(key));
++  const knownIds = new Set(policies.map(p => p.id));
+   return contacts.map((c) => {
+     const associated = policies.filter(
+       (p) => p.applicantId === c.id || (bothRoles && p.insuredId === c.id),
+     );
+-    const known = new Set(policies.map(key));
+-    const knownIds = new Set(policies.map(p => p.id));
+     return {
+       ...c,
+       policies: [
+diff --git a/services/renewalStorage.ts b/services/renewalStorage.ts
+index 201ae6a..b9b91c6 100644
+--- a/services/renewalStorage.ts
++++ b/services/renewalStorage.ts
+@@ -1,4 +1,5 @@
+ import { supabase } from "./supabaseService";
++import { nextPayment as importNextPayment } from "./renewal";
+ import type { RenewalData } from "./renewal";
+ import type { Contact } from "../types";
+ const appId = import.meta.env.VITE_APP_ID;
+@@ -24,3 +25,26 @@ export async function saveImport(data: RenewalData, contacts: Contact[]) {
+   );
+   if (error) throw error;
+ }
++
++export interface PolicyMarkResult { payments: import('./renewal').Payment[]; renewed?: boolean }
++// Send only the selected installment; the database updates both projections atomically.
++export async function savePolicyMark(policy: import('./renewal').ManagedPolicy, kind: string, date?: string): Promise<PolicyMarkResult> {
++  if (!appId) throw new Error('缺少固定数据标识');
++  const payment = policy.payments.find(p => p.date === date);
++  const seed = payment || (date ? { ...importNextPayment(policy), date } : undefined);
++  const controller = new AbortController();
++  const timeout = setTimeout(() => controller.abort(), 15000);
++  try {
++    const { data, error } = await supabase.rpc('mark_policy_installment_v1', {
++      p_app_id: appId, p_policy_id: policy.id, p_kind: kind, p_date: date || null,
++      p_expected: kind === 'renewal' ? Boolean(policy.renewed) : payment || null,
++      p_seed: seed || null,
++      p_target: kind === 'renewal' ? !policy.renewed : (payment?.status === '已缴费' ? '未缴费' : '已缴费'),
++    }).abortSignal(controller.signal);
++    if (error) throw new Error(error.message || '保存失败，请重试');
++    return data;
++  } catch (e) {
++    if (controller.signal.aborted) throw new Error('保存超时，请刷新核对状态后重试。');
++    throw e;
++  } finally { clearTimeout(timeout); }
++}
+diff --git a/supabase/migrations/20261121083640_fast_policy_marks.sql b/supabase/migrations/20261121083640_fast_policy_marks.sql
+new file mode 100644
+index 0000000..e55969c
+--- /dev/null
++++ b/supabase/migrations/20261121083640_fast_policy_marks.sql
+@@ -0,0 +1,69 @@
++-- Preserve existing RLS; lock both records in the same order as imports.
++create or replace function public.mark_policy_installment_v1(
++ p_app_id text,p_policy_id text,p_kind text,p_date text,p_expected jsonb,p_seed jsonb,p_target jsonb
++) returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
++declare
++ r public.app_data%rowtype; c public.app_data%rowtype; policy jsonb; payment jsonb;
++ result_payments jsonb; changed jsonb; stamp text:=to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
++ idx integer; payment_idx integer; contact_row record; policy_row record; result jsonb;
++begin
++ if p_kind is null or p_kind not in ('contact','payment','renewal') then raise exception using errcode='22023',message='未知操作'; end if;
++ if p_kind <> 'renewal' and (p_date is null or p_date !~ '^\d{4}-\d{2}-\d{2}$') then raise exception using errcode='22023',message='缴费日期不正确'; end if;
++ if (p_kind='renewal' and jsonb_typeof(p_target) is distinct from 'boolean') or
++    (p_kind='payment' and (p_target is null or p_target not in ('"已缴费"'::jsonb,'"未缴费"'::jsonb))) then
++  raise exception using errcode='22023',message='目标状态不正确';
++ end if;
++ perform id from public.app_data where app_id=p_app_id and data_type in('contacts','renewal_v1') order by data_type for update;
++ select * into r from public.app_data where app_id=p_app_id and data_type='renewal_v1';
++ select * into c from public.app_data where app_id=p_app_id and data_type='contacts';
++ if r.id is null or c.id is null then raise exception using errcode='PT409',message='请刷新后重新同步保单'; end if;
++ select value,(ordinality-1)::integer into policy,idx from jsonb_array_elements(r.data->'policies') with ordinality where value->>'id'=p_policy_id;
++ if policy is null then raise exception using errcode='PT409',message='保单已变化，请刷新后重试'; end if;
++ result_payments:=coalesce(policy->'payments','[]'::jsonb);
++ if p_kind='renewal' then
++  if coalesce(policy->'renewed','false'::jsonb) is distinct from p_expected and coalesce(policy->'renewed','false'::jsonb) is distinct from p_target then
++   raise exception using errcode='PT409',message='续保状态已变化，请刷新后重试';
++  end if;
++  changed:=jsonb_build_object('renewed',p_target);
++ else
++  select value,(ordinality-1)::integer into payment,payment_idx from jsonb_array_elements(result_payments) with ordinality where value->>'date'=p_date;
++  if payment is distinct from nullif(p_expected,'null'::jsonb) then
++   -- A retry of the same completed request is safe and creates no duplicate history.
++   if p_kind='payment' and payment->'status'=p_target and (payment->>'confirmedAt') is not null then
++    return jsonb_build_object('payments',result_payments,'renewed',coalesce(policy->'renewed','false'::jsonb));
++   end if;
++   if p_kind='contact' and (payment->>'contactedAt') is not null and
++      (payment-'contactedAt') is not distinct from (coalesce(nullif(p_expected,'null'::jsonb),p_seed)-'contactedAt') then
++    return jsonb_build_object('payments',result_payments,'renewed',coalesce(policy->'renewed','false'::jsonb));
++   end if;
++   raise exception using errcode='PT409',message='这期缴费记录已变化，请刷新后重试';
++  end if;
++  if payment is null then
++   if p_seed is null or jsonb_typeof(p_seed) <> 'object' or p_seed->>'date' is distinct from p_date or p_seed->>'amount' is null then
++    raise exception using errcode='22023',message='缺少该期缴费金额';
++   end if;
++   payment:=jsonb_build_object('date',p_date,'amount',p_seed->>'amount','status',coalesce(p_seed->>'status','未缴费')) ||
++     case when p_seed ? 'estimated' then jsonb_build_object('estimated',p_seed->'estimated') else '{}'::jsonb end ||
++     case when p_seed ? 'amountReference' then jsonb_build_object('amountReference',p_seed->'amountReference') else '{}'::jsonb end;
++  end if;
++  if p_kind='contact' then payment:=payment||jsonb_build_object('contactedAt',stamp);
++  else
++   payment:=payment||jsonb_build_object('status',p_target,'confirmedAt',stamp,'paidAt',case when p_target='"已缴费"'::jsonb then to_char(clock_timestamp() at time zone 'Asia/Shanghai','YYYY-MM-DD') else null end,
++    'history',coalesce(payment->'history','[]'::jsonb)||jsonb_build_array(jsonb_build_object('at',stamp,'from',payment->>'status','to',p_target,'source','人工标记')));
++  end if;
++  if payment_idx is null then result_payments:=result_payments||jsonb_build_array(payment);
++  else result_payments:=jsonb_set(result_payments,array[payment_idx::text],payment); end if;
++  changed:=jsonb_build_object('payments',result_payments);
++ end if;
++ update public.app_data set data=jsonb_set(r.data,array['policies',idx::text],policy||changed),updated_at=stamp::timestamptz where id=r.id;
++ -- Change only status fields in matching contact policies; preserve all customer edits.
++ for contact_row in select value,ordinality-1 as n from jsonb_array_elements(c.data) with ordinality loop
++  for policy_row in select value,ordinality-1 as n from jsonb_array_elements(coalesce(contact_row.value->'policies','[]'::jsonb)) with ordinality where value->>'id'=p_policy_id loop
++   c.data:=jsonb_set(c.data,array[contact_row.n::text,'policies',policy_row.n::text],policy_row.value||changed);
++  end loop;
++ end loop;
++ update public.app_data set data=c.data,updated_at=stamp::timestamptz where id=c.id;
++ return jsonb_build_object('payments',result_payments,'renewed',coalesce(changed->'renewed',policy->'renewed','false'::jsonb));
++end; $$;
++revoke all on function public.mark_policy_installment_v1(text,text,text,text,jsonb,jsonb,jsonb) from public;
++grant execute on function public.mark_policy_installment_v1(text,text,text,text,jsonb,jsonb,jsonb) to anon,authenticated;
+diff --git a/supabase/migrations/20261121084214_contact_only_policy_marks.sql b/supabase/migrations/20261121084214_contact_only_policy_marks.sql
+new file mode 100644
+index 0000000..bcc7e0a
+--- /dev/null
++++ b/supabase/migrations/20261121084214_contact_only_policy_marks.sql
+@@ -0,0 +1,76 @@
++-- Preserve existing RLS; lock both records in the same order as imports.
++create or replace function public.mark_policy_installment_v1(
++ p_app_id text,p_policy_id text,p_kind text,p_date text,p_expected jsonb,p_seed jsonb,p_target jsonb
++) returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
++declare
++ r public.app_data%rowtype; c public.app_data%rowtype; policy jsonb; payment jsonb;
++ result_payments jsonb; changed jsonb; stamp text:=to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
++ idx integer; payment_idx integer; contact_row record; policy_row record; result jsonb;
++begin
++ if p_kind is null or p_kind not in ('contact','payment','renewal') then raise exception using errcode='22023',message='未知操作'; end if;
++ if p_kind <> 'renewal' and (p_date is null or p_date !~ '^\d{4}-\d{2}-\d{2}$') then raise exception using errcode='22023',message='缴费日期不正确'; end if;
++ if (p_kind='renewal' and jsonb_typeof(p_target) is distinct from 'boolean') or
++    (p_kind='payment' and (p_target is null or p_target not in ('"已缴费"'::jsonb,'"未缴费"'::jsonb))) then
++  raise exception using errcode='22023',message='目标状态不正确';
++ end if;
++ perform id from public.app_data where app_id=p_app_id and data_type in('contacts','renewal_v1') order by data_type for update;
++ select * into r from public.app_data where app_id=p_app_id and data_type='renewal_v1';
++ select * into c from public.app_data where app_id=p_app_id and data_type='contacts';
++ if r.id is null or c.id is null then raise exception using errcode='PT409',message='请刷新后重新同步保单'; end if;
++ select value,(ordinality-1)::integer into policy,idx from jsonb_array_elements(r.data->'policies') with ordinality where value->>'id'=p_policy_id;
++ if policy is null then
++  -- Contact-only manual policies are promoted on their first status mark.
++  select p.value||jsonb_build_object('applicantId',ct.value->>'id','payments',coalesce(p.value->'payments','[]'::jsonb)) into policy
++   from jsonb_array_elements(c.data) ct cross join lateral jsonb_array_elements(coalesce(ct.value->'policies','[]'::jsonb)) p
++   where p.value->>'id'=p_policy_id limit 1;
++  if policy is null then raise exception using errcode='PT409',message='保单已变化，请刷新后重试'; end if;
++  idx:=jsonb_array_length(r.data->'policies');
++ end if;
++ result_payments:=coalesce(policy->'payments','[]'::jsonb);
++ if p_kind='renewal' then
++  if coalesce(policy->'renewed','false'::jsonb) is distinct from p_expected and coalesce(policy->'renewed','false'::jsonb) is distinct from p_target then
++   raise exception using errcode='PT409',message='续保状态已变化，请刷新后重试';
++  end if;
++  changed:=jsonb_build_object('renewed',p_target);
++ else
++  select value,(ordinality-1)::integer into payment,payment_idx from jsonb_array_elements(result_payments) with ordinality where value->>'date'=p_date;
++  if payment is distinct from nullif(p_expected,'null'::jsonb) then
++   -- A retry of the same completed request is safe and creates no duplicate history.
++   if p_kind='payment' and payment->'status'=p_target and (payment->>'confirmedAt') is not null then
++    return jsonb_build_object('payments',result_payments,'renewed',coalesce(policy->'renewed','false'::jsonb));
++   end if;
++   if p_kind='contact' and (payment->>'contactedAt') is not null and
++      (payment-'contactedAt') is not distinct from (coalesce(nullif(p_expected,'null'::jsonb),p_seed)-'contactedAt') then
++    return jsonb_build_object('payments',result_payments,'renewed',coalesce(policy->'renewed','false'::jsonb));
++   end if;
++   raise exception using errcode='PT409',message='这期缴费记录已变化，请刷新后重试';
++  end if;
++  if payment is null then
++   if p_seed is null or jsonb_typeof(p_seed) <> 'object' or p_seed->>'date' is distinct from p_date or p_seed->>'amount' is null then
++    raise exception using errcode='22023',message='缺少该期缴费金额';
++   end if;
++   payment:=jsonb_build_object('date',p_date,'amount',p_seed->>'amount','status',coalesce(p_seed->>'status','未缴费')) ||
++     case when p_seed ? 'estimated' then jsonb_build_object('estimated',p_seed->'estimated') else '{}'::jsonb end ||
++     case when p_seed ? 'amountReference' then jsonb_build_object('amountReference',p_seed->'amountReference') else '{}'::jsonb end;
++  end if;
++  if p_kind='contact' then payment:=payment||jsonb_build_object('contactedAt',stamp);
++  else
++   payment:=payment||jsonb_build_object('status',p_target,'confirmedAt',stamp,'paidAt',case when p_target='"已缴费"'::jsonb then to_char(clock_timestamp() at time zone 'Asia/Shanghai','YYYY-MM-DD') else null end,
++    'history',coalesce(payment->'history','[]'::jsonb)||jsonb_build_array(jsonb_build_object('at',stamp,'from',payment->>'status','to',p_target,'source','人工标记')));
++  end if;
++  if payment_idx is null then result_payments:=result_payments||jsonb_build_array(payment);
++  else result_payments:=jsonb_set(result_payments,array[payment_idx::text],payment); end if;
++  changed:=jsonb_build_object('payments',result_payments);
++ end if;
++ update public.app_data set data=jsonb_set(r.data,array['policies',idx::text],policy||changed),updated_at=stamp::timestamptz where id=r.id;
++ -- Change only status fields in matching contact policies; preserve all customer edits.
++ for contact_row in select value,ordinality-1 as n from jsonb_array_elements(c.data) with ordinality loop
++  for policy_row in select value,ordinality-1 as n from jsonb_array_elements(coalesce(contact_row.value->'policies','[]'::jsonb)) with ordinality where value->>'id'=p_policy_id loop
++   c.data:=jsonb_set(c.data,array[contact_row.n::text,'policies',policy_row.n::text],policy_row.value||changed);
++  end loop;
++ end loop;
++ update public.app_data set data=c.data,updated_at=stamp::timestamptz where id=c.id;
++ return jsonb_build_object('payments',result_payments,'renewed',coalesce(changed->'renewed',policy->'renewed','false'::jsonb));
++end; $$;
++revoke all on function public.mark_policy_installment_v1(text,text,text,text,jsonb,jsonb,jsonb) from public;
++grant execute on function public.mark_policy_installment_v1(text,text,text,text,jsonb,jsonb,jsonb) to anon,authenticated;
+diff --git a/tests/fast-policy-marks.sql b/tests/fast-policy-marks.sql
+new file mode 100644
+index 0000000..85238fb
+--- /dev/null
++++ b/tests/fast-policy-marks.sql
+@@ -0,0 +1,39 @@
++-- Run as a single transaction. All fixtures and mutations are rolled back.
++begin;
++insert into public.app_data(app_id,data_type,data) values
++ ('test_fast_policy_marks','renewal_v1','{"policies":[{"id":"p1","premium":"12000","payments":[{"date":"2026-11-18","amount":"12000","status":"未缴费"}]},{"id":"p2","payments":[]}],"settings":{"enabled":false},"imports":[]}'),
++ ('test_fast_policy_marks','contacts','[{"id":"c1","remarkInfo":"keep customer notes","policies":[{"id":"p1","premium":"12000","payments":[{"date":"2026-11-18","amount":"12000","status":"未缴费"}]}]}]');
++set local role anon;
++do $$
++declare old_payment jsonb:='{"date":"2026-11-18","amount":"12000","status":"未缴费"}'; result jsonb; contacted jsonb; paid jsonb; before_data jsonb; after_data jsonb;
++begin
++ result:=public.mark_policy_installment_v1('test_fast_policy_marks','p1','contact','2026-11-18',old_payment,null,'"已缴费"');
++ contacted:=result->'payments'->0;
++ if contacted->>'contactedAt' is null or contacted->>'status'<>'未缴费' then raise exception 'contact mark failed'; end if;
++ result:=public.mark_policy_installment_v1('test_fast_policy_marks','p1','payment','2026-11-18',contacted,null,'"已缴费"');
++ paid:=result->'payments'->0;
++ if paid->>'confirmedAt' is null or paid->>'paidAt' is null or paid->>'status'<>'已缴费' or paid->>'contactedAt' is null then raise exception 'payment mark failed'; end if;
++ result:=public.mark_policy_installment_v1('test_fast_policy_marks','p1','payment','2026-11-18',contacted,null,'"已缴费"');
++ if jsonb_array_length(result->'payments'->0->'history')<>1 then raise exception 'retry duplicated history'; end if;
++ begin
++  perform public.mark_policy_installment_v1('test_fast_policy_marks','p1','payment','2026-11-18',old_payment,null,'"未缴费"');
++  raise exception 'stale update accepted';
++ exception when sqlstate 'PT409' then null; end;
++ select data into before_data from public.app_data where app_id='test_fast_policy_marks' and data_type='contacts';
++ if before_data->0->>'remarkInfo'<>'keep customer notes' or before_data->0->'policies'->0->'payments'->0 is distinct from paid then raise exception 'projection mismatch'; end if;
++ result:=public.mark_policy_installment_v1('test_fast_policy_marks','p1','payment','2026-11-18',paid,null,'"未缴费"');
++ if result->'payments'->0->>'paidAt' is not null or jsonb_array_length(result->'payments'->0->'history')<>2 then raise exception 'undo failed'; end if;
++ result:=public.mark_policy_installment_v1('test_fast_policy_marks','p2','contact','2027-01-01',null,'{"date":"2027-01-01","amount":"100","status":"未缴费","estimated":true}','"已缴费"');
++ if result->'payments'->0->>'amount'<>'100' then raise exception 'estimated installment failed'; end if;
++ result:=public.mark_policy_installment_v1('test_fast_policy_marks','p1','renewal',null,'false',null,'true');
++ if result->>'renewed'<>'true' then raise exception 'renewal failed'; end if;
++ select data into after_data from public.app_data where app_id='test_fast_policy_marks' and data_type='contacts';
++ if ((before_data->0->'policies'->0) -'payments') is distinct from ((after_data->0->'policies'->0) -'payments'-'renewed') then raise exception 'unrelated policy fields changed'; end if;
++end $$;
++-- A manually entered policy may only exist in contacts before the first mark.
++reset role;
++update app_data set data=data||'[{"id":"c2","policies":[{"id":"contact-only","premium":"100"}]}]'::jsonb where app_id='test_fast_policy_marks' and data_type='contacts';
++set local role anon;
++select public.mark_policy_installment_v1('test_fast_policy_marks','contact-only','contact','2026-11-01',null,'{"date":"2026-11-01","amount":"100","status":"未缴费"}','"已缴费"');
++reset role;
++rollback;

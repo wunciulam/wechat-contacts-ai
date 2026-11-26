@@ -1,0 +1,833 @@
+diff --git a/App.tsx b/App.tsx
+index 11c9d2d..336c5bc 100644
+--- a/App.tsx
++++ b/App.tsx
+@@ -1,4 +1,5 @@
+-import { migrate, projectContacts } from './services/renewal';
++import { rememberRenewalSnapshot } from './services/renewalCache';
++import { migrate, projectContacts, mergePolicies } from './services/renewal';
+ import RenewalWorkspace from './components/RenewalWorkspace';
+ import React, { useState, useEffect, useRef } from 'react';
+ import Sidebar from './components/Sidebar';
+@@ -193,9 +194,12 @@ const App: React.FC = () => {
+         if (policy.mingya && importedKeys.has(policy.mingya.key) && !policy.mingya.captureId) policy.mingya.captureId = captureId;
+       }
+       if (JSON.stringify(contactsRef.current) !== snapshot.localVersion) throw new Error('客户资料已变化，请重新预览后导入。');
+-      await commitContactImport(snapshot, plan.contacts);
+-      skipImportSyncRef.current = plan.contacts;
+-      setContacts(plan.contacts);
++      const renewalData={...snapshot.renewalData,policies:mergePolicies(snapshot.renewalData.policies,migrate(plan.contacts))};
++      const contacts=projectContacts(plan.contacts,renewalData.policies);
++      await commitContactImport(snapshot, contacts, renewalData);
++      rememberRenewalSnapshot(renewalData);
++      skipImportSyncRef.current = contacts;
++      setContacts(contacts);
+       setCurrentView('policies');
+     } finally { importSavingRef.current = false; }
+   };
+diff --git a/components/MingyaImportModal.tsx b/components/MingyaImportModal.tsx
+index 738150a..6b927de 100644
+--- a/components/MingyaImportModal.tsx
++++ b/components/MingyaImportModal.tsx
+@@ -45,7 +45,7 @@ export default function MingyaImportModal({open,initialPayload,onClose,onLoad,on
+         {!payload?<div className="mingya-file"><Upload size={28}/><p>选择明亚插件导出的原始 JSON</p><button className="mingya-primary" disabled={busy||!snapshot} onClick={()=>input.current?.click()}>选择文件</button></div>:plan&&<>
+           {!payload.status.complete&&<p className="mingya-warning">这是部分采集结果，仅合并已取得的信息。</p>}
+           <dl className="mingya-stats"><div><dt>新增客户</dt><dd>{plan.addedContacts}</dd></div><div><dt>补充客户</dt><dd>{plan.updatedContacts}</dd></div><div><dt>新增保单</dt><dd>{plan.addedPolicies}</dd></div><div><dt>补充 / 更新保单</dt><dd>{plan.updatedPolicies}</dd></div></dl>
+-          <div className="mingya-rule"><label htmlFor="mingya-mode">已有保单</label><select id="mingya-mode" value={mode} onChange={e=>setMode(e.target.value as MergeMode)}><option value="fill">只补充空缺字段</option><option value="source">用明亚数据更新保单字段</option></select></div>
++          <div className="mingya-rule"><label htmlFor="mingya-mode">已有保单</label><select id="mingya-mode" value={mode} onChange={e=>setMode(e.target.value as MergeMode)}><option value="fill">保留人工修改，更新采集字段</option><option value="source">用明亚数据更新保单字段</option></select></div>
+           <p className="mingya-note">客户按投保人归属。微信备注、标签和跟进记录保留；同号续保按生效日期区分。</p>
+           {plan.issues.length>0&&<section className="mingya-issues"><h3>需要核对的客户 · {plan.issues.length}</h3>{plan.issues.map(issue=><div key={issue.key} className="mingya-issue"><div><strong>{issue.name||'未提供姓名'}</strong><p>{issue.reason}</p></div><label><span className="mingya-sr">{issue.name}的归属</span><select value={resolutions[issue.key]||''} onChange={e=>setResolutions({...resolutions,[issue.key]:e.target.value})}><option value="">请选择处理方式</option>{issue.allowNew&&issue.candidates.map(c=><option key={c.id} value={c.id}>合并到 {c.name}{c.phone?` · ${c.phone}`:''}</option>)}{issue.allowNew&&<option value="new">建立独立客户</option>}<option value="skip">本次跳过</option></select></label></div>)}</section>}
+           <details><summary>保单明细 · {plan.rows.length}{plan.duplicateRows?`（另有 ${plan.duplicateRows} 条重复已忽略）`:''}</summary><input aria-label="搜索导入保单" placeholder="搜索客户、保单号或产品" value={query} onChange={e=>setQuery(e.target.value)}/><div className="mingya-table"><table><thead><tr><th>投保人</th><th>保单</th><th>处理结果</th><th>归属客户</th></tr></thead><tbody>{rows.map(r=><tr key={r.key}><td>{r.name}</td><td><span>{r.product}</span><small>{r.number}</small></td><td>{r.action}</td><td>{r.contact||'—'}</td></tr>)}</tbody></table></div></details>
+diff --git a/components/MingyaPolicyDetailModal.tsx b/components/MingyaPolicyDetailModal.tsx
+index 3b6788c..58808b9 100644
+--- a/components/MingyaPolicyDetailModal.tsx
++++ b/components/MingyaPolicyDetailModal.tsx
+@@ -10,11 +10,12 @@ export default function MingyaPolicyDetailModal({policy,onClose}:{policy:Policy|
+   if(!policy?.mingya)return null;
+   const source=policy.mingya;
+   const people=(list:MingyaPerson[])=>list.map((p,i)=><div key={i} className="mingya-person"><strong>{p.name||'未提供姓名'}</strong><dl>{[['证件号',p.idCard],['手机号',p.phone],['生日',p.birthday],['地址',p.address],['受益比例',p.share]].filter(([,v])=>v).map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl></div>);
+-  const basic=[['保单号',policy.policyNumber],['保险公司',policy.company],['状态',policy.status],['保费',`${currencyLabel(source.currency)} ${policy.premium}`],['生效日期',policy.effectiveDate],['保障结束日期',source.endDate],['下次缴费日期',source.nextPayDate],['下次保费',source.nextPremium?`${currencyLabel(source.currency)} ${source.nextPremium}`:'']];
++  const basic=[['保单号',policy.policyNumber],['保险公司',policy.company],['状态',policy.status],['单期保费',`${currencyLabel(source.currency)} ${source.periodicPremium||policy.premium}`],['缴费期总保费',source.termTotalPremium?`${currencyLabel(source.currency)} ${source.termTotalPremium}`:''],['生效日期',policy.effectiveDate],['保障结束日期',source.endDate],['下次缴费日期',source.nextPayDate],[source.nextPremiumIsReference?'下期参考金额':'下期应缴保费',source.nextPremium?`${currencyLabel(source.currency)} ${source.nextPremium}`:''],['上期实缴日期',source.lastPaidDate||''],['上期实缴保费',source.lastPaidPremium?`${currencyLabel(source.currency)} ${source.lastPaidPremium}`:'']];
+   async function original(){setBusy(true);setError('');try{const payload=await downloadMingyaCapture(source.captureId!);const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`明亚原始采集_${source.capturedAt.slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+   return <div className="mingya-overlay"><div className="mingya-dialog" role="dialog" aria-modal="true" aria-labelledby="mingya-detail-title" tabIndex={-1} ref={dialog}>
+     <header><h2 id="mingya-detail-title">{policy.productName}</h2><button onClick={onClose} aria-label="关闭保单详情"><X size={20}/></button></header>
+     <div className="mingya-body"><dl className="mingya-info">{basic.filter(([,v])=>v).map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
++      {source.nextPaymentNote&&<p className="mingya-note">{source.nextPaymentNote}</p>}
+       <details open><summary>投保人</summary>{people([source.applicant])}</details>
+       {source.insureds.length>0&&<details><summary>被保人 · {source.insureds.length}</summary>{people(source.insureds)}</details>}
+       {source.beneficiaries.length>0&&<details><summary>受益人 · {source.beneficiaries.length}</summary>{people(source.beneficiaries)}</details>}
+diff --git a/components/PolicyDashboard.tsx b/components/PolicyDashboard.tsx
+index c1a9c50..74ff647 100644
+--- a/components/PolicyDashboard.tsx
++++ b/components/PolicyDashboard.tsx
+@@ -161,7 +161,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
+                   </div>
+                   <div className="flex items-center gap-6 md:justify-end border-t md:border-t-0 border-gray-100 pt-3 md:pt-0">
+                     <div className="text-right"><div className="text-xs text-gray-500 font-medium">保单数量</div><div className="text-lg font-medium text-gray-700">{count} <span className="text-xs font-normal text-gray-500">份</span></div></div>
+-                    <div className="text-right pr-4 border-r border-gray-100"><div className="text-xs text-gray-500 font-medium">总保费</div><div className="text-lg font-medium text-gray-900 tabular-nums">{totalPremium}</div></div>
++                    <div className="text-right pr-4 border-r border-gray-100"><div className="text-xs text-gray-500 font-medium">单期保费合计</div><div className="text-lg font-medium text-gray-900 tabular-nums">{totalPremium}</div></div>
+                     <ChevronDown size={20} className={`text-gray-500 transition-transform ${isExpanded ? 'rotate-180 text-gray-900' : ''}`} />
+                   </div>
+                 </div>
+diff --git a/components/PolicyDetail.tsx b/components/PolicyDetail.tsx
+index f2f2e23..0041588 100644
+--- a/components/PolicyDetail.tsx
++++ b/components/PolicyDetail.tsx
+@@ -36,7 +36,7 @@ export default function PolicyDetail({
+     ["policyNumber", "保单号"],
+     ["applicationNumber", "投保单号"],
+     ["status", "保单状态"],
+-    ["premium", "保费"],
++    ["premium", "单期保费"],
+ 
+     ["effectiveDate", "生效日期", "date"],
+     ["paymentFrequency", "缴费方式"],
+@@ -153,6 +153,7 @@ export default function PolicyDetail({
+             <thead className="bg-gray-50 text-xs text-gray-500">
+               <tr>
+                 <th className="p-3 text-left">应缴日期</th>
++                <th className="p-3 text-left">实缴日期</th>
+                 <th className="p-3 text-right">金额</th>
+                 <th className="p-3 text-left">缴费状态</th>
+                 <th className="p-3 text-right">操作</th>
+@@ -165,6 +166,7 @@ export default function PolicyDetail({
+                   <React.Fragment key={q.date}>
+                     <tr className="border-b border-gray-100">
+                       <td className="p-3 whitespace-nowrap">{q.date}</td>
++                      <td className="p-3 whitespace-nowrap">{q.paidAt || '—'}</td>
+                       <td className="p-3 whitespace-nowrap text-right tabular-nums">{formatMoney(q.amount, policy.mingya?.currency)}</td>
+                       <td className="p-3">{q.status}</td>
+                       <td className="p-3 text-right">
+@@ -179,7 +181,7 @@ export default function PolicyDetail({
+                     </tr>
+                     {!!q.history?.length && (
+                       <tr>
+-                        <td colSpan={4}>
++                        <td colSpan={5}>
+                           <details className="p-3 text-xs text-gray-500">
+                             <summary>查看状态变更</summary>
+                             {q.history.map((h, i) => (
+diff --git a/components/PolicyPaymentSummary.tsx b/components/PolicyPaymentSummary.tsx
+index 5e23514..0c79fda 100644
+--- a/components/PolicyPaymentSummary.tsx
++++ b/components/PolicyPaymentSummary.tsx
+@@ -32,6 +32,7 @@ export default function PolicyPaymentSummary({ policy, amount = true }: { policy
+   if (!next) return <span className="text-sm text-gray-500">{paymentStatus(policy)}</span>;
+   return <div className="space-y-2">
+     <PaymentDate date={next.date} estimated={next.estimated} />
+-    {amount && <div className="flex items-baseline gap-2 text-sm tabular-nums"><span className="text-xs text-gray-500">本期应缴</span>{formatMoney(next.amount, policy.mingya?.currency)}</div>}
++    {next.amountReference&&<span className="text-xs text-gray-500">应缴金额尚未生成</span>}
++    {amount && <div className="flex items-baseline gap-2 text-sm tabular-nums"><span className="text-xs text-gray-500">{next.amountReference?'下期参考金额':'本期应缴'}</span>{formatMoney(next.amount, policy.mingya?.currency)}</div>}
+   </div>;
+ }
+diff --git a/components/RenewalWorkspace.tsx b/components/RenewalWorkspace.tsx
+index 9e7c826..469b6b9 100644
+--- a/components/RenewalWorkspace.tsx
++++ b/components/RenewalWorkspace.tsx
+@@ -518,7 +518,7 @@ export default function RenewalWorkspace({
+                         <div className="min-w-28"><span className="block text-xs text-gray-400">投保人</span><strong>{p.applicant || "待补充"}</strong></div>
+                         <div className="min-w-28"><span className="block text-xs text-gray-400">被保人</span><strong>{p.insured || "待补充"}</strong></div>
+                         <div className="flex-1 min-w-56"><span className="block text-xs text-gray-400">保单</span><strong>{p.productName}</strong><span className="ml-2 text-xs text-gray-500">{p.policyNumber}</span></div>
+-                        <div className="min-w-36"><span className="block text-xs text-gray-400">下次缴费</span><PolicyPaymentSummary policy={p} amount={false}/></div><div className="flex flex-nowrap items-start gap-6 shrink-0"><div><span className="block text-xs text-gray-400">本期应缴</span>{formatMoney(nextPayment(p)?.amount, p.mingya?.currency)}</div><div><span className="block text-xs text-gray-400">剩余期数</span>{remainingLabel(p)}</div></div>
++                        <div className="min-w-36"><span className="block text-xs text-gray-400">下次缴费</span><PolicyPaymentSummary policy={p} amount={false}/></div><div className="flex flex-nowrap items-start gap-6 shrink-0"><div><span className="block text-xs text-gray-400">{nextPayment(p)?.amountReference?'下期参考金额':'本期应缴'}</span>{formatMoney(nextPayment(p)?.amount, p.mingya?.currency)}</div><div><span className="block text-xs text-gray-400">剩余期数</span>{remainingLabel(p)}</div></div>
+                       </div>
+                     </button>
+                   ))}
+@@ -534,7 +534,7 @@ export default function RenewalWorkspace({
+                   </button>
+                   <PaymentDate date={t.date} estimated={t.estimated}/>
+                   <dl className="my-3 grid grid-cols-2 gap-3 text-sm">
+-                    <div><dt className="text-xs text-gray-500">本期应缴</dt><dd className="mt-1 tabular-nums">{formatMoney(t.amount, t.policy.mingya?.currency)}</dd></div>
++                    <div><dt className="text-xs text-gray-500">{t.type==='payment'&&nextPayment(t.policy)?.amountReference?'下期参考金额':'本期应缴'}</dt><dd className="mt-1 tabular-nums">{formatMoney(t.amount, t.policy.mingya?.currency)}</dd></div>
+                     <div><dt className="text-xs text-gray-500">剩余期数</dt><dd className="mt-1">{remainingLabel(t.policy)}</dd></div>
+                   </dl>
+                   <div className="flex flex-wrap justify-end gap-2">
+diff --git a/migrations/20261121_mingya_atomic_import.sql b/migrations/20261121_mingya_atomic_import.sql
+new file mode 100644
+index 0000000..60508db
+--- /dev/null
++++ b/migrations/20261121_mingya_atomic_import.sql
+@@ -0,0 +1,28 @@
++-- Both application records must still have the revisions shown in the preview.
++create or replace function public.commit_mingya_import_v2(
++  p_app_id text, p_contact_id uuid, p_contact_revision timestamptz,
++  p_renewal_revision timestamptz, p_contacts jsonb, p_renewal jsonb
++) returns timestamptz
++language plpgsql security invoker set search_path = public, pg_temp
++as $$
++declare c public.app_data%rowtype; r public.app_data%rowtype; stamp timestamptz := clock_timestamp();
++begin
++  if jsonb_typeof(p_contacts) <> 'array' or jsonb_typeof(p_renewal) <> 'object'
++     or jsonb_typeof(p_renewal->'policies') <> 'array' then
++    raise exception using errcode='22023',message='导入数据格式不正确';
++  end if;
++  perform id from public.app_data where app_id=p_app_id and data_type in ('contacts','renewal_v1') order by data_type for update;
++  select * into c from public.app_data where app_id=p_app_id and data_type='contacts';
++  select * into r from public.app_data where app_id=p_app_id and data_type='renewal_v1';
++  if c.id is null or c.id <> p_contact_id or c.updated_at is distinct from p_contact_revision
++    or r.updated_at is distinct from p_renewal_revision then
++    raise exception using errcode='PT409',message='客户或续期记录已变化，请重新预览';
++  end if;
++  update public.app_data set data=p_contacts,updated_at=stamp where id=c.id;
++  insert into public.app_data(app_id,data_type,data,updated_at) values(p_app_id,'renewal_v1',p_renewal,stamp)
++    on conflict(app_id,data_type) do update set data=excluded.data,updated_at=excluded.updated_at;
++  return stamp;
++end;
++$$;
++revoke all on function public.commit_mingya_import_v2(text,uuid,timestamptz,timestamptz,jsonb,jsonb) from public;
++grant execute on function public.commit_mingya_import_v2(text,uuid,timestamptz,timestamptz,jsonb,jsonb) to anon,authenticated;
+diff --git a/services/mingyaFinancial.ts b/services/mingyaFinancial.ts
+new file mode 100644
+index 0000000..28a4020
+--- /dev/null
++++ b/services/mingyaFinancial.ts
+@@ -0,0 +1,48 @@
++/** Financial values are taken from policyInfo / riskList, never the list totalFee. */
++export interface MingyaFinancial {
++  mappingVersion: 2;
++  periodicPremium: string;
++  termTotalPremium: string;
++  premiumBasis: 'detail.fee' | 'detail.riskList.prem' | 'missing';
++  nextPayDate: string;
++  nextPremium: string;
++  nextPremiumIsReference: boolean;
++  nextPaymentNote: string;
++  lastPaidDate: string;
++  lastPaidPremium: string;
++  paymentFrequency: string;
++  paymentEndDate: string;
++}
++const text=(v:unknown)=>v==null?'':String(v).trim();
++export function money(v:unknown):string {
++  const value=text(v).replace(/[,，]/g,'');
++  if(!/^\d+(\.\d+)?$/.test(value)||!Number.isFinite(Number(value)))return '';
++  return String(Number(value));
++}
++export function financialDate(v:unknown):string {
++  const s=text(v), match=/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(s);
++  if(!match)return '';
++  const date=`${match[1]}-${match[2].padStart(2,'0')}-${match[3].padStart(2,'0')}`;
++  const parsed=new Date(date+'T00:00:00Z');return Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===date?date:'';
++}
++function sum(values:string[]):string {return String(values.reduce((n,v)=>n+Math.round(Number(v)*10000),0)/10000);}
++export function financialFromDetail(detail:Record<string,any>|null|undefined):MingyaFinancial {
++  const p=detail||{},risks=(Array.isArray(p.riskList)?p.riskList:[]).filter(r=>r&&typeof r==='object');
++  const active=risks.filter(r=>r.state==='01');const relevant=active.length?active:risks;
++  const fee=money(p.fee);const riskAmounts=relevant.map(r=>money(r.prem));
++  const fallback=fee===''&&riskAmounts.length>0&&riskAmounts.every(v=>v!=='')?sum(riskAmounts):'';
++  const frequencies=[...new Set(relevant.map(r=>text(r.payType)).filter(Boolean))];
++  const frequency=frequencies.length===1?({Y:'期交-年',M:'期交-月'} as Record<string,string>)[frequencies[0]]||'':'';
++  const ends=[...new Set(relevant.map(r=>financialDate(r.payEndDate)).filter(Boolean))];
++  // A policy-level paid fact is valid only when all positive-premium risks agree.
++  const payable=relevant.filter(r=>Number(money(r.prem))>0);
++  const paidDates=payable.map(r=>financialDate(r.lastPayDate));
++  const paidAmounts=payable.map(r=>money(r.lastPrem));
++  const paid=payable.length>0&&paidDates.every(d=>d&&d===paidDates[0])&&paidAmounts.every(a=>a!=='');
++  const note=text(p.nextContent);
++  return {mappingVersion:2,periodicPremium:fee!==''?fee:fallback,termTotalPremium:money(p.totalFee),
++    premiumBasis:fee!==''?'detail.fee':fallback!==''?'detail.riskList.prem':'missing',
++    nextPayDate:financialDate(p.nextPayDate),nextPremium:money(p.nextPrem),nextPremiumIsReference:!!note,
++    nextPaymentNote:note,lastPaidDate:paid?paidDates[0]:'',lastPaidPremium:paid?sum(paidAmounts):'',
++    paymentFrequency:frequency,paymentEndDate:ends.length===1?ends[0]:''};
++}
+diff --git a/services/mingyaImport.ts b/services/mingyaImport.ts
+index b8eb518..29042c0 100644
+--- a/services/mingyaImport.ts
++++ b/services/mingyaImport.ts
+@@ -1,3 +1,5 @@
++import { financialFromDetail, money } from './mingyaFinancial';
++import { reconcileMingyaPayments } from './mingyaPayments';
+ import type { Contact, Policy, MingyaPolicyData, MingyaPerson } from '../types';
+ 
+ type Json = Record<string, any>;
+@@ -24,14 +26,14 @@ const policyKey = (p: Policy) => normalizeId(p.policyNumber)+'|'+companyKey(p.co
+ const uuid = () => crypto.randomUUID();
+ const has = (v: unknown) => v !== undefined && v !== null && text(v) !== '';
+ const person = (input: Json = {}): MingyaPerson => { const p=input||{};return ({ name:text(p.name),idCard:readable(p.cardNo),phone:readable(p.mobile),birthday:text(p.birthday).slice(0,10),sex:text(p.sex),address:text(p.homeAddress||p.postAddress),share:text(p.bnfRate),order:text(p.bnfOrder) }); };
+-const period = (n: unknown, unit: unknown) => {const s=text(n),u=text(unit);return s ? `${s}${u==='Y'?'年':u==='M'?'月':u==='D'?'天':u?`（单位代码 ${u}）`:''}` : '';};
++const period = (n: unknown, unit: unknown) => {const s=text(n),u=text(unit);return s ? `${u==='A'?'至':''}${s}${u==='Y'?'年':u==='M'?'月':u==='D'?'天':u==='A'?'周岁':u?`（单位代码 ${u}）`:''}` : '';};
+ function compact(source: Json, capturedAt: string, key: string): MingyaPolicyData {
+-  return { key,capturedAt,policyId:text(source.policyId),policyIndexId:text(source.policyIndexId),companyId:text(source.insComId),
++  return { ...financialFromDetail(source),key,capturedAt,policyId:text(source.policyId),policyIndexId:text(source.policyIndexId),companyId:text(source.insComId),
+     currency:text(source.currency),rawStatus:text(source.policyState),endDate:text(source.guaranteeEndDate||source.endDate).slice(0,10),
+-    nextPayDate:text(source.nextPayDate).slice(0,10),nextPremium:text(source.nextPrem),applicant:person(source.appnt),
++    applicant:person(source.appnt),
+     insureds:(source.insureds||[]).map(person),beneficiaries:(source.beneficiaries||[]).map(person),
+     risks:(source.riskList||[]).map((r:Json)=>({name:text(r.risk?.riskName||r.riskName),premium:text(r.prem),coverage:text(r.amntDesc||r.amnt),
+-      main:r.mainRiskFlag===true||['1','Y'].includes(text(r.mainRiskFlag)),paymentPeriod:period(r.payPeriod,r.payPeriodUnit),insurancePeriod:period(r.insurancePeriod,r.insurancePeriodUnit),
++      main:r.mainRiskFlag===true||['01','1','Y'].includes(text(r.mainRiskFlag)),paymentPeriod:period(r.payPeriod,r.payPeriodUnit),insurancePeriod:period(r.insurancePeriod,r.insurancePeriodUnit),
+       effectiveDate:text(r.validDate).slice(0,10),endDate:text(r.endDate).slice(0,10),state:text(r.state),insureds:(r.insureds||[]).map((p:Json)=>text(p.name)).filter(Boolean)})) };
+ }
+ export function parseMingyaPayload(input: unknown): MingyaPayload {
+@@ -52,12 +54,12 @@ export function normalizeMingya(payload: MingyaPayload): {items: IncomingPolicy[
+     if(seen.has(key)||seen.has(deDupe)){duplicates++;continue;}seen.add(key);seen.add(deDupe);
+     const applicant=person(p.appnt);applicant.name ||= text(p.appntName);
+     applicant.idCard ||= readable(p.appntCardNo);applicant.phone ||= readable(p.appntMobile);
+-    const source=compact(p,text(payload.status.finishedAt),key);
++    const source=compact(r.detail||{},text(payload.status.finishedAt),key);
+     const policy:Policy={id:`mingya-${encodeURIComponent(key)}`,policyNumber:number,productName:text(p.productName),company,
+-      premium:text(p.totalFee??p.fee),effectiveDate:dateKey(p.validDate||p.effectDate),
++      premium:source.periodicPremium||'',effectiveDate:dateKey(p.validDate||p.effectDate),
+       status:({'16':'正式保单','17':'终止保单'} as Record<string,string>)[text(p.policyState)]||`明亚状态（${text(p.policyState)||'未知'}）`,
+       applicant:applicant.name,insured:text(p.insuredName)||source.insureds.map(x=>x.name).join('、'),
+-      coverage:+p.amount===-1?'详见条款':text(p.amount),paymentYears:[...new Set(source.risks.map(x=>x.paymentPeriod).filter(Boolean))].join('、'),mingya:source};
++      coverage:+p.amount===-1?'详见条款':text(p.amount),paymentYears:[...new Set(source.risks.map(x=>x.paymentPeriod).filter(Boolean))].join('、'),paymentFrequency:source.paymentFrequency||'',paymentEndDate:source.paymentEndDate||'',mingya:source};
+     const personKey=identity(applicant.idCard)?`id:${identity(applicant.idCard)}`:phoneKey(applicant.phone)?`phone:${phoneKey(applicant.phone)}:${nameKey(applicant.name)}`:`name:${nameKey(applicant.name)}`;
+     items.push({key,personKey,policy,applicant,hasDetail:!!r.detail});
+   }
+@@ -90,7 +92,8 @@ export function planMingyaImport(existing: Contact[], payload:MingyaPayload, res
+     if(selection==='skip'){plan.skippedPolicies++;row.action='跳过';continue;}
+     const matches=contacts.flatMap(c=>(c.policies||[]).filter(x=>policyMatches(x,incoming)&&!ambiguousTerm(x,incoming)).map(x=>({contact:c,policy:x})));
+     let owner:Contact|undefined,issue='';let candidates:Contact[]=[];let allowNew=true;
+-    if(!p.policyNumber||!p.company||!a.name){issue='缺少保单号、保险公司或投保人';allowNew=false;}
++    if(!incoming.hasDetail){issue='保单详情未取得，请重新采集';allowNew=false;}
++    else if(!p.policyNumber||!p.company||!a.name){issue='缺少保单号、保险公司或投保人';allowNew=false;}
+     else if(matches.length>1){issue='这份保单已存在于多条记录，请先核对现有保单';candidates=matches.map(x=>x.contact);allowNew=false;}
+     else if(matches.length===1){
+       owner=matches[0].contact;allowNew=false;
+@@ -128,16 +131,20 @@ export function planMingyaImport(existing: Contact[], payload:MingyaPayload, res
+     }
+     if(matches.length===1){
+       const old=matches[0].policy;const merged={...old};
+-      for(const key of ['policyNumber','productName','company','premium','effectiveDate','status','applicant','insured','paymentYears','insuranceType','coverage'] as const){
++      for(const key of ['policyNumber','productName','company','premium','effectiveDate','status','applicant','insured','paymentYears','paymentFrequency','paymentEndDate','insuranceType','coverage'] as const){
+         const value=p[key];if(has(old[key])&&has(value)&&text(old[key])!==text(value)){plan.fieldConflicts++;plan.conflicts.push({number:p.policyNumber,field:key,existing:text(old[key]),incoming:text(value)});}
+-        if(has(value)&&(mode==='source'||!has(old[key])))merged[key]=value;
++        const fixOldPremium=key==='premium'&&old.mingya&&old.mingya.mappingVersion!==2&&money(old.premium)!==''&&money(old.premium)===p.mingya?.termTotalPremium;
++        const sourceField=({premium:'periodicPremium',paymentFrequency:'paymentFrequency',paymentEndDate:'paymentEndDate'} as Record<string,string>)[key];
++        const sourceOwned=old.mingya?.mappingVersion===2&&sourceField&&text(old[key])===text((old.mingya as any)[sourceField]);
++        if(has(value)&&(mode==='source'||!has(old[key])||fixOldPremium||sourceOwned))merged[key]=value;
+       }
+       merged.mingya=p.mingya;
++      (merged as any).payments=reconcileMingyaPayments((old as any).payments||[],merged);
+       // A new capture time alone does not create a changed policy on every run.
+       if(old.mingya&&JSON.stringify({...old.mingya,capturedAt:'',captureId:undefined})===JSON.stringify({...p.mingya,capturedAt:'',captureId:undefined}))merged.mingya=old.mingya;
+       if(JSON.stringify(old)!==JSON.stringify(merged)){owner.policies=(owner.policies||[]).map(x=>x.id===old.id?merged:x);plan.updatedPolicies++;row.action='补充 / 更新';}
+       else{plan.unchangedPolicies++;row.action='已存在';}
+-    }else{owner.policies=[...(owner.policies||[]),p];plan.addedPolicies++;row.action='新增保单';}
++    }else{(p as any).payments=reconcileMingyaPayments([],p);owner.policies=[...(owner.policies||[]),p];plan.addedPolicies++;row.action='新增保单';}
+     if(p.productName)owner.dealProducts=[...new Set([...(owner.dealProducts||[]),p.productName])];
+     owner.tags=[...new Set([...(owner.tags||[]),'成交客户'])];
+     if(before!==JSON.stringify(owner)&&!created.has(owner.id))touched.add(owner.id);
+diff --git a/services/mingyaPayments.ts b/services/mingyaPayments.ts
+new file mode 100644
+index 0000000..c02fc6b
+--- /dev/null
++++ b/services/mingyaPayments.ts
+@@ -0,0 +1,36 @@
++import type {Policy} from '../types';
++import type {Payment} from './renewal';
++import {financialDate,money} from './mingyaFinancial.ts';
++const manualAfter=(payment:Payment,capturedAt:string)=>Math.max(Date.parse(payment.confirmedAt||'')||0,...(payment.history||[]).filter(h=>!(h.source||'').startsWith('明亚')).map(h=>Date.parse(h.at)||0))>(Date.parse(capturedAt)||0);
++function contractualDate(policy:Policy,actual:string){
++  const anchor=financialDate(policy.effectiveDate);if(!anchor||actual<anchor)return false;
++  const frequency=policy.paymentFrequency||policy.mingya?.paymentFrequency||'';
++  const months=/半年/.test(frequency)?6:/季/.test(frequency)?3:/月/.test(frequency)?1:/年/.test(frequency)?12:0;
++  if(!months)return actual===anchor;
++  const [y,m,d]=anchor.split('-').map(Number),[ay,am]=actual.split('-').map(Number),delta=(ay-y)*12+am-m;
++  if(delta<0||delta%months)return false;
++  const target=new Date(Date.UTC(y,m-1+delta,1)),last=new Date(Date.UTC(target.getUTCFullYear(),target.getUTCMonth()+1,0)).getUTCDate();target.setUTCDate(Math.min(d,last));
++  return target.toISOString().slice(0,10)===actual;
++}
++export function reconcileMingyaPayments(payments:Payment[],policy:Policy):Payment[]{
++  const result=structuredClone(payments||[]),source=policy.mingya;
++  if(source?.mappingVersion!==2||!source.lastPaidDate||money(source.lastPaidPremium)==='')return result;
++  const index=result.findIndex(p=>p.date===source.lastPaidDate);
++  if(index<0&&!contractualDate(policy,source.lastPaidDate))return result;
++  const before=index>=0?result[index]:undefined;
++  if(before&&manualAfter(before,source.capturedAt))return result;
++  const amount=money(source.lastPaidPremium),already=before?.status==='已缴费'&&money(before.amount)===amount&&before.paidAt===source.lastPaidDate;
++  if(already)return result;
++  const updated:Payment={...before,date:source.lastPaidDate,amount,status:'已缴费',paidAt:source.lastPaidDate,
++    source:'明亚保单详情',history:[...(before?.history||[]),{at:source.capturedAt,from:before?.status||'未记录',to:'已缴费',source:'明亚保单详情·上期实缴'}]};
++  if(index>=0)result[index]=updated;else result.push(updated);
++  return result.sort((a,b)=>a.date.localeCompare(b.date));
++}
++export function detailNextPayment(policy:Policy,payments:Payment[]):Payment|undefined{
++  const source=policy.mingya;if(source?.mappingVersion!==2||!financialDate(source.nextPayDate))return;
++  if((payments||[]).some(p=>p.status==='未缴费'&&p.date<=source.nextPayDate&&manualAfter(p,source.capturedAt)))return;
++  const paid=(payments||[]).find(p=>p.date>=source.nextPayDate&&p.status==='已缴费'&&manualAfter(p,source.capturedAt));
++  if(paid)return;
++  return {date:source.nextPayDate,amount:source.nextPremium,status:source.nextPremiumIsReference?'待确认':'未缴费',
++    amountReference:source.nextPremiumIsReference,source:'明亚保单详情',sourceCapturedAt:source.capturedAt};
++}
+diff --git a/services/mingyaRepair.ts b/services/mingyaRepair.ts
+new file mode 100644
+index 0000000..3462560
+--- /dev/null
++++ b/services/mingyaRepair.ts
+@@ -0,0 +1,29 @@
++import type {Contact,Policy} from '../types';
++import type {MingyaPayload} from './mingyaImport';
++import {normalizeMingya,canonicalContactData} from './mingyaImport';
++import {money} from './mingyaFinancial';
++import {reconcileMingyaPayments} from './mingyaPayments';
++import type {RenewalData} from './renewal';
++export function repairCapturedPolicies(contacts:Contact[],renewal:RenewalData,payload:MingyaPayload,captureId:string){
++  const lookup=new Map(payload.records.flatMap(record=>normalizeMingya({...payload,records:[record]}).items).map(item=>[item.key,item.policy]));
++  let premiums=0,paidUpdates=0,metadata=0;
++  const rows:{number:string;beforePremium:string;afterPremium:string;nextDate:string;paidDate:string}[]=[];
++  const repair=(original:Policy):Policy=>{
++    if(!original.mingya||original.mingya.captureId!==captureId||original.mingya.mappingVersion===2)return structuredClone(original);
++    const incoming=lookup.get(original.mingya.key);if(!incoming?.mingya||incoming.policyNumber!==original.policyNumber)return structuredClone(original);
++    const p=structuredClone(original),oldPremium=p.premium;
++    const sameOldTotal=money(p.premium)!==''&&money(p.premium)===incoming.mingya.termTotalPremium;
++    if(incoming.mingya.periodicPremium!==''&&(!p.premium||sameOldTotal))p.premium=incoming.mingya.periodicPremium!;
++    if(money(p.premium)!==money(oldPremium))premiums++;
++    p.paymentFrequency ||= incoming.paymentFrequency;p.paymentEndDate ||= incoming.paymentEndDate;
++    p.mingya={...incoming.mingya,captureId};
++    const previous=(p as any).payments||[];const updated=reconcileMingyaPayments(previous,p);
++    if(canonicalContactData(previous)!==canonicalContactData(updated))paidUpdates++;
++    (p as any).payments=updated;metadata++;
++    rows.push({number:p.policyNumber,beforePremium:oldPremium,afterPremium:p.premium,nextDate:p.mingya.nextPayDate,paidDate:p.mingya.lastPaidDate||''});
++    return p;
++  };
++  const resultContacts=contacts.map(c=>({...structuredClone(c),policies:(c.policies||[]).map(repair)}));
++  const resultRenewal={...structuredClone(renewal),policies:renewal.policies.map(p=>repair(p) as typeof p)};
++  return {contacts:resultContacts,renewal:resultRenewal,counts:{premiums,paidUpdates,metadata},rows};
++}
+diff --git a/services/renewal.ts b/services/renewal.ts
+index f5a7dff..99aec1d 100644
+--- a/services/renewal.ts
++++ b/services/renewal.ts
+@@ -1,3 +1,4 @@
++import { detailNextPayment, reconcileMingyaPayments } from './mingyaPayments.ts';
+ import * as XLSX from "xlsx";
+ import type { Contact, Policy } from "../types";
+ export interface Payment {
+@@ -6,6 +7,10 @@ export interface Payment {
+   status: string;
+   confirmedAt?: string;
+   estimated?: boolean;
++  paidAt?: string;
++  amountReference?: boolean;
++  source?: string;
++  sourceCapturedAt?: string;
+   contactedAt?: string;
+   history?: { at: string; from: string; to: string; source: string }[];
+ }
+@@ -157,27 +162,15 @@ export function mergePolicies(old: ManagedPolicy[], incoming: ManagedPolicy[]) {
+       map.set(key(p), structuredClone(p));
+       continue;
+     }
+-    const payments = new Map(prev.payments.map((x) => [x.date, x]));
++    const payments = new Map((prev.payments||[]).map((x) => [x.date, x]));
+     for (const x of p.payments) {
+-      const before = payments.get(x.date);
+-      payments.set(x.date, {
+-        ...before,
+-        ...x,
+-        contactedAt: before?.contactedAt,
+-        history: [
+-          ...(before?.history || []),
+-          ...(before && before.status !== x.status
+-            ? [
+-                {
+-                  at: new Date().toISOString(),
+-                  from: before.status,
+-                  to: x.status,
+-                  source: p.source || "导入",
+-                },
+-              ]
+-            : []),
+-        ],
+-      });
++      const before=payments.get(x.date);
++      const histories=[...(before?.history||[]),...(x.history||[])];
++      if(before&&before.status!==x.status&&!histories.some(h=>h.from===before.status&&h.to===x.status)) {
++        histories.push({at:x.sourceCapturedAt||p.mingya?.capturedAt||new Date().toISOString(),from:before.status,to:x.status,source:x.source||p.source||'导入'});
++      }
++      const history=[...new Map(histories.map(h=>[`${h.at}|${h.from}|${h.to}|${h.source}`,h])).values()];
++      payments.set(x.date,{...before,...x,contactedAt:before?.contactedAt,history});
+     }
+     const nonempty = Object.fromEntries(
+       Object.entries(p).filter(
+@@ -189,16 +182,14 @@ export function mergePolicies(old: ManagedPolicy[], incoming: ManagedPolicy[]) {
+       ...prev,
+       ...nonempty,
+       id: prev.id,
+-      ...(p.payments.length
++      ...(p.payments.length && !p.mingya
+         ? {
+             status: prev.status || p.status,
+             premium: prev.premium || p.premium,
+             effectiveDate: prev.effectiveDate || p.effectiveDate,
+           }
+         : {}),
+-      payments: [...payments.values()].sort((a, b) =>
+-        a.date.localeCompare(b.date),
+-      ),
++      payments: reconcileMingyaPayments([...payments.values()].sort((a,b)=>a.date.localeCompare(b.date)), {...prev,...nonempty} as ManagedPolicy),
+     });
+   }
+   return [...map.values()];
+@@ -272,7 +263,8 @@ export function addMonths(anchor: string, months: number): string {
+ }
+ export function nextPayment(p: ManagedPolicy): Payment | undefined {
+   if (inactive(p.status) || p.status.includes('明亚状态')) return;
+-  const latest = [...(p.payments || [])].sort((a, b) =>
++  const detail=detailNextPayment(p,p.payments||[]);if(detail)return detail;
++  const latest = [...reconcileMingyaPayments(p.payments||[],p)].sort((a, b) =>
+     b.date.localeCompare(a.date),
+   )[0];
+   if (latest?.status === "未缴费") return latest;
+diff --git a/services/supabaseService.ts b/services/supabaseService.ts
+index dfb558e..25265e1 100644
+--- a/services/supabaseService.ts
++++ b/services/supabaseService.ts
+@@ -301,25 +301,30 @@ export interface ContactImportSnapshot {
+   revision: string;
+   contacts: import('../types').Contact[];
+   localVersion: string;
++  renewalRevision: string | null;
++  renewalData: import('./renewal').RenewalData;
+ }
+ 
+ export const readContactImportSnapshot = async (): Promise<Omit<ContactImportSnapshot, 'localVersion'>> => {
+   const appId = configuredAppId || getStoredAppId();
+   if (!appId) throw new Error('尚未确定当前数据空间，请先加载客户数据。');
+-  const {data,error}=await supabase.from('app_data').select('id,app_id,data,updated_at')
+-    .eq('app_id',appId).eq('data_type','contacts').single();
+-  if(error||!data||!Array.isArray(data.data))throw new Error('无法读取当前云端客户，请检查网络后重试。');
+-  return {id:data.id,appId:data.app_id,revision:data.updated_at,contacts:data.data};
++  const {data,error}=await supabase.from('app_data').select('id,app_id,data_type,data,updated_at')
++    .eq('app_id',appId).in('data_type',['contacts','renewal_v1']);
++  const contacts=data?.find(row=>row.data_type==='contacts'),renewal=data?.find(row=>row.data_type==='renewal_v1');
++  if(error||!contacts||!Array.isArray(contacts.data))throw new Error('无法读取当前云端客户，请检查网络后重试。');
++  return {id:contacts.id,appId:contacts.app_id,revision:contacts.updated_at,contacts:contacts.data,
++    renewalRevision:renewal?.updated_at||null,renewalData:renewal?.data||{policies:[],imports:[],settings:{email:'',time:'09:00',enabled:false}}};
+ };
+ 
+-export const commitContactImport = async (snapshot: ContactImportSnapshot, contacts: import('../types').Contact[]): Promise<void> => {
++export const commitContactImport = async (snapshot: ContactImportSnapshot, contacts: import('../types').Contact[], renewalData: import('./renewal').RenewalData): Promise<void> => {
+   const appId=configuredAppId||getStoredAppId();
+   if(!appId||snapshot.appId!==appId)throw new Error('数据空间已变化，请重新预览导入。');
+-  // Compare-and-set prevents overwriting edits made from another device after the preview.
+-  const {data,error}=await supabase.from('app_data').update({data:contacts,updated_at:new Date().toISOString()})
+-    .eq('id',snapshot.id).eq('app_id',appId).eq('data_type','contacts').eq('updated_at',snapshot.revision).select('id');
+-  if(error)throw new Error('导入未保存到云端，请检查网络后重试。');
+-  if(data?.length!==1)throw new Error('云端客户已变化，请重新预览后导入。');
++  const {error}=await supabase.rpc('commit_mingya_import_v2',{
++    p_app_id:appId,p_contact_id:snapshot.id,p_contact_revision:snapshot.revision,
++    p_renewal_revision:snapshot.renewalRevision,p_contacts:contacts,p_renewal:renewalData
++  });
++  if(error?.code==='PT409')throw new Error('客户或续期记录已变化，请重新预览后导入。');
++  if(error)throw new Error('导入未保存，请检查网络后重试。');
+ };
+ 
+ export const archiveMingyaCapture = async (snapshot: ContactImportSnapshot, payload: unknown): Promise<string> => {
+@@ -332,7 +337,8 @@ export const archiveMingyaCapture = async (snapshot: ContactImportSnapshot, payl
+   let binary='';for(let i=0;i<compressed.length;i+=32768)binary+=String.fromCharCode(...compressed.subarray(i,i+32768));
+   const {error}=await supabase.from('app_data').upsert([
+     {app_id:snapshot.appId,data_type:`mingya_capture:${hash}`,data:{encoding:'gzip-base64',content:btoa(binary),sha256:hash},updated_at:new Date().toISOString()},
+-    {app_id:snapshot.appId,data_type:`contacts_backup:mingya:${hash}:${snapshot.revision}`,data:snapshot.contacts,updated_at:new Date().toISOString()}
++    {app_id:snapshot.appId,data_type:`contacts_backup:mingya:${hash}:${snapshot.revision}`,data:snapshot.contacts,updated_at:new Date().toISOString()},
++    {app_id:snapshot.appId,data_type:`renewal_backup:mingya:${hash}:${snapshot.renewalRevision||'new'}`,data:snapshot.renewalData,updated_at:new Date().toISOString()}
+   ],{onConflict:'app_id,data_type'});
+   if(error)throw new Error('原始采集信息和导入前备份未保存成功，本次未修改客户。');
+   return hash;
+diff --git a/tests/collector.test.mjs b/tests/collector.test.mjs
+new file mode 100644
+index 0000000..ae4b1b6
+--- /dev/null
++++ b/tests/collector.test.mjs
+@@ -0,0 +1,50 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import vm from 'node:vm';
++import fs from 'node:fs';
++import {createRequire} from 'node:module';
++const require=createRequire(import.meta.url), XLSX=require('xlsx');
++const collector=fs.readFileSync(new URL('../tools/mingya-export-extension/collector.js',import.meta.url),'utf8');
++const exporter=fs.readFileSync(new URL('../tools/mingya-export-extension/export.js',import.meta.url),'utf8');
++const base='https://policy.mingya.com.cn/pms-1.0/api/policyCenter/';
++function harness(handler){
++  class XHR{open(){}send(){}setRequestHeader(){}}
++  const calls=[];
++  const w={fetch:async(url,init)=>{const body=JSON.parse(init.body);calls.push({url,body});return handler(url,body,init);}};
++  const ctx={window:w,XMLHttpRequest:XHR,Headers,Request,URL,location:{href:'https://app.mingya.com.cn/salespolicy/'},
++    AbortController,structuredClone,Date,setTimeout:(cb,ms)=>ms===45000?0:setTimeout(cb,0),clearTimeout};
++  vm.runInNewContext(collector,ctx);
++  return {w,calls,api:w.__mingyaExport};
++}
++const ok=data=>({ok:true,status:200,json:async()=>({code:'00',data})});
++const policy=i=>({policyIndexId:`index${i}`,policyId:`id${i}`,policyCode:`000${i}`,productName:'产品',totalFee:0});
++async function ready(h){await h.w.fetch(base+'pageList',{method:'POST',headers:{erptoken:'secret'},body:JSON.stringify({policyBigType:2,isTodo:false,pageNum:1,pageSize:2,hideSx:true})});}
++async function finished(api){for(let i=0;i<200&&api.status().running;i++)await new Promise(r=>setTimeout(r,5));assert.equal(api.status().running,false);}
++test('all pages and nested details; credentials stay out of export',async()=>{
++ const h=harness((url,b)=>url.endsWith('pageList')?ok({pageNum:b.pageNum,total:3,hasNextPage:b.pageNum<2,list:b.pageNum===1?[policy(1),policy(2)]:[policy(3)]}):ok({...policy(+b.policyIndexId.slice(5)),erptoken:'secret',appnt:{cardNo:'001234',mobile:'01234'},riskList:[{prem:0}]}));
++ await ready(h);h.api.start('all');await finished(h.api);const p=h.api.export();
++ assert.equal(p.status.complete,true);assert.equal(p.records.length,3);assert.equal(p.status.detailDone,3);assert.ok(!JSON.stringify(p).includes('secret'));
++ assert.equal(h.calls[1].body.hideSx,false);assert.equal(h.calls[1].body.hideTg,false);
++ assert.deepEqual(h.calls.filter(c=>c.url.endsWith('policyInfo')).map(c=>c.body.policyIndexId),['index1','index2','index3']);
++});
++test('ignored page parameter never reports a complete export',async()=>{
++ const h=harness(()=>ok({pageNum:1,total:3,list:[policy(1),policy(2)],hasNextPage:true}));await ready(h);h.api.start('current');await finished(h.api);
++ assert.equal(h.api.status().complete,false);assert.equal(h.api.status().count,2);assert.match(h.api.status().message,/页码/);
++});
++test('detail failure retains the list and records the failure',async()=>{
++ const h=harness(url=>url.endsWith('pageList')?ok({pageNum:1,total:1,list:[policy(1)]}):({ok:false,status:400}));await ready(h);h.api.start('all');await finished(h.api);
++ assert.equal(h.api.status().complete,false);assert.equal(h.api.export().records.length,1);assert.equal(h.api.export().failures.length,1);
++});
++test('expired login stops fetching details',async()=>{
++ let n=0;const h=harness(url=>url.endsWith('pageList')?ok({pageNum:1,total:2,list:[policy(1),policy(2)]}):(n++,{ok:false,status:401}));await ready(h);h.api.start('all');await finished(h.api);
++ assert.equal(n,1);assert.match(h.api.status().message,/登录/);assert.equal(h.api.status().complete,false);
++});
++test('export preserves identifiers, zero premium, formula-like text, nested values and long fields',()=>{
++ const ctx={};vm.runInNewContext(fs.readFileSync(new URL('../tools/mingya-export-extension/financial.js',import.meta.url),'utf8'),ctx);vm.runInNewContext(exporter,ctx);
++ const entry={...policy(1),appntName:'=1+1',remark:'长'.repeat(35000),insureds:[{name:'客户',cardNo:'00001'}]};
++ const payload={records:[{list:entry,detail:{...entry,riskList:[{prem:0}]}}],status:{scope:'all',complete:true,count:1,total:1,detailDone:1,failed:0},failures:[]};
++ const book=ctx.MingyaFile.workbook(payload,XLSX);const decoded=XLSX.read(XLSX.write(book,{type:'buffer',bookType:'xlsx'}),{type:'buffer'});
++ const data=XLSX.utils.sheet_to_json(decoded.Sheets['保单汇总']);assert.equal(data[0]['保单号'],'0001');assert.equal(data[0]['保费'],0);assert.equal(data[0]['投保人姓名'],'=1+1');
++ const fields=XLSX.utils.sheet_to_json(decoded.Sheets['全部字段']);assert.equal(fields.filter(r=>r['字段']==='详情.remark').map(r=>r['值']).join(''),'长'.repeat(35000));
++ assert.ok(fields.some(r=>r['字段']==='详情.insureds.0.cardNo'&&r['值']==='00001'));
++});
+diff --git a/tests/mingyaFinancial.test.ts b/tests/mingyaFinancial.test.ts
+new file mode 100644
+index 0000000..483af1b
+--- /dev/null
++++ b/tests/mingyaFinancial.test.ts
+@@ -0,0 +1,6 @@
++import {test} from 'node:test';import assert from 'node:assert/strict';
++import {financialFromDetail} from '../services/mingyaFinancial.ts';
++const sample={fee:12000,totalFee:120000,nextPrem:12000,nextPayDate:'2027-11-18 00:00:00',nextContent:'此保单应缴数据未产生，当前展示上期实缴金额作为参考',riskList:[{prem:12000,totalFee:120000,lastPrem:12000,lastPayDate:'2026-11-18 00:00:00',payType:'Y',payEndDate:'2035-11-18 00:00:00',state:'01'}]};
++test('single-period, cumulative, paid and reference amounts are separate',()=>{const p=financialFromDetail(sample);assert.equal(p.periodicPremium,'12000');assert.equal(p.termTotalPremium,'120000');assert.equal(p.lastPaidDate,'2026-11-18');assert.equal(p.lastPaidPremium,'12000');assert.equal(p.nextPayDate,'2027-11-18');assert.equal(p.nextPremiumIsReference,true);assert.equal(p.paymentFrequency,'期交-年');});
++test('missing fee never falls back to cumulative premium',()=>{assert.equal(financialFromDetail({totalFee:120000}).periodicPremium,'');assert.equal(financialFromDetail({fee:0,totalFee:120000}).periodicPremium,'0');assert.equal(financialFromDetail({riskList:[{prem:828,state:'01'},{prem:828,state:'01'}]}).periodicPremium,'1656');});
++test('different risk paid dates do not invent a policy-level paid fact',()=>{assert.equal(financialFromDetail({riskList:[{prem:100,lastPrem:100,lastPayDate:'2026-01-01',state:'01'},{prem:200,lastPrem:200,lastPayDate:'2026-02-01',state:'01'}]}).lastPaidDate,'');});
+diff --git a/tests/mingyaImport.test.cjs b/tests/mingyaImport.test.cjs
+index e30e911..0da30b1 100644
+--- a/tests/mingyaImport.test.cjs
++++ b/tests/mingyaImport.test.cjs
+@@ -1,8 +1,9 @@
+ const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const ts=require('typescript');const crypto=require('node:crypto').webcrypto;
+-const exportsObject={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/mingyaImport.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsObject,crypto,structuredClone,console});
++const moduleCache={};function localRequire(name){name=name.replace(/\.ts$/,'');if(moduleCache[name])return moduleCache[name];if(!['./mingyaFinancial','./mingyaPayments','./mingyaImport','./mingyaRepair'].includes(name))throw Error(name);const exp={};moduleCache[name]=exp;vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/'+name.slice(2)+'.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exp,require:localRequire,structuredClone});return exp;}
++const exportsObject={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/mingyaImport.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsObject,crypto,structuredClone,console,require:localRequire});
+ const {planMingyaImport,parseMingyaPayload}=exportsObject;
+ const contact=(extra={})=>({id:'c1',wxid:'wechat',nickname:'客户甲',remarkName:'客户甲',remarkInfo:'手动备注',tags:['重点'],addedAt:1,dealProducts:[],intentProducts:['养老'],progressHistory:[{id:'h',date:'2026-01-01',content:'保留跟进'}],policies:[],...extra});
+-const record=(extra={})=>({list:{},detail:{policyIndexId:'m1',policyCode:'000001',insComName:'公司甲',productName:'产品',totalFee:0,effectDate:'2026-01-01',policyState:'16',appntName:'客户甲',appnt:{name:'客户甲',cardNo:'ID001',mobile:'13800000000'},insureds:[],beneficiaries:[],riskList:[],...extra}});
++const record=(extra={})=>({list:{},detail:{policyIndexId:'m1',policyCode:'000001',insComName:'公司甲',productName:'产品',fee:0,totalFee:0,effectDate:'2026-01-01',policyState:'16',appntName:'客户甲',appnt:{name:'客户甲',cardNo:'ID001',mobile:'13800000000'},insureds:[],beneficiaries:[],riskList:[],...extra}});
+ const payload=(records)=>({version:1,status:{complete:true,finishedAt:'2026-11-21'},records});
+ test('adds by applicant and repeated imports do not duplicate or alter follow-up data',()=>{
+  const source=payload([record()]);const first=planMingyaImport([],source);assert.equal(first.addedPolicies,1);assert.equal(first.contacts[0].policies[0].premium,'0');const second=planMingyaImport(first.contacts,source);assert.equal(second.addedPolicies,0);assert.equal(second.updatedPolicies,0);assert.equal(second.unchangedPolicies,1);assert.equal(second.contacts.length,1);
+@@ -38,3 +39,22 @@ test('uses website effective date instead of underwriting date; JSON key order d
+  const p=payload([record({effectDate:'2026-11-02 00:00:00',validDate:'2026-11-06 00:00:00'})]);const result=planMingyaImport([],p);assert.equal(result.contacts[0].policies[0].effectiveDate,'2026-11-06');
+  assert.equal(exportsObject.canonicalContactData([{id:'1',tags:['a']}]),exportsObject.canonicalContactData([{tags:['a'],id:'1'}]));
+ });
++test('repairs the known v1 cumulative-premium bug while preserving an unrelated manual premium',()=>{
++ const r=record({fee:12000,totalFee:120000,nextPayDate:'2027-11-18',nextPrem:12000});const p=payload([r]);
++ const old={id:'old',policyNumber:'000001',company:'公司甲',productName:'产品',premium:'120000',effectiveDate:'2026-01-01',status:'正式保单',applicant:'客户甲',insured:'客户甲',mingya:{key:'index:m1',captureId:'original'}};
++ const fixed=planMingyaImport([contact({policies:[old]})],p);assert.equal(fixed.contacts[0].policies[0].premium,'12000');
++ const manual=planMingyaImport([contact({policies:[{...old,premium:'777'}]})],p);assert.equal(manual.contacts[0].policies[0].premium,'777');
++});
++test('future detail captures update source-owned premium without undoing a user edit',()=>{
++ const first=planMingyaImport([],payload([record({fee:100,totalFee:1000})]));
++ const refresh=planMingyaImport(first.contacts,payload([record({fee:120,totalFee:1200})]));assert.equal(refresh.contacts[0].policies[0].premium,'120');
++ first.contacts[0].policies[0].premium='90';const manual=planMingyaImport(first.contacts,payload([record({fee:120,totalFee:1200})]));assert.equal(manual.contacts[0].policies[0].premium,'90');
++});
++test('data repair changes only source-linked financial data in both stores, and is idempotent',()=>{
++ const fix=localRequire('./mingyaRepair').repairCapturedPolicies;
++ const old={id:'old',policyNumber:'000001',company:'公司甲',productName:'产品',premium:'120000',effectiveDate:'2025-11-18',paymentFrequency:'期交-年',status:'正式保单',applicant:'客户甲',insured:'客户甲',payments:[{date:'2026-11-18',amount:'12000',status:'未缴费'}],mingya:{key:'index:m1',captureId:'original'}};
++ const customers=[contact({policies:[old]})];const renewal={policies:[old],imports:[{at:'keep'}],settings:{enabled:false}};
++ const source=payload([record({fee:12000,totalFee:120000,validDate:'2025-11-18',nextPayDate:'2027-11-18',nextPrem:12000,nextContent:'应缴金额未产生',riskList:[{prem:12000,lastPrem:12000,lastPayDate:'2026-11-18',payType:'Y',state:'01'}]})]);
++ const result=fix(customers,renewal,source,'original');assert.equal(result.contacts[0].policies[0].premium,'12000');assert.equal(result.renewal.policies[0].payments[0].status,'已缴费');assert.equal(result.contacts[0].wxid,customers[0].wxid);assert.equal(result.contacts[0].remarkInfo,customers[0].remarkInfo);assert.equal(JSON.stringify(result.renewal.imports),JSON.stringify(renewal.imports));assert.equal(customers[0].policies[0].premium,'120000');
++ const repeat=fix(result.contacts,result.renewal,source,'original');assert.equal(repeat.counts.metadata,0);assert.equal(exportsObject.canonicalContactData(repeat.contacts),exportsObject.canonicalContactData(result.contacts));
++});
+diff --git a/tests/renewal.test.ts b/tests/renewal.test.ts
+index 4ac1f67..9077d4c 100644
+--- a/tests/renewal.test.ts
++++ b/tests/renewal.test.ts
+@@ -209,3 +209,24 @@ test('Mingya source identity preserves separate annual terms and old payment his
+ test('unrecognized Mingya states do not create renewal alerts',()=>{
+   assert.equal(dueItems([{...p,status:'明亚状态（23）',expiryDate:'2026-11-01',payments:[]}], '2026-11-01').length,0);
+ });
++
++test('detail paid date resolves the old unpaid installment and shows the official next date as a reference',()=>{
++  const policy:any={...p,effectiveDate:'2025-11-18',paymentFrequency:'期交-年',paymentYears:'10年',paymentEndDate:'2035-11-18',
++    payments:[{date:'2026-11-18',amount:'12000.0000',status:'未缴费',history:[]}],
++    mingya:{mappingVersion:2,capturedAt:'2026-11-21T03:35:47Z',nextPayDate:'2027-11-18',nextPremium:'12000',nextPremiumIsReference:true,lastPaidDate:'2026-11-18',lastPaidPremium:'12000'}};
++  const next=nextPayment(policy)!;assert.equal(next.date,'2027-11-18');assert.equal(next.amount,'12000');assert.equal(next.amountReference,true);assert.equal(next.estimated,undefined);
++  assert.equal(dueItems([policy],'2026-11-21').length,0);
++  const merged=mergePolicies([policy],[policy]);assert.equal(merged[0].payments[0].status,'已缴费');assert.equal(merged[0].payments[0].paidAt,'2026-11-18');
++  assert.equal(mergePolicies(merged,[merged[0]])[0].payments[0].history!.length,1);
++});
++test('manual payment changes after capture take priority over the old detail snapshot',()=>{
++  const policy:any={...p,effectiveDate:'2025-11-18',paymentFrequency:'期交-年',paymentYears:'10年',
++    payments:[{date:'2026-11-18',amount:'12000',status:'未缴费',history:[{at:'2026-11-21T05:00:00Z',source:'手动标记',from:'已缴费',to:'未缴费'}]}],
++    mingya:{mappingVersion:2,capturedAt:'2026-11-21T03:35:47Z',nextPayDate:'2027-11-18',nextPremium:'12000',lastPaidDate:'2026-11-18',lastPaidPremium:'12000'}};
++  assert.equal(nextPayment(policy)!.date,'2026-11-18');assert.equal(mergePolicies([policy],[policy])[0].payments[0].status,'未缴费');
++});
++test('merging a detail-paid installment preserves its source audit rather than turning it into a manual change',()=>{
++ const old:any={...p,payments:[{date:'2026-11-18',amount:'12000',status:'未缴费',history:[]}]};
++ const detail:any={...old,mingya:{mappingVersion:2,key:'sample',capturedAt:'2026-11-21T03:35:47Z'},payments:[{date:'2026-11-18',amount:'12000',status:'已缴费',source:'明亚保单详情',history:[{at:'2026-11-21T03:35:47Z',from:'未缴费',to:'已缴费',source:'明亚保单详情·上期实缴'}]}]};
++ const result=mergePolicies([old],[detail]);assert.equal(result[0].payments[0].history!.length,1);assert.match(result[0].payments[0].history![0].source,/^明亚/);
++});
+diff --git a/tools/build-mingya-financial.cjs b/tools/build-mingya-financial.cjs
+new file mode 100644
+index 0000000..f119c46
+--- /dev/null
++++ b/tools/build-mingya-financial.cjs
+@@ -0,0 +1,4 @@
++const fs=require('node:fs'),ts=require('typescript');
++const source=fs.readFileSync('services/mingyaFinancial.ts','utf8');
++const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
++fs.writeFileSync('tools/mingya-export-extension/financial.js',`/* Generated from services/mingyaFinancial.ts; do not edit by hand. */\n(function(root){const exports={};\n${js}\nroot.MingyaFinancial=exports;})(globalThis);\n`);
+diff --git a/tools/mingya-export-extension/collector.js b/tools/mingya-export-extension/collector.js
+index 62a9d4c..9c2dc82 100644
+--- a/tools/mingya-export-extension/collector.js
++++ b/tools/mingya-export-extension/collector.js
+@@ -128,7 +128,7 @@
+           if (!detail.policyIndexId && !detail.policyId && !detail.policyCode) throw new Error('详情为空');
+           if (p.policyIndexId && detail.policyIndexId && p.policyIndexId !== detail.policyIndexId) throw new Error('详情与保单不匹配');
+           if (p.policyCode && detail.policyCode && p.policyCode !== detail.policyCode) throw new Error('详情与保单不匹配');
+-          entry.detail = detail; detailDone++;
++          entry.detail = detail; entry.detailSource = 'policyCenter/policyInfo'; entry.detailCapturedAt = new Date().toISOString(); detailDone++;
+         } catch (error) {
+           if (cancelled || /登录/.test(error.message)) throw error;
+           failures.push({ 保单号: p.policyCode || '', 标识: entry.key, 原因: error.message });
+diff --git a/tools/mingya-export-extension/export.js b/tools/mingya-export-extension/export.js
+index 75afdc3..6344066 100644
+--- a/tools/mingya-export-extension/export.js
++++ b/tools/mingya-export-extension/export.js
+@@ -2,11 +2,11 @@
+   'use strict';
+   const fields = {
+     policyCode: '保单号', productName: '产品名称', insComName: '保险公司',
+-    totalFee: '保费', validDate: '生效日期', effectDate: '承保日期', appntName: '投保人姓名', insuredName: '被保人',
++    fee: '保费', totalFee: '缴费期总保费', validDate: '生效日期', effectDate: '承保日期', appntName: '投保人姓名', insuredName: '被保人',
+     appntMobile: '手机号', appntCardNo: '证件号', amount: '保额', currency: '币种',
+     policyState: '保单状态代码', dataSource: '数据来源代码', policySource: '保单来源代码',
+     endDate: '结束日期', guaranteeEndDate: '保障结束日期', receiveDate: '交单日期',
+-    nextPayDate: '下次缴费日期', nextPrem: '下次保费', insurancePeriod: '保险期间',
++    nextPayDate: '下次缴费日期', nextPrem: '下期金额', nextContent: '下期金额说明', insurancePeriod: '保险期间',
+     insurancePeriodUnit: '保险期间单位代码', salerName: '销售人员', salerServiceName: '服务人员',
+     benefName: '受益人', remark: '备注', policyId: '保单ID', policyIndexId: '保单索引ID'
+   };
+@@ -27,7 +27,8 @@
+     for (const entry of payload.records) {
+       const p={...entry.list,...(entry.detail||{})};
+       const number=String(p.policyCode||'');
+-      const summaryPolicy={...p,appntMobile:p.appnt?.mobile||p.appntMobile,appntCardNo:p.appnt?.cardNo||p.appntCardNo};
++      const financial=MingyaFinancial.financialFromDetail(entry.detail);
++      const summaryPolicy={...p,fee:financial.periodicPremium===''?'':Number(financial.periodicPremium),appntMobile:p.appnt?.mobile||p.appntMobile,appntCardNo:p.appnt?.cardNo||p.appntCardNo};
+       const row=Object.fromEntries(Object.entries(fields).map(([key,label])=>[label,summaryPolicy[key] ?? '']));
+       // Keep backend codes explicit; do not invent a status or convert currencies/units.
+       row['详情采集']=entry.detail?'成功':'未取得';
+diff --git a/tools/mingya-export-extension/financial.js b/tools/mingya-export-extension/financial.js
+new file mode 100644
+index 0000000..2758242
+--- /dev/null
++++ b/tools/mingya-export-extension/financial.js
+@@ -0,0 +1,47 @@
++/* Generated from services/mingyaFinancial.ts; do not edit by hand. */
++(function(root){const exports={};
++"use strict";
++Object.defineProperty(exports, "__esModule", { value: true });
++exports.money = money;
++exports.financialDate = financialDate;
++exports.financialFromDetail = financialFromDetail;
++const text = (v) => v == null ? '' : String(v).trim();
++function money(v) {
++    const value = text(v).replace(/[,，]/g, '');
++    if (!/^\d+(\.\d+)?$/.test(value) || !Number.isFinite(Number(value)))
++        return '';
++    return String(Number(value));
++}
++function financialDate(v) {
++    const s = text(v), match = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(s);
++    if (!match)
++        return '';
++    const date = `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
++    const parsed = new Date(date + 'T00:00:00Z');
++    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date ? date : '';
++}
++function sum(values) { return String(values.reduce((n, v) => n + Math.round(Number(v) * 10000), 0) / 10000); }
++function financialFromDetail(detail) {
++    const p = detail || {}, risks = (Array.isArray(p.riskList) ? p.riskList : []).filter(r => r && typeof r === 'object');
++    const active = risks.filter(r => r.state === '01');
++    const relevant = active.length ? active : risks;
++    const fee = money(p.fee);
++    const riskAmounts = relevant.map(r => money(r.prem));
++    const fallback = fee === '' && riskAmounts.length > 0 && riskAmounts.every(v => v !== '') ? sum(riskAmounts) : '';
++    const frequencies = [...new Set(relevant.map(r => text(r.payType)).filter(Boolean))];
++    const frequency = frequencies.length === 1 ? { Y: '期交-年', M: '期交-月' }[frequencies[0]] || '' : '';
++    const ends = [...new Set(relevant.map(r => financialDate(r.payEndDate)).filter(Boolean))];
++    // A policy-level paid fact is valid only when all positive-premium risks agree.
++    const payable = relevant.filter(r => Number(money(r.prem)) > 0);
++    const paidDates = payable.map(r => financialDate(r.lastPayDate));
++    const paidAmounts = payable.map(r => money(r.lastPrem));
++    const paid = payable.length > 0 && paidDates.every(d => d && d === paidDates[0]) && paidAmounts.every(a => a !== '');
++    const note = text(p.nextContent);
++    return { mappingVersion: 2, periodicPremium: fee !== '' ? fee : fallback, termTotalPremium: money(p.totalFee),
++        premiumBasis: fee !== '' ? 'detail.fee' : fallback !== '' ? 'detail.riskList.prem' : 'missing',
++        nextPayDate: financialDate(p.nextPayDate), nextPremium: money(p.nextPrem), nextPremiumIsReference: !!note,
++        nextPaymentNote: note, lastPaidDate: paid ? paidDates[0] : '', lastPaidPremium: paid ? sum(paidAmounts) : '',
++        paymentFrequency: frequency, paymentEndDate: ends.length === 1 ? ends[0] : '' };
++}
++
++root.MingyaFinancial=exports;})(globalThis);
+diff --git a/tools/mingya-export-extension/manifest.json b/tools/mingya-export-extension/manifest.json
+index aa93e96..2ccb37c 100644
+--- a/tools/mingya-export-extension/manifest.json
++++ b/tools/mingya-export-extension/manifest.json
+@@ -1,7 +1,7 @@
+ {
+   "manifest_version": 3,
+   "name": "明亚保单导出",
+-  "version": "1.1.0",
++  "version": "1.2.0",
+   "minimum_chrome_version": "111",
+   "description": "在已登录的明亚页面批量读取保单与详情，导出本地 Excel 或 JSON，不调用 AI。",
+   "permissions": [
+diff --git a/tools/mingya-export-extension/popup.html b/tools/mingya-export-extension/popup.html
+index d591f69..5677af3 100644
+--- a/tools/mingya-export-extension/popup.html
++++ b/tools/mingya-export-extension/popup.html
+@@ -14,5 +14,5 @@
+   <div class="export"><button id="excel" disabled>导出 Excel</button><button id="json" disabled>导出原始 JSON</button></div>
+   <details><summary>使用说明</summary><p>登录工作台 → 点击顶部「保单」→ 再点内页「保单」。首次安装后请刷新网页。</p><p>采集时保持网页打开；可关闭此弹窗。刷新网页会清空本次数据。</p><p>跟单仔中先预览合并结果，确认后才保存。仅导出账号可读取的信息。影像附件、电子保单 PDF 文件需另行下载。</p><p>采集和去重不调用 AI。</p><button id="clear" class="text">清空本次数据</button></details>
+ </main>
+-<script src="vendor/xlsx.full.min.js"></script><script src="export.js"></script><script src="popup.js"></script>
++<script src="vendor/xlsx.full.min.js"></script><script src="financial.js"></script><script src="export.js"></script><script src="popup.js"></script>
+ </body></html>
+diff --git a/tools/repair-mingya-financials.cjs b/tools/repair-mingya-financials.cjs
+new file mode 100644
+index 0000000..545d22b
+--- /dev/null
++++ b/tools/repair-mingya-financials.cjs
+@@ -0,0 +1,5 @@
++// Read-only by default. Explicit --apply uses the version-checked atomic RPC.
++const fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
++const cache={};function load(name){const file=name.endsWith('.ts')?name:name+'.ts';if(cache[file])return cache[file];const exp={};cache[file]=exp;const js=ts.transpileModule(fs.readFileSync('services/'+file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;vm.runInNewContext(js,{exports:exp,structuredClone,crypto:require('node:crypto').webcrypto,require:p=>load(p.replace(/^\.\//,''))});return exp;}
++(async()=>{const dir='/Users/apple/.codex/backups/insurance-20261121-premium-fix';const backup=JSON.parse(fs.readFileSync(fs.readFileSync(dir+'/latest-backup-path.txt','utf8'),'utf8'));const payload=JSON.parse(fs.readFileSync(dir+'/capture.json','utf8'));const c=backup.find(x=>x.data_type==='contacts'),r=backup.find(x=>x.data_type==='renewal_v1'),a=backup.find(x=>x.data_type.startsWith('mingya_capture:'));const captureId=a.data_type.split(':')[1];const plan=load('mingyaRepair').repairCapturedPolicies(c.data,r.data,payload,captureId);fs.writeFileSync(dir+'/repair-plan.json',JSON.stringify(plan),{mode:0o600});const target=plan.renewal.policies.find(p=>p.policyNumber==='88136010');console.log(JSON.stringify({counts:plan.counts,contacts:plan.contacts.length,renewalPolicies:plan.renewal.policies.length,target:{premium:target?.premium,lastPaidDate:target?.mingya?.lastPaidDate,nextPayDate:target?.mingya?.nextPayDate,reference:target?.mingya?.nextPremiumIsReference,payments:target?.payments}}));if(!process.argv.includes('--apply'))return;
++const{loadEnv}=await import('vite');const{createClient}=await import('@supabase/supabase-js');const env=loadEnv('production',process.cwd(),'VITE_');const config=fs.readFileSync('vite.config.ts','utf8');const url=env.VITE_SUPABASE_URL||'https://ulgqiixqaxxgodyowrep.supabase.co';if(new URL(url).hostname!=='ulgqiixqaxxgodyowrep.supabase.co')throw Error('Wrong data target');const key=env.VITE_SUPABASE_ANON_KEY||config.match(/env\.VITE_SUPABASE_ANON_KEY \|\| '([^']+)'/)[1];const client=createClient(url,key,{auth:{persistSession:false}});const{error}=await client.rpc('commit_mingya_import_v2',{p_app_id:c.app_id,p_contact_id:c.id,p_contact_revision:c.updated_at,p_renewal_revision:r.updated_at,p_contacts:plan.contacts,p_renewal:plan.renewal});if(error)throw error;console.log('Verified repair committed atomically.');})().catch(e=>{console.error(e.message);process.exitCode=1;});
+diff --git a/types.ts b/types.ts
+index 5ddc3e6..2cc13c0 100644
+--- a/types.ts
++++ b/types.ts
+@@ -1,3 +1,4 @@
++import type {MingyaFinancial} from './services/mingyaFinancial';
+ 
+ export interface ProgressRecord {
+   id: string;
+@@ -9,7 +10,7 @@ export interface ProgressRecord {
+ export interface MingyaPerson {
+   name: string; idCard: string; phone: string; birthday: string; sex: string; address: string; share: string; order: string;
+ }
+-export interface MingyaPolicyData {
++export interface MingyaPolicyData extends Partial<MingyaFinancial> {
+   key: string; captureId?: string; capturedAt: string; policyId: string; policyIndexId: string; companyId: string;
+   currency: string; rawStatus: string; endDate: string; nextPayDate: string; nextPremium: string;
+   applicant: MingyaPerson; insureds: MingyaPerson[]; beneficiaries: MingyaPerson[];
+diff --git "a/\346\230\216\344\272\232\345\257\274\345\205\245\350\257\264\346\230\216.md" "b/\346\230\216\344\272\232\345\257\274\345\205\245\350\257\264\346\230\216.md"
+index c48a78e..b7b3f3c 100644
+--- "a/\346\230\216\344\272\232\345\257\274\345\205\245\350\257\264\346\230\216.md"
++++ "b/\346\230\216\344\272\232\345\257\274\345\205\245\350\257\264\346\230\216.md"
+@@ -41,3 +41,7 @@
+ ## 源码边界
+ 
+ 基于当前正式版 5deb38c（2026-11-19，含统一导入与续期提醒），独立加入本次功能。未混入工作目录中的其他未发布页面。导入使用现有 app_data 数据空间，不新增表和权限。
++
++## 2026-11-21 详情字段修正
++
++单期保费读取详情 fee（必要时合计险种 prem），总缴费额 totalFee 单独展示为缴费期总保费。读取险种上期实缴日期、金额和保单下次缴费日期；应缴尚未生成时，标明下期金额为参考。客户与续期记录采用同一事务保存，发生版本冲突时不覆盖。旧版原始 JSON 已包含这些详情字段，可以直接重新导入；1.2.0 插件同时修正 Excel 导出。

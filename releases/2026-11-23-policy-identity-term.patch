@@ -1,0 +1,467 @@
+diff --git a/components/ImportModal.tsx b/components/ImportModal.tsx
+index c388c7c..1aef2fe 100644
+--- a/components/ImportModal.tsx
++++ b/components/ImportModal.tsx
+@@ -1,3 +1,4 @@
++import {readPolicyNumber} from '../services/policyIdentity';
+ import {excludedPolicyImport,mingyaStatusLabel} from '../services/policyImportRules';
+ import PolicyStatus from './PolicyStatus';
+ import {formatMoney} from './PolicyPaymentSummary';
+@@ -6,7 +7,7 @@ import { X, Upload, Check, AlertCircle, Plus, FileSpreadsheet, ShoppingBag, Tras
+ import { extractContactsFromMedia, extractTableFromMedia } from '../services/geminiService';
+ import { NewContact, Contact, ProgressRecord, ExtractedTableData, Policy, ExcelCustomerRow, ExcelPolicyRow } from '../types';
+ import * as XLSX from 'xlsx';
+-import { key as policyKey } from '../services/renewal';
++import { mergePolicies } from '../services/renewal';
+ 
+ interface ImportModalProps {
+   isOpen: boolean;
+@@ -26,7 +27,7 @@ interface ImportModalProps {
+ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPolicyImport, onClose, onSave, onPersistFollowup, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail, onManagePolicies }) => {
+   const [historyBusy,setHistoryBusy]=useState(false),[profileBusy,setProfileBusy]=useState(false),[historyError,setHistoryError]=useState(''),[historySaved,setHistorySaved]=useState('');
+   const historyBusyRef=useRef(false),historyRequestId=useRef(crypto.randomUUID()),profileRequestId=useRef(crypto.randomUUID());
+-  const displayedPolicies = () => Array.from(new Map([...(formData.policies || []), ...relatedPolicies].map(p => [policyKey(p), p])).values()).filter(p=>!excludedPolicyImport(p.status));
++  const displayedPolicies = () => mergePolicies([...(formData.policies || []), ...relatedPolicies].map(p=>({...p,payments:(p as any).payments||[]})),[]).filter(p=>!excludedPolicyImport(p.status));
+   const profileBaseline=useRef<NewContact|null>(null);
+   const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'table' | 'policies'>('ai');
+   const [loading, setLoading] = useState(false);
+@@ -160,7 +161,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+         tableData = {
+           type: 'policy',
+           items: jsonData.map((row: any) => ({
+-            policyNumber: getRowValue(row, '保单号', '保单号') || '',
++            policyNumber: readPolicyNumber(getRowValue(row, '保单号', '保单号')),
+             productName: getRowValue(row, '产品名称', '产品名称') || '',
+             company: getRowValue(row, '保险公司', '保险公司') || '',
+             premium: String(getRowValue(row, '保费', '保费') || '0'),
+diff --git a/components/MingyaImportModal.tsx b/components/MingyaImportModal.tsx
+index 1d82a93..8878014 100644
+--- a/components/MingyaImportModal.tsx
++++ b/components/MingyaImportModal.tsx
+@@ -24,7 +24,7 @@ export default function MingyaImportModal({open,initialPayload,onClose,onLoad,on
+   },[open,initialPayload]);
+   const result=useMemo(()=>{
+     if(!payload||!snapshot)return {plan:null,error:''};
+-    try{return {plan:planMingyaImport(snapshot.contacts,payload,resolutions,mode),error:''};}catch{return {plan:null,error:'文件包含无法识别的字段，请重新采集并导出。'};}
++    try{return {plan:planMingyaImport(snapshot.contacts,payload,resolutions,mode),error:''};}catch(e){return {plan:null,error:e instanceof Error&&e.message.includes('长保单号')?e.message:'文件包含无法识别的字段，请重新采集并导出。'};}
+   },[payload,snapshot,resolutions,mode]);
+   const plan=result.plan;
+   const rows=plan?.rows.filter(r=>!query||`${r.name} ${r.number} ${r.product} ${r.contact}`.toLowerCase().includes(query.toLowerCase()))||[];
+diff --git a/components/PolicyFieldsForm.tsx b/components/PolicyFieldsForm.tsx
+index bd8076d..e7dbd8e 100644
+--- a/components/PolicyFieldsForm.tsx
++++ b/components/PolicyFieldsForm.tsx
+@@ -34,7 +34,7 @@ export default function PolicyFieldsForm({value,onChange,contacts,identityReadon
+           onChange({...value,[k]:c?c.remarkName||c.nickname:value[k],[k==='applicant'?'applicantId':'insuredId']:c?.id});
+         }}>
+           <option value="">{textValue||'选择客户'}</option>
+-          {contacts.map(c=><option value={c.id} key={c.id}>{c.remarkName||c.nickname}{c.phoneNumber?` · 尾号${c.phoneNumber.slice(-4)}`:''}</option>)}
++          {contacts.map(c=><option value={c.id} key={c.id}>{c.remarkName||c.nickname}{c.phoneNumber?` · 尾号${String(c.phoneNumber).slice(-4)}`:''}</option>)}
+         </select>:k==='paymentFrequency'?<select id={`${formId}-${k}`} className="input mt-1.5 font-normal text-gray-900" value={textValue} onChange={e=>update(e.target.value)}>
+           {['','期交-年','期交-半年','期交-季','期交-月','趸交',...(!['','期交-年','期交-半年','期交-季','期交-月','趸交'].includes(textValue)?[textValue]:[])].map(v=><option key={v} value={v}>{v||'待补充'}</option>)}
+         </select>:<input id={`${formId}-${k}`} className="input mt-1.5 font-normal text-gray-900 read-only:bg-gray-50" type={type||'text'} required={k==='productName'}
+diff --git a/components/PolicyPaymentSummary.tsx b/components/PolicyPaymentSummary.tsx
+index f5eb8bf..475c6fb 100644
+--- a/components/PolicyPaymentSummary.tsx
++++ b/components/PolicyPaymentSummary.tsx
+@@ -1,5 +1,5 @@
+ import React from 'react';
+-import { inactive, nextPayment, remainingInstallments, today, type ManagedPolicy } from '../services/renewal';
++import { inactive, nextPayment, remainingInstallments, paymentTermEnded, today, type ManagedPolicy } from '../services/renewal';
+ 
+ export function formatMoney(value: unknown, currency = 'CNY') {
+   if (value === null || value === undefined || String(value).trim() === '') return '待补充';
+@@ -13,6 +13,7 @@ export function paymentStatus(policy: ManagedPolicy) {
+   if (policy.status.includes('明亚状态')) return '保单状态待确认，暂不提醒';
+   if (inactive(policy.status)) return '已退出续期提醒';
+   if (remainingInstallments(policy) === 0) return '缴费期已完成';
++  if (paymentTermEnded(policy)) return '缴费期已结束，历史缴费待核对';
+   if (/趸|一次/.test(policy.paymentFrequency || '') || /趸/.test(policy.paymentYears || '')) return '一次性缴费';
+   return '下次缴费待确认';
+ }
+diff --git a/design.md b/design.md
+index d5f23be..588e404 100644
+--- a/design.md
++++ b/design.md
+@@ -165,3 +165,7 @@
+ ## 客户保单摘要与管理
+ 
+ 终止、满期终止、最终撤单保单在客户摘要及正常保单管理中不展示，使用统一状态判断；不通过过滤删除数据库或表单持有的历史记录。中止、撤单中与撤单失败不能视作最终结束。客户摘要只承担查看及进入管理，操作列固定紧凑宽度，首列吸收余宽；批量操作在保单管理按客户ID定位并自动展开，提供返回全部保单的动作。跳转前检查未保存资料，不能静默丢失草稿。编辑客户时必须传入完整对象，不能把过滤后的展示对象当作保存数据。
++
++## 保单身份及缴费提醒
++
++跨表格与明亚来源识别同一保单必须统一前导零匹配，并结合保险公司、年度和投被保关系；显示保留完整原始文本单号。不得将不同年度或不同完整单号仅凭产品/保费相同合并；长数字单号不得经Number转换。缺少缴费历史不代表首期未缴，不得凭生效日制造逾期；缴费结束后停止推算未来应缴，已确认的历史未缴仍保留。缴费期结束不等同已缴清，资料不足时明确待核对。共享表单必须兼容旧数据的数字型手机号等标识字段，读取时转成文本，不通过改动真实客户资料规避显示错误。
+diff --git a/docs/2026-11-23-policy-identity-and-term-verification.md b/docs/2026-11-23-policy-identity-and-term-verification.md
+new file mode 100644
+index 0000000..8534515
+--- /dev/null
++++ b/docs/2026-11-23-policy-identity-and-term-verification.md
+@@ -0,0 +1,13 @@
++# 保单重复、缴费期提醒与编辑崩溃
++
++根因：明亚导入使用包含前导零的单号，续期导入使用去零单号，且明亚来源ID与旧表格键并存；mergePolicies只对一种进入顺序尝试匹配，已有数据中的重复未归并。长数字单号旧记录出现尾号全零。详情编辑对手机号直接调用slice，真实数据中58个手机号为数字，触发TypeError并使React根节点白屏。没有缴费历史时nextPayment直接把生效日作为待缴日，未先检查缴费结束边界。
++
++统一policyIdentity：单号始终文本，匹配时统一前导零、公司、年度及投被保关系；原始单号按明亚完整文本展示。年度不同、已知来源ID不同、被保人不兼容或单号真正不同不自动合并。主投保人归属不再被被保人副本覆盖；客户摘要和管理投影共用归并，别名副本不会重新出现。新导入和既有数据归并均保留缴费日期、人工确认、联系时间和历史；明亚详情优先于旧表格空缺字段。超长数字型单号停止导入，提示将该列设为文本重新导出。
++
++已备份后通过版本校验的单事务合并158条确认重复，并按用户明确确认纠正尾号全零的平安单号再合并1条。685条存储记录变为526条，162位联系人及67条跟进保持；缴费日期逐项断言没有丢失。潘淑蓓的平安、君龙重复消除，完整单号保留；不同年度合同不合并。数据库触发器拦截旧页面或导入重新插入同单、同年度重复记录。完整合并前快照、ID映射及计划在私有目录 /Users/apple/.codex/backups/insurance-20261123-policy-dedup/，原始快照1795412412512。
++
++提醒修正：缴费结束后不再根据生效日或无明细推算欠费；在缴费期内，缺少历史也不能证明首期未缴。摘要显示“缴费期已结束，历史缴费待核对”，不声称已经缴清。真实未缴明细仍显示；结束日不含当天，超出合同的日期不当作应缴。修复手机号尾号展示的数字兼容，复用PolicyFieldsForm，无须修改用户手机号数据。
++
++验证：59项测试、类型检查和构建通过。数据库匿名角色重复拦截、不同年度/来源保留测试通过；既有状态标记、客户资料及批量删除事务回滚断言通过，安全检查无新增问题。浏览器复现旧版2009-05-19虚假逾期6397天及phoneNumber.slice白屏；修正版无虚假逾期、16字段均显示、取消恢复、保存成功、手机底栏可达。6条虚拟跨来源记录在管理及客户摘要均为4份，保费42706元，未对真实记录做界面测试删除或缴费标记。
++
++文案独立走查：用一处缴费期结束/待核对状态替代虚假逾期，不再重复展示猜测日期与猜测金额；长单号错误只保留原因及重新导出操作。没有新增说明卡片或装饰标签。公共标题、控件及固定操作栏复用现有组件。桌面、手机及滚动截图位于output。
+diff --git a/services/mingyaImport.ts b/services/mingyaImport.ts
+index a88be76..9d4a5e5 100644
+--- a/services/mingyaImport.ts
++++ b/services/mingyaImport.ts
+@@ -1,3 +1,4 @@
++import {policyNumberKey,readPolicyNumber} from './policyIdentity';
+ import {excludedPolicyImport,mingyaStatusLabel} from './policyImportRules';
+ import { financialFromDetail, money } from './mingyaFinancial';
+ import { reconcileMingyaPayments } from './mingyaPayments';
+@@ -23,7 +24,7 @@ const phoneKey = (v: unknown) => readable(v).replace(/^\+?86(?=1\d{10}$)/,'').re
+ const identity = (v: unknown) => normalizeId(readable(v));
+ const companyKey = (v: unknown) => normalizeId(v).replace(/[（）()]/g,'');
+ export const dateKey = (v: unknown) => { const s=text(v),m=s.match(/^(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})/);return m?`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`:s.slice(0,10); };
+-const policyKey = (p: Policy) => normalizeId(p.policyNumber)+'|'+companyKey(p.company);
++const policyKey = (p: Policy) => policyNumberKey(p.policyNumber)+'|'+companyKey(p.company);
+ const uuid = () => crypto.randomUUID();
+ const has = (v: unknown) => v !== undefined && v !== null && text(v) !== '';
+ const person = (input: Json = {}): MingyaPerson => { const p=input||{};return ({ name:text(p.name),idCard:readable(p.cardNo),phone:readable(p.mobile),birthday:text(p.birthday).slice(0,10),sex:text(p.sex),address:text(p.homeAddress||p.postAddress),share:text(p.bnfRate),order:text(p.bnfOrder) }); };
+@@ -64,7 +65,7 @@ export function normalizeMingya(payload: MingyaPayload): {items: IncomingPolicy[
+   const items:IncomingPolicy[]=[],seen=new Set<string>();let duplicates=0;
+   for(const r of payload.records){
+     const p={...r.list,...(r.detail||{})};
+-    const index=text(p.policyIndexId),number=text(p.policyCode),company=text(p.insComName||p.insComSimpleName);
++    const index=text(p.policyIndexId),number=readPolicyNumber(p.policyCode),company=text(p.insComName||p.insComSimpleName);
+     const key=index?`index:${index}`:`policy:${text(p.dataSource)}:${text(p.policyId)||normalizeId(number)+'|'+companyKey(company)}`;
+     const deDupe=normalizeId(number)&&companyKey(company)?normalizeId(number)+'|'+companyKey(company)+'|'+dateKey(p.validDate||p.effectDate):key;
+     if(seen.has(key)||seen.has(deDupe)){duplicates++;continue;}seen.add(key);seen.add(deDupe);
+@@ -128,7 +129,7 @@ export function planMingyaImport(existing: Contact[], payload:MingyaPayload, res
+       else if(newOwners.has(incoming.personKey))owner=contacts.find(c=>c.id===newOwners.get(incoming.personKey));
+       else {candidates=contacts.filter(c=>sameName(c,a.name));if(candidates.length){issue='同名联系人已存在，请确认合并归属';allowNew=false;}}
+       // A different known insurer with the same number must not silently become a second record.
+-      const numberMatches=contacts.flatMap(c=>(c.policies||[]).filter(x=>normalizeId(x.policyNumber)===normalizeId(p.policyNumber)&&(companyKey(x.company)!==companyKey(p.company)||ambiguousTerm(x,incoming))).map(()=>c));
++      const numberMatches=contacts.flatMap(c=>(c.policies||[]).filter(x=>policyNumberKey(x.policyNumber)===policyNumberKey(p.policyNumber)&&(companyKey(x.company)!==companyKey(p.company)||ambiguousTerm(x,incoming))).map(()=>c));
+       if(numberMatches.length){issue='相同保单号的保险公司不一致，或旧记录缺少年度';candidates=numberMatches;owner=undefined;allowNew=false;}
+       if(selection&&selection!=='new'){
+         const selected=contacts.find(c=>c.id===selection);
+@@ -150,6 +151,7 @@ export function planMingyaImport(existing: Contact[], payload:MingyaPayload, res
+     }
+     if(matches.length===1){
+       const old=matches[0].policy;const merged={...old};
++      if(policyNumberKey(old.policyNumber)===policyNumberKey(p.policyNumber))merged.policyNumber=p.policyNumber;
+       for(const key of ['policyNumber','productName','company','premium','effectiveDate','status','applicant','insured','paymentYears','paymentFrequency','paymentEndDate','coveragePeriod','expiryDate','insuranceType','coverage'] as const){
+         const value=p[key];if(has(old[key])&&has(value)&&text(old[key])!==text(value)){plan.fieldConflicts++;plan.conflicts.push({number:p.policyNumber,field:key,existing:text(old[key]),incoming:text(value)});}
+         const fixOldPremium=key==='premium'&&old.mingya&&old.mingya.mappingVersion!==2&&money(old.premium)!==''&&money(old.premium)===p.mingya?.termTotalPremium;
+diff --git a/services/policyIdentity.ts b/services/policyIdentity.ts
+new file mode 100644
+index 0000000..88f9828
+--- /dev/null
++++ b/services/policyIdentity.ts
+@@ -0,0 +1,21 @@
++// Match policy identity across exports without converting long numbers to Number.
++export type PolicyIdentity={id?:string;policyNumber?:unknown;company?:string;effectiveDate?:string;applicant?:string;insured?:string;mingya?:{key?:string}};
++export function readPolicyNumber(value:unknown):string {if(typeof value==='number'&&(!Number.isSafeInteger(value)||String(Math.abs(value)).length>15))throw new Error('长保单号被表格按数字保存，尾号可能已改变。请将保单号列设为文本后重新导出。');return String(value??'').trim();}
++export const policyNumberKey=(value:unknown)=>String(value??'').trim().replace(/[^0-9A-Za-z]/g,'').toUpperCase().replace(/^0+(?=[0-9A-Z])/,'');
++const clean=(value:unknown)=>String(value??'').replace(/[\s（）()]/g,'').toUpperCase();
++const person=(value:unknown)=>String(value??'').replace(/\s/g,'').toLocaleLowerCase();
++const insuredNames=(v:unknown)=>[...new Set(String(v||'').split(/[,，、;；]/).map(person).filter(Boolean))].sort();
++const insuredCompatible=(a:PolicyIdentity,b:PolicyIdentity)=>{const x=insuredNames(a.insured),y=insuredNames(b.insured);return !x.length||!y.length||JSON.stringify(x)===JSON.stringify(y)||(Boolean(a.mingya?.key)&&y.every(n=>x.includes(n)))||(Boolean(b.mingya?.key)&&x.every(n=>y.includes(n)));};
++export const policyCompanyKey=(value:unknown)=>clean(value);
++export const policyTermKey=(value:unknown)=>{const m=String(value||'').match(/^(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})/);return m?`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`:'';};
++export const policyBaseKey=(p:PolicyIdentity)=>policyNumberKey(p.policyNumber)&&clean(p.company)?`${clean(p.company)}|${policyNumberKey(p.policyNumber)}`:'';
++export function findPolicyMatch<T extends PolicyIdentity>(p:PolicyIdentity,all:T[]):T|undefined {
++ const direct=all.find(x=>p.id&&x.id===p.id)||all.find(x=>p.mingya?.key&&x.mingya?.key===p.mingya.key);if(direct)return direct;
++ const base=policyBaseKey(p);if(!base)return;
++ const candidates=all.filter(x=>policyBaseKey(x)===base&&!(p.mingya?.key&&x.mingya?.key&&p.mingya.key!==x.mingya.key)&&!(person(p.applicant)&&person(x.applicant)&&person(p.applicant)!==person(x.applicant))&&insuredCompatible(p,x));
++ const term=policyTermKey(p.effectiveDate);const exact=term?candidates.filter(x=>policyTermKey(x.effectiveDate)===term):[];
++ if(exact.length===1)return exact[0];if(exact.length>1)return;
++ const terms=new Set(candidates.map(x=>policyTermKey(x.effectiveDate)).filter(Boolean));
++ const compatible=candidates.filter(x=>!term||!policyTermKey(x.effectiveDate));
++ return terms.size<=1&&compatible.length===1?compatible[0]:undefined;
++}
+diff --git a/services/renewal.ts b/services/renewal.ts
+index 0ce683a..a88e694 100644
+--- a/services/renewal.ts
++++ b/services/renewal.ts
+@@ -1,3 +1,4 @@
++import {findPolicyMatch,policyBaseKey,policyTermKey,policyNumberKey,readPolicyNumber} from './policyIdentity.ts';
+ import {excludedPolicyImport,mingyaStatusLabel} from './policyImportRules.ts';
+ import { detailNextPayment, reconcileMingyaPayments } from './mingyaPayments.ts';
+ import * as XLSX from "xlsx";
+@@ -38,14 +39,8 @@ export const emptyData: RenewalData = {
+   imports: [],
+ };
+ export const inactive = (s: string) => /撤单|退保|拒保|终止|失效/.test(s || "");
+-export const normalizedPolicyNumber = (value: unknown) => {
+-  const clean = String(value ?? "").trim().replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+-  return clean.replace(/^0+(?=[0-9A-Z])/, "");
+-};
+-const legacyKey = (p: Partial<ManagedPolicy>) =>
+-  normalizedPolicyNumber(p.policyNumber)
+-    ? `${p.company?.trim()}|${normalizedPolicyNumber(p.policyNumber)}`
+-    : `manual:${p.id}`;
++export const normalizedPolicyNumber=policyNumberKey;
++const legacyKey=(p:Partial<ManagedPolicy>)=>policyBaseKey(p)?`${policyBaseKey(p)}|${policyTermKey(p.effectiveDate)}|${String(p.applicant||'').replace(/\s/g,'').toLowerCase()}|${String(p.insured||'').replace(/\s/g,'').toLowerCase()}`:`manual:${p.id}`;
+ export const key = (p: Partial<ManagedPolicy>) => p.mingya?.key ? `mingya:${p.mingya.key}` : legacyKey(p);
+ const text = (v: unknown) => String(v ?? "").trim();
+ export function date(v: unknown) {
+@@ -88,7 +83,7 @@ export function parseWorkbook(
+       };
+       const status=text(get("保单状态"))||(text(get("保单状态代码"))?mingyaStatusLabel(get("保单状态代码")):"");
+       if(excludedPolicyImport(status)){filtered++;continue;}
+-      const num = text(get("保单号"));
++      const num = readPolicyNumber(get("保单号"));
+       if (!num) {
+         if (text(get("保单状态")) === "撤单") continue;
+         if (row.some((v) => text(v)))
+@@ -153,40 +148,40 @@ export function candidates(
+     });
+ }
+ export function mergePolicies(old: ManagedPolicy[], incoming: ManagedPolicy[]) {
+-  const map = new Map(old.map((p) => [key(p), structuredClone(p)]));
+-  for (const p of incoming) {
+-    let prev = map.get(key(p)) || [...map.values()].find(old => old.id === p.id);
+-    if (!prev && !p.mingya) {
+-      const related=[...map.values()].filter(old=>old.mingya && legacyKey(old)===legacyKey(p));
+-      prev=related.find(old=>date(old.effectiveDate)===date(p.effectiveDate)) || (related.length===1?related[0]:undefined);
+-    }
+-    const targetKey=prev?.mingya && !p.mingya ? key(prev) : key(p);
+-    if (prev && key(prev)!==targetKey) map.delete(key(prev));
++  const map=new Map<string,ManagedPolicy>();
++  for(const [index,p] of [...old,...incoming].entries()) {
++    const dedupe=index<old.length;
++    const prev=findPolicyMatch(p,[...map.values()]);
++    const targetKey=prev?.mingya&&!p.mingya?key(prev):key(p);
++    if(prev)map.delete(key(prev));
+     if (!prev) {
+       map.set(key(p), structuredClone(p));
+       continue;
+     }
+     const payments = new Map((prev.payments||[]).map((x) => [x.date, x]));
+-    for (const x of p.payments) {
++    for (const x of p.payments||[]) {
+       const before=payments.get(x.date);
++      const beforeTime=Date.parse(before?.confirmedAt||'')||0,incomingTime=Date.parse(x.confirmedAt||'')||0;
++      const keepBefore=before&&(beforeTime>incomingTime||(dedupe&&beforeTime===incomingTime&&before.status==='已缴费'&&x.status!=='已缴费'));
++      const selected=keepBefore?{...x,...before}:x;
+       const histories=[...(before?.history||[]),...(x.history||[])];
+-      if(before&&before.status!==x.status&&!histories.some(h=>h.from===before.status&&h.to===x.status)) {
+-        histories.push({at:x.sourceCapturedAt||p.mingya?.capturedAt||new Date().toISOString(),from:before.status,to:x.status,source:x.source||p.source||'导入'});
++      if(before&&before.status!==selected.status&&!histories.some(h=>h.from===before.status&&h.to===selected.status)) {
++        histories.push({at:x.sourceCapturedAt||p.mingya?.capturedAt||new Date().toISOString(),from:before.status,to:selected.status,source:x.source||p.source||'导入'});
+       }
+       const history=[...new Map(histories.map(h=>[`${h.at}|${h.from}|${h.to}|${h.source}`,h])).values()];
+-      payments.set(x.date,{...before,...x,contactedAt:before?.contactedAt,history});
++      payments.set(x.date,{...before,...selected,contactedAt:before?.contactedAt||x.contactedAt,history});
+     }
+     const nonempty = Object.fromEntries(
+       Object.entries(p).filter(
+         ([k, v]) =>
+-          v !== "" && v !== undefined && !["id", "payments"].includes(k),
++          v !== "" && v !== undefined && !["id", "payments"].includes(k) && !(prev.mingya&&!p.mingya&&prev[k as keyof ManagedPolicy]!==undefined&&prev[k as keyof ManagedPolicy]!==''),
+       ),
+     );
+     map.set(targetKey, {
+       ...prev,
+       ...nonempty,
+       id: prev.id,
+-      ...(p.payments.length && !p.mingya
++      ...((p.payments||[]).length && !p.mingya
+         ? {
+             status: prev.status || p.status,
+             premium: prev.premium || p.premium,
+@@ -215,7 +210,7 @@ export function dueItems(policies: ManagedPolicy[], now = today()) {
+   return policies
+     .filter((p) => !inactive(p.status) && !p.status.includes('明亚状态'))
+     .flatMap((p) => {
+-      const pay = nextPayment(p);
++      const pay = nextPayment(p,now);
+       const items: {
+         policy: ManagedPolicy;
+         type: "payment" | "renewal";
+@@ -248,7 +243,7 @@ export function migrate(contacts: Contact[]) {
+     for (const p of c.policies || [])
+       all.push({
+         ...p,
+-        applicantId: c.id,
++        applicantId: (p as ManagedPolicy).applicantId || c.id,
+         payments: (p as ManagedPolicy).payments || [],
+       });
+   return mergePolicies([], all);
+@@ -264,14 +259,22 @@ export function addMonths(anchor: string, months: number): string {
+   target.setUTCDate(Math.min(d, last));
+   return target.toISOString().slice(0, 10);
+ }
+-export function nextPayment(p: ManagedPolicy): Payment | undefined {
++export function paymentTermEnd(p:ManagedPolicy):string {
++ const explicit=date(p.paymentEndDate||p.mingya?.paymentEndDate);if(explicit)return explicit;
++ const years=/^(\d+)年$/.exec(p.paymentYears||'');return years&&date(p.effectiveDate)?addMonths(p.effectiveDate,Number(years[1])*12):'';
++}
++export const paymentTermEnded=(p:ManagedPolicy,asOf=today())=>Boolean(paymentTermEnd(p)&&paymentTermEnd(p)<=asOf);
++export function nextPayment(p: ManagedPolicy,asOf=today()): Payment | undefined {
+   if (inactive(p.status) || p.status.includes('明亚状态')) return;
+-  const detail=detailNextPayment(p,p.payments||[]);if(detail)return detail;
++  const end=paymentTermEnd(p);
++  const detail=detailNextPayment(p,p.payments||[]);if(detail&&(!end||detail.date<end)&&!(paymentTermEnded(p,asOf)&&detail.amountReference))return detail;
+   const latest = [...reconcileMingyaPayments(p.payments||[],p)].sort((a, b) =>
+     b.date.localeCompare(a.date),
+   )[0];
+-  if (latest?.status === "未缴费") return latest;
++  if (latest?.status === "未缴费") return !end||latest.date<end?latest:undefined;
+   if (latest && latest.status !== "已缴费") return;
++  if(paymentTermEnded(p,asOf))return;
++  if(!latest&&date(p.effectiveDate)&&p.effectiveDate<asOf)return;
+   const frequency = p.paymentFrequency || "";
+   if (/趸|一次/.test(frequency) || /趸/.test(p.paymentYears || "")) return;
+   const months = /半年/.test(frequency)
+@@ -286,8 +289,7 @@ export function nextPayment(p: ManagedPolicy): Payment | undefined {
+   const years = /^(\d+)年$/.exec(p.paymentYears || "");
+   if (!months || !date(p.effectiveDate) || (!p.paymentEndDate && !years))
+     return;
+-  const end =
+-    p.paymentEndDate || addMonths(p.effectiveDate, Number(years![1]) * 12);
++
+   let candidate = p.effectiveDate;
+   if (latest) {
+     let n = Math.max(
+@@ -327,7 +329,7 @@ export function projectContacts(
+     return {
+       ...c,
+       policies: [
+-        ...(c.policies || []).filter((p) => !known.has(key(p)) && !knownIds.has(p.id)),
++        ...(c.policies || []).filter((p) => !known.has(key(p)) && !knownIds.has(p.id) && !findPolicyMatch(p,policies)),
+         ...associated,
+       ],
+     };
+diff --git a/supabase/migrations/20261123053532_protect_policy_identity.sql b/supabase/migrations/20261123053532_protect_policy_identity.sql
+new file mode 100644
+index 0000000..e2acf96
+--- /dev/null
++++ b/supabase/migrations/20261123053532_protect_policy_identity.sql
+@@ -0,0 +1,36 @@
++create or replace function public.policy_business_key_v1(p jsonb)returns text language sql immutable set search_path=public,pg_temp as $$
++ select case when coalesce(p->>'policyNumber','')='' or coalesce(p->>'company','')='' then null else regexp_replace(upper(p->>'company'),'[[:space:]（）()]','','g')||'|'||regexp_replace(upper(regexp_replace(p->>'policyNumber','[^a-zA-Z0-9]','','g')),'^0+(?=.)','')||'|'||left(coalesce(p->>'effectiveDate',''),10)||'|'||lower(regexp_replace(coalesce(p->>'applicant',''),'[[:space:]　]+','','g')) end;
++$$;
++create or replace function public.policy_insured_names_v1(p jsonb)returns text[] language sql immutable set search_path=public,pg_temp as $$
++ select coalesce(array_agg(distinct n order by n),'{}'::text[])from(select lower(regexp_replace(v,'[[:space:]　]+','','g'))n from regexp_split_to_table(coalesce(p->>'insured',''),'[,，、;；]')v)s where n<>'';
++$$;
++create or replace function public.policies_have_duplicates_v1(items jsonb)returns boolean language plpgsql immutable set search_path=public,pg_temp as $$
++declare g record;a record;b record;an text[];bn text[];
++begin
++ if jsonb_typeof(items)is distinct from 'array' then return false;end if;
++ if exists(select 1 from jsonb_array_elements(items)p where nullif(p->>'id','')is not null group by p->>'id' having count(*)>1)then return true;end if;
++ if exists(select 1 from jsonb_array_elements(items)p where nullif(p->'mingya'->>'key','')is not null group by p->'mingya'->>'key' having count(*)>1)then return true;end if;
++ for g in select jsonb_agg(p)members from jsonb_array_elements(items)p where public.policy_business_key_v1(p)is not null group by public.policy_business_key_v1(p)having count(*)>1 loop
++  for a in select value,ordinality n from jsonb_array_elements(g.members)with ordinality loop
++   for b in select value,ordinality n from jsonb_array_elements(g.members)with ordinality where ordinality>a.n loop
++    if nullif(a.value->'mingya'->>'key','')is not null and nullif(b.value->'mingya'->>'key','')is not null and a.value->'mingya'->>'key'<>b.value->'mingya'->>'key' then continue;end if;
++    an:=public.policy_insured_names_v1(a.value);bn:=public.policy_insured_names_v1(b.value);
++    if cardinality(an)=0 or cardinality(bn)=0 or an=bn or (nullif(a.value->'mingya'->>'key','')is not null and bn<@an) or(nullif(b.value->'mingya'->>'key','')is not null and an<@bn)then return true;end if;
++   end loop;
++  end loop;
++ end loop;
++ return false;
++end $$;
++create or replace function public.guard_policy_identity_v1()returns trigger language plpgsql security invoker set search_path=public,pg_temp as $$
++declare c jsonb;
++begin
++ if new.data_type='renewal_v1' then
++  if public.policies_have_duplicates_v1(new.data->'policies')then raise exception using errcode='PT409',message='检测到同一保单的重复记录，请刷新后合并导入，未保存此次修改。';end if;
++ elsif new.data_type='contacts' and jsonb_typeof(new.data)='array' then
++  for c in select value from jsonb_array_elements(new.data)loop
++   if public.policies_have_duplicates_v1(c->'policies')then raise exception using errcode='PT409',message='客户保单包含重复记录，请刷新后合并导入，未保存此次修改。';end if;
++  end loop;
++ end if;return new;
++end $$;
++revoke all on function public.guard_policy_identity_v1()from public;
++create trigger zz_policy_identity before insert or update of data on public.app_data for each row execute function public.guard_policy_identity_v1();
+diff --git a/tests/mingyaImport.test.cjs b/tests/mingyaImport.test.cjs
+index 44b43cf..231a0af 100644
+--- a/tests/mingyaImport.test.cjs
++++ b/tests/mingyaImport.test.cjs
+@@ -1,5 +1,5 @@
+ const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const ts=require('typescript');const crypto=require('node:crypto').webcrypto;
+-const moduleCache={};function localRequire(name){name=name.replace(/\.ts$/,'');if(moduleCache[name])return moduleCache[name];if(!['./mingyaFinancial','./mingyaPayments','./mingyaImport','./mingyaRepair','./policyImportRules'].includes(name))throw Error(name);const exp={};moduleCache[name]=exp;vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/'+name.slice(2)+'.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exp,require:localRequire,structuredClone});return exp;}
++const moduleCache={};function localRequire(name){name=name.replace(/\.ts$/,'');if(moduleCache[name])return moduleCache[name];if(!['./mingyaFinancial','./mingyaPayments','./mingyaImport','./mingyaRepair','./policyImportRules','./policyIdentity'].includes(name))throw Error(name);const exp={};moduleCache[name]=exp;vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/'+name.slice(2)+'.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exp,require:localRequire,structuredClone});return exp;}
+ const exportsObject={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/mingyaImport.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsObject,crypto,structuredClone,console,require:localRequire});
+ const {planMingyaImport,parseMingyaPayload}=exportsObject;
+ const contact=(extra={})=>({id:'c1',wxid:'wechat',nickname:'客户甲',remarkName:'客户甲',remarkInfo:'手动备注',tags:['重点'],addedAt:1,dealProducts:[],intentProducts:['养老'],progressHistory:[{id:'h',date:'2026-01-01',content:'保留跟进'}],policies:[],...extra});
+@@ -83,3 +83,5 @@ test('does not confuse suspended or cancellation-in-progress with final cancella
+ });
+ 
+ test('same-name policy import cannot create an independent duplicate',()=>{const p=payload([record()]),original=[contact()];const pending=planMingyaImport(original,p);assert.equal(pending.issues[0].allowNew,false);const forced=planMingyaImport(original,p,{[pending.issues[0].key]:'new'});assert.equal(forced.contacts.length,1);assert.equal(forced.addedContacts,0);assert.equal(forced.issues.length,1);});
++test('leading zero aliases merge into the existing ID and preserve the exact source number',()=>{const p=payload([record({policyCode:'000001'})]);const old={id:'legacy',policyNumber:'1',company:'公司甲',effectiveDate:'2026-01-01',productName:'产品',applicant:'客户甲',premium:'50'};const result=planMingyaImport([contact({policies:[old]})],p);assert.equal(result.addedPolicies,0);assert.equal(result.updatedPolicies,1);assert.equal(result.contacts[0].policies[0].id,'legacy');assert.equal(result.contacts[0].policies[0].policyNumber,'000001');});
++test('numeric JSON with unsafe long policy number is rejected rather than silently rounded',()=>{assert.throws(()=>planMingyaImport([],payload([record({policyCode:10490006601088300000})])),/长保单号/);});
+diff --git a/tests/policy-identity-guard.sql b/tests/policy-identity-guard.sql
+new file mode 100644
+index 0000000..1afee0c
+--- /dev/null
++++ b/tests/policy-identity-guard.sql
+@@ -0,0 +1,11 @@
++begin;
++insert into public.app_data(app_id,data_type,data)values('test_policy_identity','renewal_v1','{"policies":[{"id":"p1","company":"示例公司","policyNumber":"00123","effectiveDate":"2026-01-01","applicant":"甲","insured":"乙","payments":[]}]}'),('test_policy_identity','contacts','[{"id":"c1","remarkName":"甲","policies":[{"id":"p1","company":"示例公司","policyNumber":"00123","effectiveDate":"2026-01-01","applicant":"甲","insured":"乙"}]}]');
++set local role anon;
++do $$begin
++ begin update public.app_data set data=jsonb_set(data,'{policies}',data->'policies'||'[{"id":"p2","company":"示例公司","policyNumber":"123","effectiveDate":"2026-01-01","applicant":"甲","insured":"乙","mingya":{"key":"index:2"}}]')where app_id='test_policy_identity'and data_type='renewal_v1';raise exception 'duplicate accepted';exception when sqlstate 'PT409' then null;end;
++ if public.policies_have_duplicates_v1('[{"id":"a","company":"C","policyNumber":"1","effectiveDate":"2025-01-01"},{"id":"b","company":"C","policyNumber":"001","effectiveDate":"2026-01-01"}]')then raise exception 'annual policies collapsed';end if;
++ if public.policies_have_duplicates_v1('[{"id":"a","company":"C","policyNumber":"1","effectiveDate":"2026-01-01","mingya":{"key":"a"}},{"id":"b","company":"C","policyNumber":"001","effectiveDate":"2026-01-01","mingya":{"key":"b"}}]')then raise exception 'distinct source identities collapsed';end if;
++ if not public.policies_have_duplicates_v1('[{"id":"a","company":"C","policyNumber":"1","effectiveDate":"2026-01-01","insured":"乙,甲"},{"id":"b","company":"C","policyNumber":"001","effectiveDate":"2026-01-01","insured":"甲、乙","mingya":{"key":"b"}}]')then raise exception 'insured order duplicate missed';end if;
++ begin update public.app_data set data='[{"id":"c1","remarkName":"甲","policies":[{"id":"p1","company":"C","policyNumber":"1","effectiveDate":"2026-01-01"},{"id":"p2","company":"C","policyNumber":"001","effectiveDate":"2026-01-01"}]}]'::jsonb where app_id='test_policy_identity' and data_type='contacts';raise exception 'contact duplicate accepted';exception when sqlstate 'PT409' then null;end;
++end $$;
++reset role;rollback;
+diff --git a/tests/policyIdentity.test.ts b/tests/policyIdentity.test.ts
+new file mode 100644
+index 0000000..a2dd35a
+--- /dev/null
++++ b/tests/policyIdentity.test.ts
+@@ -0,0 +1,11 @@
++import test from 'node:test';import assert from 'node:assert/strict';
++import {mergePolicies,migrate,projectContacts,parseWorkbook} from '../services/renewal.ts';
++import {readPolicyNumber} from '../services/policyIdentity.ts';
++import * as XLSX from 'xlsx';
++const legacy:any={id:'legacy',company:'君龙人寿保险有限公司',policyNumber:'537037199',effectiveDate:'2024-08-26',productName:'产品',applicant:'甲',insured:'甲',premium:'20000',status:'正式保单',payments:[{date:'2026-08-26',amount:'20000',status:'已缴费',confirmedAt:'2026-11-22T01:00:00Z',contactedAt:'2026-11-21T01:00:00Z',history:[{at:'2026-11-22T01:00:00Z',from:'未缴费',to:'已缴费',source:'人工确认'}]}],applicantId:'c1'};
++const detail:any={...legacy,id:'source',policyNumber:'000000537037199',mingya:{key:'index:1',capturedAt:'2026-11-21T01:00:00Z',mappingVersion:2},paymentYears:'10年',payments:[{date:'2026-08-26',amount:'20000',status:'未缴费'},{date:'2025-08-26',amount:'20000',status:'已缴费'}]};
++test('old/new source order collapses duplicates already in the database, preserving paid/contacted history',()=>{for(const rows of [[legacy,detail],[detail,legacy]]){const result=mergePolicies(rows,[]);assert.equal(result.length,1);assert.equal(result[0].mingya?.key,'index:1');assert.equal(result[0].policyNumber,'000000537037199');assert.equal(result[0].payments.length,2);const pay=result[0].payments.find(x=>x.date==='2026-08-26')!;assert.equal(pay.status,'已缴费');assert.equal(pay.contactedAt,legacy.payments[0].contactedAt);assert.equal(pay.history?.length,1);}});
++test('renewal years and genuinely different numbers or insurers do not collapse',()=>{assert.equal(mergePolicies([legacy,{...legacy,id:'annual',effectiveDate:'2025-08-26'}],[]).length,2);assert.equal(mergePolicies([legacy,{...legacy,id:'number',policyNumber:'537037198'}],[]).length,2);assert.equal(mergePolicies([legacy,{...legacy,id:'insurer',company:'其他公司'}],[]).length,2);assert.equal(mergePolicies([{...detail},{...detail,id:'differentIndex',mingya:{...detail.mingya,key:'index:2'}}],[]).length,2);});
++test('insured order and an authoritative full insured list can enrich the same contract',()=>{assert.equal(mergePolicies([{...legacy,insured:'甲,乙'},{...detail,insured:'乙、甲'}],[]).length,1);assert.equal(mergePolicies([{...legacy,insured:'乙'},{...detail,insured:'乙、甲'}],[]).length,1);assert.equal(mergePolicies([{...legacy,insured:'乙'},{...detail,insured:'丙'}],[]).length,2);});
++test('projection and insured copies cannot resurrect aliases or move ownership',()=>{const policies=mergePolicies([legacy,detail],[]);const c:any={id:'c1',policies:[legacy,detail]};assert.equal(projectContacts([c],policies,true)[0].policies?.length,1);const insured:any={id:'c2',policies:[{...detail,insuredId:'c2'}]};assert.equal(migrate([c,insured])[0].applicantId,'c1');});
++test('unsafe long numeric policy numbers are blocked while exact text is preserved',()=>{assert.equal(readPolicyNumber('10490006601088366512'),'10490006601088366512');assert.throws(()=>readPolicyNumber(10490006601088300000),/长保单号/);const w=XLSX.utils.book_new();XLSX.utils.book_append_sheet(w,XLSX.utils.aoa_to_sheet([['保单号','保单状态'],[10490006601088300000,'正式保单']]),'保单');assert.throws(()=>parseWorkbook(XLSX.write(w,{type:'array',bookType:'xlsx'}),'test'),/长保单号/);});
+diff --git a/tests/renewal.test.ts b/tests/renewal.test.ts
+index da56a2a..5447fc1 100644
+--- a/tests/renewal.test.ts
++++ b/tests/renewal.test.ts
+@@ -244,3 +244,6 @@ test('Mingya workbook status codes use the verified cancellation mapping',()=>{
+  ]),'保单');
+  assert.deepEqual(parseWorkbook(XLSX.write(book,{type:'array',bookType:'xlsx'}),'codes.xlsx').map(p=>p.policyNumber),['A','PENDING']);
+ });
++test('expired payment term with no billing history cannot invent an overdue first installment',()=>{const old={...p,effectiveDate:'2009-05-19',paymentEndDate:'2023-05-19',paymentYears:'15年',paymentFrequency:'期交-年',payments:[]};assert.equal(nextPayment(old,'2026-11-23'),undefined);assert.equal(dueItems([old],'2026-11-23').length,0);assert.equal(nextPayment({...old,paymentEndDate:''},'2026-11-23'),undefined);});
++test('term end does not erase a real unpaid historical installment',()=>{const old={...p,effectiveDate:'2009-05-19',paymentEndDate:'2023-05-19',paymentYears:'15年',paymentFrequency:'期交-年',payments:[{date:'2022-05-19',amount:'4491',status:'未缴费'}]};assert.equal(nextPayment(old,'2026-11-23')?.date,'2022-05-19');assert.equal(nextPayment({...old,payments:[{...old.payments[0],date:'2023-05-19'}]},'2026-11-23'),undefined);});
++test('missing billing history is not proof of an unpaid first premium in an ongoing term',()=>{const current={...p,effectiveDate:'2024-01-01',paymentFrequency:'期交-年',paymentYears:'20年',payments:[]};assert.equal(nextPayment(current,'2026-11-23'),undefined);});
+diff --git a/tools/audit-policy-duplicates.cjs b/tools/audit-policy-duplicates.cjs
+new file mode 100644
+index 0000000..232391e
+--- /dev/null
++++ b/tools/audit-policy-duplicates.cjs
+@@ -0,0 +1,3 @@
++// Private read-only snapshot. Never prints raw customer records or credentials.
++const fs=require('node:fs');
++(async()=>{const{loadEnv}=await import('vite');const{createClient}=await import('@supabase/supabase-js');const env=loadEnv('production',process.cwd(),'VITE_'),config=fs.readFileSync('vite.config.ts','utf8');const url=env.VITE_SUPABASE_URL||'https://ulgqiixqaxxgodyowrep.supabase.co',key=env.VITE_SUPABASE_ANON_KEY||config.match(/env\.VITE_SUPABASE_ANON_KEY \|\| '([^']+)'/)[1];if(new URL(url).hostname!=='ulgqiixqaxxgodyowrep.supabase.co')throw Error('Wrong target');const client=createClient(url,key,{auth:{persistSession:false}});const{data,error}=await client.from('app_data').select('id,app_id,data_type,data,updated_at').eq('app_id','app_yp9dq7mofjm').in('data_type',['contacts','renewal_v1']);if(error)throw error;const dir='/Users/apple/.codex/backups/insurance-20261123-policy-dedup';fs.mkdirSync(dir,{recursive:true,mode:0o700});const file=dir+'/snapshot-'+Date.now()+'.json';fs.writeFileSync(file,JSON.stringify(data),{mode:0o600});fs.writeFileSync(dir+'/latest.txt',file,{mode:0o600});console.log(JSON.stringify({backup:file,contacts:data.find(x=>x.data_type==='contacts').data.length,policies:data.find(x=>x.data_type==='renewal_v1').data.policies.length}));})().catch(e=>{console.error(e.message);process.exitCode=1;});
+diff --git a/tools/repair-policy-duplicates.cjs b/tools/repair-policy-duplicates.cjs
+new file mode 100644
+index 0000000..3a30e99
+--- /dev/null
++++ b/tools/repair-policy-duplicates.cjs
+@@ -0,0 +1,11 @@
++// Read-only by default; only an explicit --apply commits the backed-up, versioned plan.
++const fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
++const cache={};function load(name){const file=name.replace(/\.ts$/,'')+'.ts';if(cache[file])return cache[file];const exp={};cache[file]=exp;const code=ts.transpileModule(fs.readFileSync('services/'+file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;vm.runInNewContext(code,{exports:exp,structuredClone,crypto:require('node:crypto').webcrypto,require:p=>p.startsWith('./')?load(p.slice(2)):require(p)});return exp;}
++(async()=>{const dir='/Users/apple/.codex/backups/insurance-20261123-policy-dedup';const rows=JSON.parse(fs.readFileSync(fs.readFileSync(dir+'/latest.txt','utf8'),'utf8'));const c=rows.find(r=>r.data_type==='contacts'),r=rows.find(r=>r.data_type==='renewal_v1');const {mergePolicies}=load('renewal'),{findPolicyMatch}=load('policyIdentity');
++let originals=[...r.data.policies,...c.data.flatMap(c=>(c.policies||[]).map(p=>({...p,applicantId:p.applicantId||c.id,payments:p.payments||[]})))];if(process.argv.includes('--merge-precision-confirmed')){const bad=originals.find(p=>p.policyNumber==='10490006601088300000'),good=originals.find(p=>p.policyNumber==='10490006601088366512'&&p.mingya?.key);if(bad&&(!good||!findPolicyMatch({...bad,policyNumber:good.policyNumber},[good])||bad.premium!==good.premium))throw Error('Confirmed precision pair changed');originals=originals.map(p=>p.policyNumber==='10490006601088300000'&&p.applicant===good?.applicant?{...p,policyNumber:good.policyNumber}:p);}
++const policies=mergePolicies(originals,[]);const aliases={};for(const p of originals){const m=findPolicyMatch(p,policies);if(!m)throw Error('Unmatched original '+p.id);if(m.id!==p.id)aliases[p.id]=m.id;for(const pay of p.payments||[])if(!m.payments.some(x=>x.date===pay.date))throw Error('Payment lost '+p.id);}
++const byId=new Map(policies.map(p=>[p.id,p]));const contacts=c.data.map(c=>({...c,policies:[...new Map((c.policies||[]).map(p=>{const target=byId.get(aliases[p.id]||p.id);if(!target)throw Error('Contact policy lost');return[target.id,target];})).values()]}));const next={...r.data,policies};
++for(let i=0;i<contacts.length;i++){for(const k of ['progressHistory','progressDeletedIds','remarkInfo','tags','categoryIds'])if(JSON.stringify(contacts[i][k])!==JSON.stringify(c.data[i][k]))throw Error('Contact data changed '+k);}
++const plan={contacts,renewal:next,aliases};fs.writeFileSync(dir+'/plan.json',JSON.stringify(plan),{mode:0o600});console.log(JSON.stringify({before:r.data.policies.length,after:policies.length,aliases:Object.keys(aliases).length,contactCount:contacts.length,target:policies.filter(p=>p.applicant==='潘淑蓓').map(p=>({id:p.id,number:p.policyNumber,payments:p.payments.length})),followups:contacts.reduce((n,c)=>n+(c.progressHistory||[]).length,0)}));
++if(!process.argv.includes('--apply'))return;
++const{loadEnv}=await import('vite');const{createClient}=await import('@supabase/supabase-js');const env=loadEnv('production',process.cwd(),'VITE_'),config=fs.readFileSync('vite.config.ts','utf8'),url=env.VITE_SUPABASE_URL||'https://ulgqiixqaxxgodyowrep.supabase.co',key=env.VITE_SUPABASE_ANON_KEY||config.match(/env\.VITE_SUPABASE_ANON_KEY \|\| '([^']+)'/)[1];if(new URL(url).hostname!=='ulgqiixqaxxgodyowrep.supabase.co')throw Error('Wrong target');const client=createClient(url,key,{auth:{persistSession:false}});const{error}=await client.rpc('commit_mingya_import_v2',{p_app_id:c.app_id,p_contact_id:c.id,p_contact_revision:c.updated_at,p_renewal_revision:r.updated_at,p_contacts:contacts,p_renewal:next});if(error)throw error;console.log('Backed-up duplicate reconciliation committed atomically.');})().catch(e=>{console.error(e.message);process.exitCode=1;});

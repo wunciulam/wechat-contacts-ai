@@ -167,6 +167,37 @@ export const loadFromCloud = async (dataType: string): Promise<any | null> => {
   }
 };
 
+export const loadLatestFromCloud = async (dataType: string): Promise<any | null> => {
+  if (!isSupabaseConfigured()) {
+    console.log('Supabase 未配置，跳过云端加载');
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('app_data')
+      .select('app_id, data, updated_at')
+      .eq('data_type', dataType)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('云端最新数据加载失败:', error);
+      return null;
+    }
+
+    if (data?.app_id) {
+      setStoredAppId(data.app_id);
+    }
+
+    return data?.data || null;
+  } catch (e) {
+    console.error('云端最新数据加载异常:', e);
+    return null;
+  }
+};
+
 /**
  * 旧版兼容：早期版本可能把联系人直接存进 contacts 表。
  * 当 app_data 没有 contacts 数据时，可用它来恢复/迁移。

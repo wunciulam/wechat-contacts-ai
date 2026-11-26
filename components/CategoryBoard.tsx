@@ -156,6 +156,15 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
     return contacts.filter(c => c.followUpStatus !== 'following');
   }, [contacts]);
 
+  const getDisplayCategoryId = (contact: Contact) => {
+    if (contact.categoryId && categories.some(category => category.id === contact.categoryId)) {
+      return contact.categoryId;
+    }
+
+    const tagMatchedCategory = categories.find(category => contact.tags?.includes(category.name));
+    return tagMatchedCategory?.id || '__uncategorized__';
+  };
+
   const contactsByCategory = useMemo(() => {
     const groups: Record<string, Contact[]> = {};
     categories.forEach(cat => {
@@ -163,7 +172,7 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
     });
     groups['__uncategorized__'] = [];
     filteredContacts.forEach(contact => {
-      const key = contact.categoryId || '__uncategorized__';
+      const key = getDisplayCategoryId(contact);
       if (!groups[key]) groups[key] = [];
       groups[key].push(contact);
     });

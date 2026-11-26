@@ -1,0 +1,352 @@
+diff --git a/App.tsx b/App.tsx
+index ad05589..faef2fb 100644
+--- a/App.tsx
++++ b/App.tsx
+@@ -96,6 +96,8 @@ const App: React.FC = () => {
+   const [isLoaded, setIsLoaded] = useState(false);
+   const [currentView, setCurrentView] = useState<'contacts' | 'followups' | 'policies'>('contacts');
+   const [detailPolicyId,setDetailPolicyId]=useState<string | undefined>();
++  const [policyScopeId,setPolicyScopeId]=useState<string|null>(null);
++  const changeView=(view:typeof currentView)=>{setPolicyScopeId(null);setCurrentView(view);};
+   const [policyContactId, setPolicyContactId] = useState<string | null>(null);
+   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+   
+@@ -961,6 +963,7 @@ const App: React.FC = () => {
+           case 'policies':
+               return (
+                   <RenewalWorkspace 
++                     scopeContactId={policyScopeId} onClearScope={()=>setPolicyScopeId(null)}
+                      importFiles={policyImportFiles}
+                      onImportConsumed={() => setPolicyImportFiles(null)}
+                      onContacts={acceptSavedPolicyContacts} beforeSave={beforePolicySave}
+@@ -1001,9 +1004,9 @@ const App: React.FC = () => {
+         onToggleAllTags={handleToggleAllTags}
+         totalContacts={contacts.length}
+         followUpCount={contacts.filter(c => c.followUpStatus === 'following').length}
+-        policyCount={contacts.filter(c => c.policies && c.policies.length > 0).length}
++        policyCount={contacts.filter(c => c.policies?.some(p=>!excludedPolicyImport(p.status))).length}
+         currentView={currentView}
+-        onChangeView={setCurrentView}
++        onChangeView={changeView}
+         isMobileOpen={isMobileSidebarOpen}
+         onCloseMobile={() => setIsMobileSidebarOpen(false)}
+       />
+@@ -1034,21 +1037,21 @@ const App: React.FC = () => {
+         {/* Mobile Bottom Navigation */}
+         <div className="md:hidden h-16 bg-white border-t border-gray-100 flex items-center justify-around px-2 shrink-0 z-20 pb-safe">
+           <button
+-            onClick={() => setCurrentView('contacts')}
++            onClick={() => changeView('contacts')}
+             className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all ${currentView === 'contacts' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`}
+           >
+             <Users size={18} />
+             <span className="text-[9px] font-medium">联系人</span>
+           </button>
+           <button 
+-            onClick={() => setCurrentView('followups')}
++            onClick={() => changeView('followups')}
+             className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all ${currentView === 'followups' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`}
+           >
+             <ClipboardList size={18} />
+             <span className="text-[9px] font-medium">工作台</span>
+           </button>
+           <button 
+-            onClick={() => setCurrentView('policies')}
++            onClick={() => changeView('policies')}
+             className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-all ${currentView === 'policies' ? 'text-gray-900 bg-gray-100' : 'text-gray-400'}`}
+           >
+             <FileText size={18} />
+@@ -1074,7 +1077,8 @@ const App: React.FC = () => {
+       />
+       <ImportModal 
+         onMingyaImport={() => { setIsModalOpen(false); setMingyaPayload(null); setIsMingyaImportOpen(true); }}
+-        onPolicyImport={files => { setPolicyImportFiles(files); setIsModalOpen(false); setCurrentView('policies'); }}
++        onPolicyImport={files => { setPolicyImportFiles(files); setIsModalOpen(false); changeView('policies'); }}
++        onManagePolicies={id=>{setIsModalOpen(false);setEditingContact(null);setPolicyScopeId(id);setSelectedTags(new Set());setFollowUpFilter(null);setCurrentView('policies');}}
+         relatedPolicies={editingContact ? projectContacts(contacts, migrate(contacts), true).find(c => c.id === editingContact.id)?.policies : []}
+         onPolicyDetail={p=>{if(editingContact){setDetailPolicyId(p.id);setPolicyContactId(editingContact.id);}}}
+         isOpen={isModalOpen}
+diff --git a/components/ImportModal.tsx b/components/ImportModal.tsx
+index 7931d63..c388c7c 100644
+--- a/components/ImportModal.tsx
++++ b/components/ImportModal.tsx
+@@ -14,6 +14,7 @@ interface ImportModalProps {
+   onPolicyImport?: (files: FileList) => void;
+   relatedPolicies?: Policy[];
+   onPolicyDetail?: (p: Policy) => void;
++  onManagePolicies?: (contactId:string)=>void;
+   onClose: () => void;
+   onSave: (contacts: NewContact[],requestId?:string) => Promise<void>;
+   onPersistFollowup?: (contactId:string,kind:'add'|'edit'|'delete',record:ProgressRecord,expected?:ProgressRecord)=>Promise<Contact>;
+@@ -22,10 +23,11 @@ interface ImportModalProps {
+   allTags?: string[];
+ }
+ 
+-const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPolicyImport, onClose, onSave, onPersistFollowup, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail }) => {
++const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPolicyImport, onClose, onSave, onPersistFollowup, onTableSave, initialData, allTags = [], relatedPolicies = [], onPolicyDetail, onManagePolicies }) => {
+   const [historyBusy,setHistoryBusy]=useState(false),[profileBusy,setProfileBusy]=useState(false),[historyError,setHistoryError]=useState(''),[historySaved,setHistorySaved]=useState('');
+   const historyBusyRef=useRef(false),historyRequestId=useRef(crypto.randomUUID()),profileRequestId=useRef(crypto.randomUUID());
+-  const displayedPolicies = () => Array.from(new Map([...(formData.policies || []), ...relatedPolicies].map(p => [policyKey(p), p])).values());
++  const displayedPolicies = () => Array.from(new Map([...(formData.policies || []), ...relatedPolicies].map(p => [policyKey(p), p])).values()).filter(p=>!excludedPolicyImport(p.status));
++  const profileBaseline=useRef<NewContact|null>(null);
+   const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'table' | 'policies'>('ai');
+   const [loading, setLoading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
+@@ -74,6 +76,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+         setExtractedList([]);
+         setExtractedTableData(null);
+       }
++      profileBaseline.current=initialData?{...initialData,policies:initialData.policies||[],progressHistory:initialData.progressHistory||[]}:null;
++      setShowPolicyAdd(false);setEditingPolicyId(null);setPolicyForm({policyNumber:'',productName:'',company:'',premium:'',effectiveDate:'',status:'正式保单',applicant:'',insured:'',paymentYears:'',insuranceType:'',coverage:''});
+       setShowHistoryAdd(false);
+       setEditingHistoryId(null);
+       setError(null);
+@@ -227,11 +231,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+     setProfileBusy(true);setError(null);
+     try{await onSave([formData],profileRequestId.current);onClose();}catch(e){setError(e instanceof Error?e.message:'客户资料未保存，请重试。');}finally{setProfileBusy(false);}
+   };
+-  const requestClose = () => {
+-    if(historyBusy||profileBusy)return;
+-    if(historyForm.content?.trim()&&!window.confirm('跟进内容尚未保存，确认放弃？'))return;
+-    onClose();
++  const canLeave=()=>{
++    if(historyBusy||profileBusy)return false;
++    const dirty=historyForm.content?.trim()||(showPolicyAdd&&Object.entries(policyForm).some(([k,v])=>k==='status'?v!=='正式保单':Boolean(String(v||'').trim())))||editingPolicyId||(initialData&&profileBaseline.current&&JSON.stringify(formData)!==JSON.stringify(profileBaseline.current));
++    return !dirty||window.confirm('有尚未保存的资料，确认放弃并离开？');
+   };
++  const requestClose=()=>{if(canLeave())onClose();};
++  const managePolicies=()=>{if(initialData&&canLeave())onManagePolicies?.(initialData.id);};
+ 
+   const addTag = (tag: string) => {
+     const trimmed = tag.trim();
+@@ -249,6 +255,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+       if(initialData&&onPersistFollowup){
+         const saved=await onPersistFollowup(initialData.id,kind,record,expected);
+         setFormData(prev=>({...prev,progressHistory:saved.progressHistory,lastDate:saved.lastDate,followUpStatus:saved.followUpStatus}));
++        if(profileBaseline.current)profileBaseline.current={...profileBaseline.current,progressHistory:saved.progressHistory,lastDate:saved.lastDate,followUpStatus:saved.followUpStatus};
+       }else{
+         setFormData(prev=>({...prev,progressHistory:kind==='add'?[record,...(prev.progressHistory||[])]:kind==='delete'?(prev.progressHistory||[]).filter(r=>r.id!==record.id):(prev.progressHistory||[]).map(r=>r.id===record.id?record:r),lastDate:record.date}));
+       }
+@@ -360,11 +367,11 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+   if (!isOpen) return null;
+ 
+   return (
+-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
++    <div role="dialog" aria-modal="true" aria-label={initialData?'编辑联系人资料':'添加 / 导入'} className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
+       <div className={`bg-white shadow-2xl w-full ${!initialData&&activeTab==='policies'?'max-w-3xl':'max-w-5xl'} overflow-hidden flex flex-col max-h-[90dvh] rounded-2xl border border-gray-200`}>
+         <div className="px-5 py-4 border-b border-gray-100 flex shrink-0 justify-between items-center">
+           <h2 className="text-base font-semibold text-gray-800">{initialData ? '编辑联系人资料' : '添加 / 导入'}</h2>
+-          <button disabled={profileBusy||historyBusy} onClick={requestClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
++          <button disabled={profileBusy||historyBusy} onClick={requestClose} aria-label="关闭" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
+             <X size={20} />
+           </button>
+         </div>
+@@ -452,11 +459,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+ 
+                 {/* 成交产品 - 保单表格 */}
+                 <div className="space-y-2">
+-                  <div className="flex items-center justify-between">
+-                    <label className="block text-xs font-medium text-gray-700">成交产品</label>
++                  <div className="flex flex-wrap items-center justify-between gap-2">
++                    <label className="mr-auto block text-xs font-medium text-gray-700">成交产品</label>
++                    {initialData&&onManagePolicies&&<button type="button" className="btn btn-secondary btn-sm" disabled={historyBusy||profileBusy} onClick={managePolicies}>管理保单</button>}
+                     <button
+                       onClick={() => setShowPolicyAdd(!showPolicyAdd)}
+-                      className="text-xs font-medium text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
++                      className="btn btn-ghost btn-sm"
+                     >
+                       <Plus size={14} /> 添加保单
+                     </button>
+@@ -558,9 +566,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+                   {/* 保单列表 */}
+                   {displayedPolicies().length > 0 ? (
+                     <div className="max-w-full border border-gray-200 rounded-lg overflow-x-auto">
+-                      <table className="w-full min-w-[904px] table-fixed text-sm">
+-                        <colgroup>{[260,160,120,112,130,120].map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup>
+-                        <thead className="bg-gray-50 border-b border-gray-200">
++                      <table data-contact-policy-table className="w-full table-fixed text-sm" style={{minWidth:editingPolicyId?900:852}}>
++                        <colgroup>{[260,144,120,128,128,editingPolicyId?120:72].map((w,i)=><col key={i} style={i===0?undefined:{width:w}}/>)}</colgroup>
++                        <thead className="table-header border-b border-gray-200">
+                           <tr>
+                             <th className="text-left px-3 py-2 font-medium text-gray-600">产品名称</th>
+                             <th className="text-left px-3 py-2 font-medium text-gray-600">公司</th>
+@@ -596,13 +604,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+                                 <>
+                                   <td className="px-3 py-2 font-medium text-gray-800"><button type="button" className="text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)}>{policy.productName}</button></td>
+                                   <td className="px-3 py-2 text-gray-600">{policy.company || '-'}</td>
+-                                  <td className="px-3 py-2 text-gray-600">{policy.premium ? `¥${policy.premium}` : '-'}</td>
++                                  <td className="px-3 py-2 text-gray-600">{formatMoney(policy.premium,policy.mingya?.currency)}</td>
+                                   <td className="px-3 py-2">
+                                     <PolicyStatus status={policy.status}/>
+                                   </td>
+                                   <td className="px-3 py-2 text-gray-500">{policy.effectiveDate || '-'}</td>
+                                   <td className="sticky right-0 z-10 border-l border-gray-200 bg-white px-3 py-2 text-right whitespace-nowrap">
+-                                    <button onClick={() => onPolicyDetail && initialData ? onPolicyDetail(policy) : handleEditPolicy(policy.id)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded"><Edit2 size={12} /></button>
++                                    <button type="button" aria-label={onPolicyDetail&&initialData?'保单详情':'编辑保单'} onClick={() => onPolicyDetail && initialData ? onPolicyDetail(policy) : handleEditPolicy(policy.id)} className={onPolicyDetail&&initialData?'btn btn-ghost btn-sm':'text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded'}>{onPolicyDetail&&initialData?'详情':<Edit2 size={12}/>}</button>
+                                     {!(onPolicyDetail && initialData) && <button onClick={() => handleDeletePolicy(policy.id)} className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1 rounded ml-1"><Trash2 size={12} /></button>}
+                                   </td>
+                                 </>
+diff --git a/components/PolicyDashboard.tsx b/components/PolicyDashboard.tsx
+index ba904d7..919bbfb 100644
+--- a/components/PolicyDashboard.tsx
++++ b/components/PolicyDashboard.tsx
+@@ -1,3 +1,4 @@
++import {excludedPolicyImport} from '../services/policyImportRules';
+ import WorkspaceDialog, {WorkspaceDialogFooter} from './WorkspaceDialog';
+ import PolicyStatus from './PolicyStatus';
+ import CustomerTags from './CustomerTags';
+@@ -11,6 +12,8 @@ import { PageHeader } from './PageHeader';
+ 
+ interface PolicyDashboardProps {
+   contacts: Contact[];
++  scopeContactId?:string|null;
++  onClearScope?:()=>void;
+   onPolicyDetail?: (policy: Policy) => void;
+   onReminders?: () => void;
+   onImport?: () => void;
+@@ -24,10 +27,11 @@ interface PolicyDashboardProps {
+   onDeletePolicies?: (contactId:string,policyIds:string[],requestId:string)=>Promise<void>;
+ }
+ 
+-const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags, followUpFilter, onEditContact, onAddPolicy, onBatchDeleteContacts, onDeletePolicy, onDeletePolicies, onPolicyDetail, onReminders, onImport, reminderCount = 0 }) => {
++const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, scopeContactId, onClearScope, filterTags, followUpFilter, onEditContact, onAddPolicy, onBatchDeleteContacts, onDeletePolicy, onDeletePolicies, onPolicyDetail, onReminders, onImport, reminderCount = 0 }) => {
+   const [searchTerm, setSearchTerm] = useState('');
+   const [expandedContactIds, setExpandedContactIds] = useState<Set<string>>(new Set());
+   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
++  React.useEffect(()=>{if(scopeContactId)setExpandedContactIds(new Set([scopeContactId]));},[scopeContactId]);
+ 
+   const [selectedPolicies,setSelectedPolicies]=useState<Record<string,Set<string>>>({});
+   const [deleteTarget,setDeleteTarget]=useState<{contactId:string;policies:Policy[];requestId:string}|null>(null);
+@@ -73,7 +77,8 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
+   };
+ 
+   const filteredContactsWithPolicies = useMemo(() => {
+-    let result = contacts.filter(c => c.policies && c.policies.length > 0);
++    let result = contacts.map(c=>({...c,policies:c.policies?.filter(p=>!excludedPolicyImport(p.status))})).filter(c => c.policies && c.policies.length > 0);
++    if(scopeContactId)result=result.filter(c=>c.id===scopeContactId);
+ 
+     if (filterTags.size > 0) {
+       result = result.filter(c => c.tags.some(tag => filterTags.has(tag)));
+@@ -98,7 +103,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
+     }
+ 
+     return result;
+-  }, [contacts, searchTerm, filterTags, followUpFilter]);
++  }, [contacts, searchTerm, filterTags, followUpFilter,scopeContactId]);
+ 
+   const allSelected = filteredContactsWithPolicies.length > 0 && filteredContactsWithPolicies.every(c => selectedIds.has(c.id));
+ 
+@@ -144,7 +149,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
+           allSelected={allSelected}
+           onSelectAll={handleSelectAll}
+           actionButton={
+-            <div className="flex gap-2 flex-wrap"><button onClick={onReminders} className="btn btn-secondary text-sm"><Bell size={16}/>续期提醒（{reminderCount}）</button><button onClick={onAddPolicy} className="btn btn-primary text-sm"><Plus size={16} /><span>录入保单</span></button></div>
++            <div className="flex gap-2 flex-wrap">{scopeContactId&&onClearScope&&<button className="btn btn-secondary text-sm" onClick={onClearScope}>全部保单</button>}<button onClick={onReminders} className="btn btn-secondary text-sm"><Bell size={16}/>续期提醒（{reminderCount}）</button><button onClick={onAddPolicy} className="btn btn-primary text-sm"><Plus size={16} /><span>录入保单</span></button></div>
+           }
+           searchBox={
+             <div className="relative w-full sm:w-72">
+@@ -163,7 +168,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
+ 
+       <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 custom-scrollbar space-y-4 md:space-y-6">
+         {filteredContactsWithPolicies.length === 0 ? (
+-          <div className="flex flex-col items-center justify-center h-full text-gray-300"><Shield size={64} className="mb-4 opacity-50" /><p className="text-lg font-medium">暂无保单数据</p><p className="text-sm mt-2 opacity-60">{filterTags.size > 0 ? '没有匹配选中标签的投保记录' : '当前没有任何投保记录'}</p></div>
++          <div className="flex flex-col items-center justify-center h-full text-gray-500"><Shield size={40} className="mb-4 opacity-50" /><p className="text-sm">{scopeContactId?'该客户暂无可展示保单':'暂无符合条件的保单'}</p></div>
+         ) : (
+           filteredContactsWithPolicies.map(contact => {
+             const { count, totalPremium } = getTotals(contact.policies || []);
+@@ -185,7 +190,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
+                       {contactReminders > 0 && <button onClick={e=>{e.stopPropagation();onReminders?.();}} className="text-xs text-amber-700 mt-2">{contactReminders} 份保单待处理</button>}
+                       <div className="flex flex-wrap items-center gap-2 mt-2">
+                         <CustomerTags tags={contact.tags}/>
+-                        <button onClick={(e) => { e.stopPropagation(); onEditContact(contact); }} className="text-xs text-gray-500 hover:bg-gray-100 px-2 py-0.5 rounded-md transition-colors flex items-center gap-1 font-medium"><Edit2 size={10} /> 修改标签</button>
++                        <button onClick={(e) => { e.stopPropagation(); onEditContact(contacts.find(c=>c.id===contact.id)||contact); }} className="text-xs text-gray-500 hover:bg-gray-100 px-2 py-0.5 rounded-md transition-colors flex items-center gap-1 font-medium"><Edit2 size={10} /> 修改标签</button>
+                       </div>
+                     </div>
+                   </div>
+diff --git a/components/RenewalWorkspace.tsx b/components/RenewalWorkspace.tsx
+index 93a996e..fc8fb87 100644
+--- a/components/RenewalWorkspace.tsx
++++ b/components/RenewalWorkspace.tsx
+@@ -1,3 +1,4 @@
++import {excludedPolicyImport} from '../services/policyImportRules';
+ import WorkspaceDialog from './WorkspaceDialog';
+ import PolicyPaymentSummary, { PaymentDate, formatMoney } from './PolicyPaymentSummary';
+ import { ArrowLeft, Settings } from 'lucide-react';
+@@ -42,6 +43,8 @@ export default function RenewalWorkspace({
+   onContacts: (c: Contact[]) => void;
+   beforeSave?: () => Promise<unknown>;
+   customerId?: string;
++  scopeContactId?:string|null;
++  onClearScope?:()=>void;
+   initialPolicyId?: string;
+   onCloseDetail?: () => void;
+   filterTags?: Set<string>;
+@@ -368,11 +371,12 @@ export default function RenewalWorkspace({
+   if (!data)
+     return <div className="p-6">{error || "正在读取保单与续费数据…"}</div>;
+   const shownPolicies = preview && rows.length ? mergePolicies(data.policies, rows) : data.policies;
++  const visiblePolicies=shownPolicies.filter(p=>!excludedPolicyImport(p.status));
+   const all = customerId
+-    ? shownPolicies.filter(
++    ? visiblePolicies.filter(
+         (p) => p.applicantId === customerId || p.insuredId === customerId,
+       )
+-    : shownPolicies;
++    : visiblePolicies;
+   const tasks = dueItems(all).filter(x => x.type === "payment").filter(
+     (x) =>
+       (filter === "all" || filter === x.type) &&
+diff --git a/design.md b/design.md
+index 1243147..d5f23be 100644
+--- a/design.md
++++ b/design.md
+@@ -161,3 +161,7 @@
+ ## 联系人与跟进分类
+ 
+ 同名联系人只能有一份资料，姓名匹配忽略空白与大小写。跟进分类是联系人关联，可同时有多个，不能通过复制联系人实现。一位联系人跨分类复用同一个ID、跟进历史、标签和保单；工作台总数按联系人去重，分类分别计数。添加已有姓名复用资料，移出此分类只移除当前关联，拖动只更换来源分类，保留其他分类。未分类只显示没有有效分类的跟进中联系人。保存失败保留输入，成功收到数据库确认后更新；已有同名资料不得通过导入的“新建”绕过唯一性限制。
++
++## 客户保单摘要与管理
++
++终止、满期终止、最终撤单保单在客户摘要及正常保单管理中不展示，使用统一状态判断；不通过过滤删除数据库或表单持有的历史记录。中止、撤单中与撤单失败不能视作最终结束。客户摘要只承担查看及进入管理，操作列固定紧凑宽度，首列吸收余宽；批量操作在保单管理按客户ID定位并自动展开，提供返回全部保单的动作。跳转前检查未保存资料，不能静默丢失草稿。编辑客户时必须传入完整对象，不能把过滤后的展示对象当作保存数据。
+diff --git a/docs/2026-11-23-contact-policy-management-verification.md b/docs/2026-11-23-contact-policy-management-verification.md
+new file mode 100644
+index 0000000..2ca1adb
+--- /dev/null
++++ b/docs/2026-11-23-contact-policy-management-verification.md
+@@ -0,0 +1,13 @@
++# 客户保单摘要与批量管理
++
++问题：历史终止/撤单保单未在显示层过滤，客户资料的操作列固定120px且全列指定宽度，在较宽容器还会被继续分配空白；编辑图标实际打开详情，缺少整批管理入口。
++
++实现：客户资料、保单管理和关联续期列表共用导入的状态判断，隐藏终止、满期终止、撤单及明亚17/22；中止、撤单中、撤单失败仍保留。过滤仅用于展示，不修改数据库或表单持有的完整保单。侧栏数量同步按可展示保单计算。
++
++客户资料“管理保单”跳至对应客户的保单管理并自动展开，清除无关标签/跟进筛选，支持原有逐项及全选删除。全部保单返回全局列表，侧栏重新进入也清除客户范围。离开客户资料前检查未保存资料、跟进及保单输入，取消保留原文。已入库跟进更新基线，不误报未保存。
++
++摘要操作列为72px，第一列吸收余宽，容器内横向滚动，桌面与手机一致；草稿编辑时临时放宽操作区以容纳保存/取消。复用公共btn、btn-sm、table-header、PolicyStatus、formatMoney，金额两位小数。编辑联系人仍传完整资料，防止显示过滤反向影响保存。
++
++验证：49项测试、网页类型检查和构建通过。虚拟数据浏览器测试覆盖终止/撤单/满期终止隐藏、中止和撤单中保留、仅终止客户不出现在保单管理、72px操作列、客户范围及自动展开、全部保单返回、手机跳转和容器滚动。实际批量删除仅发送可见所选ID，3份隐藏保单及跟进保留；从管理页编辑并保存联系人也保留全部6份保单。未使用真实保单执行删除。
++
++文案独立删减：用“详情”替换含义不符的铅笔图标，不增加操作说明段落；管理页空态由标题与重复解释两段收为一句，按客户范围说明“该客户暂无可展示保单”。“管理保单”“全部保单”分别承担进入批量管理和退出客户范围两个操作，保留。桌面1304×880、手机390×844及表格滚动截图在output目录。
+diff --git a/services/policyImportRules.ts b/services/policyImportRules.ts
+index 2df083c..58c3bf3 100644
+--- a/services/policyImportRules.ts
++++ b/services/policyImportRules.ts
+@@ -1,6 +1,6 @@
+ export function excludedPolicyImport(status:unknown):boolean {
+   const value=String(status??'').trim();
+-  return /终止/.test(value)||/撤单/.test(value)&&!/撤单中|撤单失败/.test(value);
++  return ['17','22'].includes(value)||/终止/.test(value)||/撤单/.test(value)&&!/撤单中|撤单失败/.test(value);
+ }
+ // Verified against Mingya's policy-list status choices, not order/risk statuses.
+ export function mingyaStatusLabel(value:unknown):string {
+diff --git a/tests/policyVisibility.test.ts b/tests/policyVisibility.test.ts
+new file mode 100644
+index 0000000..89dc8cf
+--- /dev/null
++++ b/tests/policyVisibility.test.ts
+@@ -0,0 +1,5 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import {excludedPolicyImport} from '../services/policyImportRules.ts';
++test('terminal display uses the same rules as import, including legacy suffixes and codes',()=>{for(const s of ['终止保单','终止保单-满期终止','撤单','已撤单','撤单保单','17',22])assert.equal(excludedPolicyImport(s),true,String(s));});
++test('suspension, in-progress cancellation and unknown status stay visible',()=>{for(const s of ['正式保单','中止保单','撤单中','撤单失败','明亚状态（23）','',undefined,'18','21'])assert.equal(excludedPolicyImport(s),false,String(s));});

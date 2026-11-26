@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>电子保单批量下载 · 使用说明</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 20px 60px;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f6f5f2; color: #26251f; line-height: 1.7;
+  }
+  .wrap { max-width: 740px; margin: 0 auto; }
+  h1 { font-size: 23px; font-weight: 600; margin: 0 0 6px; letter-spacing: -.3px; }
+  .sub { color: #6b6a63; font-size: 14px; margin-bottom: 26px; }
+  .card {
+    background: #fff; border: 1px solid #e5e3da; border-radius: 14px;
+    padding: 24px 26px; margin-bottom: 18px;
+  }
+  .step { display: flex; gap: 14px; margin-bottom: 22px; }
+  .step:last-child { margin-bottom: 0; }
+  .num {
+    flex: 0 0 26px; height: 26px; border-radius: 50%;
+    background: #4f46a8; color: #fff; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; margin-top: 3px;
+  }
+  .sb { flex: 1; min-width: 0; }
+  .st { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+  .sd { font-size: 14px; color: #5c5b54; }
+  kbd {
+    background: #f2f0e9; border: 1px solid #d6d4ca; border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 6px; font-size: 12.5px;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  code {
+    background: #f2f0e9; border-radius: 4px; padding: 1px 5px;
+    font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;
+  }
+  .btn {
+    width: 100%; padding: 15px; font-size: 16px; font-weight: 600;
+    color: #fff; background: #4f46a8; border: none; border-radius: 10px;
+    cursor: pointer; font-family: inherit; transition: background .15s; margin-top: 12px;
+  }
+  .btn:hover { background: #3b338a; }
+  .btn.done { background: #12705a; }
+  .hint { font-size: 13px; color: #8b8a80; margin-top: 9px; text-align: center; }
+  .warn {
+    background: #fdf3e3; border: 1px solid #eda93b; border-radius: 10px;
+    padding: 13px 16px; font-size: 13.5px; color: #43290a; margin-top: 14px;
+  }
+  .warn b { color: #8a5310; }
+  .ok { background: #eaf6f2; border: 1px solid #2f9e7e; border-radius: 10px;
+        padding: 13px 16px; font-size: 13.5px; color: #0f4c3c; margin-top: 14px; }
+  textarea {
+    width: 100%; height: 88px; margin-top: 10px; padding: 10px;
+    border: 1px solid #d6d4ca; border-radius: 8px; font-size: 12px;
+    font-family: ui-monospace, Menlo, monospace; color: #6b6a63; resize: vertical;
+  }
+  pre {
+    background: #23221d; color: #e8e6dd; border-radius: 10px; padding: 16px 18px;
+    font-size: 12.5px; line-height: 1.6; overflow-x: auto; margin: 12px 0 0;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  pre .g { color: #8fd6b4; }
+  pre .y { color: #e5c07b; }
+  pre .d { color: #7d7b72; }
+  ul { padding-left: 20px; margin: 10px 0 0; font-size: 13.8px; color: #4a4942; }
+  li { margin-bottom: 7px; }
+  .tag { display:inline-block; background:#eee9fb; color:#4f46a8; font-size:11.5px;
+         padding:2px 8px; border-radius:20px; margin-left:8px; vertical-align:2px; font-weight:600;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>电子保单批量下载</h1>
+  <p class="sub">全程 4 步 · 不用 token、不用装软件，最后得到一个含全部 PDF 的压缩包</p>
+
+  <div class="card">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="sb">
+        <div class="st">打开「保单」列表页</div>
+        <div class="sd">
+          就是有 <b>待处理 / 投保单 / 保单</b> 三个标签、每张卡片上有「电子保单」按钮的那个页面。
+          保持登录状态，能看到保单列表就行。
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">2</div>
+      <div class="sb">
+        <div class="st">打开控制台</div>
+        <div class="sd">按 <kbd>F12</kbd>，或 Mac 上按 <kbd>⌥</kbd>+<kbd>⌘</kbd>+<kbd>I</kbd>，点顶部 <b>Console</b>（控制台）标签。</div>
+        <div class="warn">
+          <b>第一次粘贴会被拦：</b>控制台会提示 <code>Warning: Don't paste code…</code>。
+          先手动输入 <code>allow pasting</code> 回车，之后就能正常粘贴了。
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">3</div>
+      <div class="sb">
+        <div class="st">复制脚本</div>
+        <div class="sd">点下面的按钮，脚本自动进剪贴板。</div>
+        <button class="btn" id="copyBtn">复制脚本</button>
+        <div class="hint" id="hint">点一下即可</div>
+        <div class="warn">
+          <b>按钮没反应？</b>（部分预览环境限制剪贴板）点下面文本框全选，再按 <kbd>⌘</kbd>+<kbd>C</kbd>：
+          <textarea id="fb" readonly onclick="this.select()"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">4</div>
+      <div class="sb">
+        <div class="st">粘贴到控制台，回车</div>
+        <div class="sd">
+          粘贴后按 <kbd>Enter</kbd>。如果脚本没自动开始，就<b>点一下「保单」标签或翻一页</b>，它一捕获到数据就会自己跑起来。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="st" style="margin-bottom:6px">它自己会做的事<span class="tag">全自动</span></div>
+    <ul>
+      <li>从当前页面读登录凭证（<code>erp_token</code>），不需要你复制任何 token</li>
+      <li>监听页面真实发出的列表请求，自动认出「取保单列表」的那个接口</li>
+      <li>自动往下翻页，把所有保单 ID 抓全</li>
+      <li>逐个调接口下载 PDF（3 个并发）</li>
+      <li>打包成 <b>一个 zip</b> 下载 —— 不会被浏览器「多文件下载」拦截</li>
+      <li>文件名尽量用「投保人_保单号.pdf」；重跑会自动跳过已下载的</li>
+    </ul>
+    <div class="ok">
+      <b>为什么要打包：</b>如果逐个文件下载，Chrome 下到第二个就会弹「是否允许下载多个文件」，很烦。
+      打包成一个 zip 只要下 1 次。
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="st" style="margin-bottom:6px">你会看到什么</div>
+    <pre><span class="d">[保单]</span> erp_token <span class="g">✓</span> 来自 erp_token，长度 176
+<span class="d">[保单]</span> 监听已就绪。现在去点「保单」标签或翻页…
+<span class="d">[保单]</span> 捕获 20 个保单 ← POST https://web.mingya.com.cn/xxx/policy/list
+<span class="d">[保单]</span>    累计 20 个
+<span class="d">[保单]</span> 检测到分页参数「pageNum」，当前值 1，开始自动翻页…
+<span class="d">[保单]</span>   第 2 页 → 新增 20（累计 40）
+<span class="d">[保单]</span>   第 3 页 → 新增 3（累计 43）
+<span class="d">[保单]</span>   连续两页无新增，翻页结束
+<span class="d">[保单]</span> 共识别到 <span class="y">43</span> 份保单
+<span class="d">[保单]</span> <span class="g">✓</span> 1/43  张三 1234567
+<span class="d">[保单]</span> <span class="g">✓</span> 2/43  李四 7654321
+<span class="d">[保单]</span> 打包中…（43 份，28.4 MB）
+<span class="d">[保单]</span> 已触发下载：明亚电子保单_43份_20261026_1130.zip</pre>
+  </div>
+
+  <div class="card">
+    <div class="st" style="margin-bottom:6px">常见问题</div>
+    <ul>
+      <li><b>15 秒没反应</b> → 当前页不对。确认是保单列表页，然后点一下「保单」标签或翻一页。</li>
+      <li><b>全部报「返回空内容」</b> → 登录态过期了。刷新页面重新登录，重进保单列表，再跑一次。</li>
+      <li><b>只下了几份就停</b> → 浏览器拦了下载。点地址栏右侧图标允许，重跑会自动跳过已下的。</li>
+      <li><b>想重新全量下载</b> → 控制台执行 <code>myPolicy.reset()</code> 再跑。</li>
+      <li><b>想看抓到多少</b> → 控制台执行 <code>myPolicy.report()</code>，会打印保单清单表格。</li>
+      <li><b>想立刻开始不等</b> → 控制台执行 <code>myPolicy.start()</code>。</li>
+      <li><b>某个保司没有电子保单</b> → 控制台会打印该保司的原始链接，那个只能手动点。</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const SCRIPT = "/* ================================================================\n * 明亚「电子保单」批量下载 · 自动发现版\n * ----------------------------------------------------------------\n * 原理（从 viewer.js / app.js 逆出来的）：\n *   电子保单按钮最终请求：\n *     GET https://policy.mingya.com.cn/pms-1.0/api/policyCom/queryElectronPolicyWithWatermark?policyId=xxx\n *     Header: erptoken: <sessionStorage.erp_token>\n *   直接返回 PDF 字节流。\n *\n * 所以只要拿到「全部 policyId」就能批量下。本脚本不猜列表接口，\n * 而是挂载 XHR/fetch 监听页面真实请求，自动识别出列表接口并翻页。\n *\n * 用法：\n *   1. 在「保单」列表页（能看到 待处理/投保单/保单 那个页面）按 F12\n *   2. 切到 Console，粘贴本文件全部内容，回车\n *   3. 若脚本没自动开始，点一下「保单」标签或翻一页，它捕获到就会自动跑\n *   4. 结束时会下载一个 zip，里面是全部 PDF\n * ================================================================ */\n(async function () {\n  'use strict';\n\n  var TAG = '[保单]';\n  function log()  { console.log.apply(console,  [TAG].concat([].slice.call(arguments))); }\n  function warn() { console.warn.apply(console, [TAG].concat([].slice.call(arguments))); }\n  function err()  { console.error.apply(console,[TAG].concat([].slice.call(arguments))); }\n\n  var CONFIG = {\n    AUTO_DOWNLOAD: true,   // 捕获到就自动开跑\n    AUTO_PAGE: true,       // 自动翻页，把全部保单抓完\n    MAX_PAGES: 60,\n    IDLE_MS: 2000,         // 抓到数据后静默多久开始跑\n    CONCURRENCY: 3,\n    ZIP: true,             // true=打包成一个 zip（推荐，不会被浏览器拦）\n    ZIP_MAX_MB: 350,       // 超过这个体积就改成逐个下载\n    PMS:     'https://policy.mingya.com.cn/pms-1.0/api/policyCom/queryElectronPolicyWithWatermark',\n    PMS_ALT: 'https://nerpcs.mingya.com.cn/policy-1.0/api/policyCom/queryElectronPolicyWithWatermark',\n    DONE_KEY: 'my_policy_download_done_v1'\n  };\n\n  /* ---------------- 0. 取 erp_token ---------------- */\n  var TOKEN = null, tokenFrom = '';\n  ['erp_token', 'jettoken-pc'].forEach(function (k) {\n    if (TOKEN) return;\n    var v = sessionStorage.getItem(k) || localStorage.getItem(k);\n    if (v) { TOKEN = v; tokenFrom = k; }\n  });\n  if (!TOKEN) {\n    err('没找到 erp_token。请确认这是已登录的明亚页面（保单列表页/工作台都行）。');\n    return;\n  }\n  log('erp_token ✓ 来自 ' + tokenFrom + '，长度 ' + TOKEN.length);\n  log('若稍后出现 401/403，说明登录态过期，刷新页面重登后重跑即可。');\n\n  /* ---------------- 1. 收集保单 ---------------- */\n  var IM = {};                       // policyId -> {code, holder}\n  var APIS = [];                     // 捕获到的列表接口\n  var ID_RE = /^(policy_?id|erp_?policy_?id)$/i;\n  var CODE_KEYS   = ['policycode', 'policyno', 'policy_no', 'policy_code', 'policynumber'];\n  var HOLDER_KEYS = ['policyholder', 'policyholdername', 'holdername', 'customername',\n                     'insurantname', 'insuredname', 'insured'];\n\n  function pick(o, names) {\n    for (var i = 0; i < names.length; i++) {\n      var n = names[i];\n      for (var k in o) {\n        if (k.toLowerCase() === n) {\n          var v = o[k];\n          if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n        }\n      }\n    }\n    return '';\n  }\n\n  function scan(node, depth) {\n    if (!node || typeof node !== 'object' || depth > 7) return 0;\n    if (Array.isArray(node)) {\n      var c0 = 0;\n      for (var i = 0; i < node.length; i++) c0 += scan(node[i], depth + 1);\n      return c0;\n    }\n    var c = 0, id = '';\n    for (var k in node) {\n      if (ID_RE.test(k)) {\n        var v = node[k];\n        if ((typeof v === 'string' || typeof v === 'number') && String(v).length >= 6) { id = String(v); break; }\n      }\n    }\n    if (id && !IM[id]) {\n      IM[id] = { code: pick(node, CODE_KEYS), holder: pick(node, HOLDER_KEYS) };\n      c++;\n    }\n    for (var k2 in node) {\n      if (node[k2] && typeof node[k2] === 'object') c += scan(node[k2], depth + 1);\n    }\n    return c;\n  }\n\n  function onResp(url, method, body, json) {\n    var n = scan(json, 0);\n    if (n <= 0) return;\n    if (!APIS.some(function (a) { return a.url === url && a.method === method; })) {\n      APIS.push({ url: url, method: method, body: body, count: n });\n    }\n    log('捕获 ' + n + ' 个保单 ← ' + method + ' ' + String(url).slice(0, 110));\n    log('   累计 ' + Object.keys(IM).length + ' 个');\n    schedule();\n  }\n\n  /* ---------------- 2. 挂载监听 ---------------- */\n  var XO = XMLHttpRequest.prototype.open, XS = XMLHttpRequest.prototype.send;\n  XMLHttpRequest.prototype.open = function (m, u) { this.__u = u; this.__m = m; return XO.apply(this, arguments); };\n  XMLHttpRequest.prototype.send = function () {\n    this.__b = arguments[0];\n    this.addEventListener('load', function () {\n      try {\n        var u = String(this.__u || '');\n        if (/queryElectronPolicyWithWatermark/i.test(u)) return;\n        var ct = this.getResponseHeader('content-type') || '';\n        if (ct.indexOf('json') === -1) return;\n        if (!this.responseText || this.responseText.length > 8e6) return;\n        onResp(u, this.__m, this.__b, JSON.parse(this.responseText));\n      } catch (e) {}\n    });\n    return XS.apply(this, arguments);\n  };\n\n  var OF = window.fetch;\n  window.fetch = function () {\n    var args = [].slice.call(arguments);\n    var req = args[0];\n    var url = typeof req === 'string' ? req : (req && req.url) || '';\n    var method = (args[1] && args[1].method) || (req && req.method) || 'GET';\n    var body = (args[1] && args[1].body) || '';\n    var p = OF.apply(this, args);\n    p.then(function (res) {\n      try {\n        if (/queryElectronPolicyWithWatermark/i.test(url)) return;\n        var ct = res.headers.get('content-type') || '';\n        if (ct.indexOf('json') === -1) return;\n        res.clone().json().then(function (j) { onResp(url, method, body, j); }).catch(function () {});\n      } catch (e) {}\n    }).catch(function () {});\n    return p;\n  };\n\n  /* ---------------- 3. 自动翻页 ---------------- */\n  function pagerOf(api) {\n    try {\n      var u = new URL(api.url, location.origin);\n      var hit = null;\n      u.searchParams.forEach(function (v, k) {\n        if (hit) return;\n        if (/^(page|pageNum|pageNo|pageIndex|current|currentPage)$/i.test(k) && /^\\d+$/.test(v)) {\n          hit = { type: 'q', key: k, val: +v, base: u.toString() };\n        }\n      });\n      if (hit) return hit;\n    } catch (e) {}\n    if (api.body && typeof api.body === 'string') {\n      try {\n        var j = JSON.parse(api.body);\n        for (var k in j) {\n          if (/^(page|pageNum|pageNo|pageIndex|current|currentPage)$/i.test(k) && typeof j[k] === 'number') {\n            return { type: 'b', key: k, val: j[k], src: j, url: api.url, method: api.method };\n          }\n        }\n      } catch (e2) {}\n    }\n    return null;\n  }\n\n  async function autoPage() {\n    if (!CONFIG.AUTO_PAGE) return;\n    var api = APIS.slice().sort(function (a, b) { return b.count - a.count; })[0];\n    if (!api) return;\n    var pg = pagerOf(api);\n    if (!pg) { warn('列表接口没有分页参数，跳过自动翻页（只处理已捕获的部分）'); return; }\n    log('检测到分页参数「' + pg.key + '」，当前值 ' + pg.val + '，开始自动翻页…');\n    var empty = 0;\n    for (var i = 1; i <= CONFIG.MAX_PAGES; i++) {\n      var next = pg.val + i;\n      try {\n        var r;\n        if (pg.type === 'q') {\n          var u = new URL(pg.base);\n          u.searchParams.set(pg.key, String(next));\n          r = await fetch(u.toString(), { credentials: 'include' });\n        } else {\n          var b = Object.assign({}, pg.src);\n          b[pg.key] = next;\n          r = await fetch(pg.url, {\n            method: pg.method || 'POST', credentials: 'include',\n            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b)\n          });\n        }\n        var got = scan(await r.json(), 0);\n        log('  第 ' + next + ' 页 → 新增 ' + got + '（累计 ' + Object.keys(IM).length + '）');\n        if (got === 0) { if (++empty >= 2) { log('  连续两页无新增，翻页结束'); break; } }\n        else empty = 0;\n      } catch (e) {\n        warn('  第 ' + next + ' 页失败：' + e.message);\n        break;\n      }\n    }\n  }\n\n  /* ---------------- 4. 下载 ---------------- */\n  function loadDone() { try { return new Set(JSON.parse(localStorage.getItem(CONFIG.DONE_KEY) || '[]')); } catch (e) { return new Set(); } }\n  function saveDone(s) { try { localStorage.setItem(CONFIG.DONE_KEY, JSON.stringify(Array.from(s))); } catch (e) {} }\n\n  async function getPdf(id) {\n    var lastErr = null;\n    for (var i = 0; i < 2; i++) {\n      var base = i === 0 ? CONFIG.PMS : CONFIG.PMS_ALT;\n      var ctl = new AbortController();\n      var tid = setTimeout(function () { ctl.abort(); }, 90000);\n      try {\n        var r = await fetch(base + '?policyId=' + encodeURIComponent(id), {\n          headers: { erptoken: TOKEN }, credentials: 'omit', signal: ctl.signal\n        });\n        clearTimeout(tid);\n        if (!r.ok) throw new Error('HTTP ' + r.status);\n        var ct = r.headers.get('content-type') || '';\n        if (ct.indexOf('json') > -1) {\n          var j = await r.json().catch(function () { return {}; });\n          throw new Error('接口返回 ' + (j.message || j.msg || JSON.stringify(j).slice(0, 100)));\n        }\n        var buf = new Uint8Array(await r.arrayBuffer());\n        // 实测：token 无效时服务端返回 200 + 空响应体，不是 401\n        if (buf.length === 0) throw new Error('__EMPTY__');\n        if (buf.length < 500) throw new Error('内容异常，仅 ' + buf.length + ' B（可能不是 PDF）');\n        return {\n          buf: buf,\n          cd: r.headers.get('content-disposition') || '',\n          orig: r.headers.get('original-url') || ''\n        };\n      } catch (e) { clearTimeout(tid); lastErr = e; }\n    }\n    throw lastErr || new Error('下载失败');\n  }\n\n  function stamp() {\n    var d = new Date(), p = function (n) { return String(n).padStart(2, '0'); };\n    return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes());\n  }\n\n  function saveBlob(blob, name) {\n    var a = document.createElement('a');\n    var url = URL.createObjectURL(blob);\n    a.href = url; a.download = name;\n    document.body.appendChild(a);\n    a.click();\n    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 5000);\n  }\n\n  function buildName(f, i) {\n    var base = '';\n    var m = /filename\\*=UTF-8''([^;]+)/i.exec(f.cd) || /filename=\"?([^\";]+)\"?/i.exec(f.cd);\n    if (m) { try { base = decodeURIComponent(m[1]); } catch (e) { base = m[1]; } }\n    if (!base) {\n      var parts = [f.meta && f.meta.holder, f.meta && f.meta.code].filter(Boolean);\n      base = parts.length ? parts.join('_') : ('保单_' + String(i + 1).padStart(3, '0') + '_' + f.id);\n    }\n    if (!/\\.pdf$/i.test(base)) base += '.pdf';\n    return base.replace(/[\\\\/:*?\"<>|\\r\\n\\t]/g, '_').replace(/\\s+/g, ' ').trim().slice(0, 100);\n  }\n\n  /* 最小 ZIP 打包（store 存储，PDF 本身就是压缩格式，不再二次压缩） */\n  var CRC_T = (function () {\n    var t = new Uint32Array(256);\n    for (var n = 0; n < 256; n++) {\n      var c = n;\n      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);\n      t[n] = c >>> 0;\n    }\n    return t;\n  })();\n  function crc32(buf) {\n    var c = 0xFFFFFFFF;\n    for (var i = 0; i < buf.length; i++) c = CRC_T[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);\n    return (c ^ 0xFFFFFFFF) >>> 0;\n  }\n  function makeZip(files) {\n    var enc = new TextEncoder();\n    var parts = [], central = [], offset = 0;\n    files.forEach(function (f) {\n      var nb = enc.encode(f.name);\n      var crc = crc32(f.data);\n      var lh = new DataView(new ArrayBuffer(30));\n      lh.setUint32(0, 0x04034b50, true);\n      lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);\n      lh.setUint16(10, 0, true); lh.setUint16(12, 0, true);\n      lh.setUint32(14, crc, true);\n      lh.setUint32(18, f.data.length, true); lh.setUint32(22, f.data.length, true);\n      lh.setUint16(26, nb.length, true); lh.setUint16(28, 0, true);\n      var local = new Uint8Array(30 + nb.length);\n      local.set(new Uint8Array(lh.buffer), 0); local.set(nb, 30);\n      parts.push(local, f.data);\n\n      var cd = new DataView(new ArrayBuffer(46));\n      cd.setUint32(0, 0x02014b50, true);\n      cd.setUint16(4, 20, true); cd.setUint16(6, 20, true);\n      cd.setUint16(8, 0x0800, true); cd.setUint16(10, 0, true);\n      cd.setUint16(12, 0, true); cd.setUint16(14, 0, true);\n      cd.setUint32(16, crc, true);\n      cd.setUint32(20, f.data.length, true); cd.setUint32(24, f.data.length, true);\n      cd.setUint16(28, nb.length, true);\n      cd.setUint16(30, 0, true); cd.setUint16(32, 0, true);\n      cd.setUint16(34, 0, true); cd.setUint16(36, 0, true);\n      cd.setUint32(38, 0, true); cd.setUint32(42, offset, true);\n      var c = new Uint8Array(46 + nb.length);\n      c.set(new Uint8Array(cd.buffer), 0); c.set(nb, 46);\n      central.push(c);\n      offset += local.length + f.data.length;\n    });\n    var cdSize = central.reduce(function (s, c) { return s + c.length; }, 0);\n    var eo = new DataView(new ArrayBuffer(22));\n    eo.setUint32(0, 0x06054b50, true);\n    eo.setUint16(4, 0, true); eo.setUint16(6, 0, true);\n    eo.setUint16(8, files.length, true); eo.setUint16(10, files.length, true);\n    eo.setUint32(12, cdSize, true); eo.setUint32(16, offset, true);\n    eo.setUint16(20, 0, true);\n    return new Blob(parts.concat(central, [new Uint8Array(eo.buffer)]), { type: 'application/zip' });\n  }\n\n  /* ---------------- 5. 主流程 ---------------- */\n  var ran = false;\n  async function run() {\n    if (ran) return;\n    ran = true;\n    log('===== 开始执行 =====');\n    await autoPage();\n\n    var ids = Object.keys(IM);\n    log('共识别到 ' + ids.length + ' 份保单');\n    if (!ids.length) { warn('没有保单数据，终止'); return; }\n\n    var done = loadDone();\n    var todo = ids.filter(function (id) { return !done.has(id); });\n    log('待下载 ' + todo.length + '（已下过 ' + (ids.length - todo.length) + ' 份，自动跳过）');\n    if (!todo.length) {\n      log('全部已下载过。要重新下：执行 localStorage.removeItem(\"' + CONFIG.DONE_KEY + '\") 后重跑');\n      return;\n    }\n\n    var files = [], failed = [], okCount = 0, total = todo.length;\n    var queue = todo.slice();\n    var emptyCount = 0, abortAll = false;\n\n    async function worker() {\n      while (queue.length && !abortAll) {\n        var id = queue.shift();\n        var meta = IM[id] || {};\n        try {\n          var r = await getPdf(id);\n          if (r.orig) {\n            warn('[' + (meta.code || id) + '] 无电子保单文件，保司原件地址：' + r.orig);\n            failed.push({ id: id, code: meta.code, reason: '保司原始地址，需手动', orig: r.orig });\n            continue;\n          }\n          okCount++;\n          emptyCount = 0;\n          files.push({ name: '', data: r.buf, id: id, meta: meta, cd: r.cd });\n          log('✓ ' + okCount + '/' + total + '  ' + (meta.holder || '') + ' ' + (meta.code || id));\n        } catch (e) {\n          var msg = e.message === '__EMPTY__' ? '返回空内容（该保单无电子保单，或 token 已失效）' : e.message;\n          warn('✗ ' + (meta.code || id) + '  ' + msg);\n          failed.push({ id: id, code: meta.code, reason: msg });\n          if (e.message === '__EMPTY__') {\n            emptyCount++;\n            if (okCount === 0 && emptyCount >= 3) {\n              abortAll = true;\n              queue.length = 0;\n              err('连续 3 个都返回空内容 → 判定 erp_token 已失效，已中止。');\n              err('处理办法：刷新页面重新登录 → 重新进入保单列表 → 重跑本脚本。');\n            }\n          }\n        }\n      }\n    }\n\n    var ws = [];\n    for (var i = 0; i < CONFIG.CONCURRENCY; i++) ws.push(worker());\n    await Promise.all(ws);\n\n    files.forEach(function (f, i) { f.name = buildName(f, i); });\n\n    if (files.length) {\n      var mb = files.reduce(function (s, f) { return s + f.data.length; }, 0) / 1048576;\n      if (CONFIG.ZIP && mb <= CONFIG.ZIP_MAX_MB) {\n        log('打包中…（' + files.length + ' 份，' + mb.toFixed(1) + ' MB）');\n        saveBlob(makeZip(files), '明亚电子保单_' + files.length + '份_' + stamp() + '.zip');\n        log('已触发下载：明亚电子保单_' + files.length + '份_' + stamp() + '.zip');\n      } else {\n        for (var k = 0; k < files.length; k++) {\n          saveBlob(new Blob([files[k].data], { type: 'application/pdf' }), files[k].name);\n          await new Promise(function (r2) { setTimeout(r2, 500); });\n        }\n        log('已逐个触发 ' + files.length + ' 个 PDF 下载');\n      }\n      var d2 = loadDone();\n      files.forEach(function (f) { d2.add(f.id); });\n      saveDone(d2);\n    }\n\n    log('===== 完成 =====');\n    log('成功 ' + files.length + ' 份，失败 ' + failed.length + ' 份');\n    if (failed.length) {\n      warn('失败清单（可复制给我）：');\n      console.table(failed);\n    }\n    if (APIS.length) {\n      log('本次捕获到的列表接口：');\n      APIS.forEach(function (a) { log('  ' + a.method + ' ' + String(a.url).slice(0, 150)); });\n    }\n  }\n\n  var timer = null;\n  function schedule() {\n    if (!CONFIG.AUTO_DOWNLOAD || ran) return;\n    clearTimeout(timer);\n    timer = setTimeout(run, CONFIG.IDLE_MS);\n  }\n\n  /* ---------------- 6. 手动入口 & 兜底提示 ---------------- */\n  window.myPolicy = {\n    report: function () {\n      log('已捕获 ' + Object.keys(IM).length + ' 份保单');\n      console.table(Object.keys(IM).slice(0, 300).map(function (id) {\n        return { policyId: id, 保单号: IM[id].code, 投保人: IM[id].holder };\n      }));\n    },\n    start: function () { ran = false; return run(); },\n    apis: function () { return APIS; },\n    reset: function () { localStorage.removeItem(CONFIG.DONE_KEY); log('已清空下载记录'); }\n  };\n\n  setTimeout(function () {\n    if (!Object.keys(IM).length) {\n      warn('15 秒内没捕到保单数据。请确认：');\n      warn('  ① 当前页面是「保单」列表页（能看到 待处理/投保单/保单 三个标签）');\n      warn('  ② 点一下「保单」标签，或翻一页 —— 发出请求后会自动开始');\n      warn('  ③ 若仍无反应，执行 myPolicy.apis() 看捕获到什么');\n    }\n  }, 15000);\n\n  log('监听已就绪。现在去点「保单」标签或翻页，捕获到会自动开始下载。');\n  log('手动指令：myPolicy.report() 看清单 / myPolicy.start() 立刻开始 / myPolicy.reset() 清下载记录');\n})();\n";
+document.getElementById('fb').value = SCRIPT;
+const btn = document.getElementById('copyBtn');
+const hint = document.getElementById('hint');
+btn.addEventListener('click', async () => {
+  let ok = false;
+  try { await navigator.clipboard.writeText(SCRIPT); ok = true; }
+  catch (e) {
+    const ta = document.getElementById('fb');
+    ta.focus(); ta.select();
+    try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+  }
+  if (ok) {
+    btn.textContent = '已复制 ✓';
+    btn.classList.add('done');
+    hint.textContent = '现在去控制台按 ⌘V 粘贴';
+    setTimeout(() => { btn.textContent = '复制脚本'; btn.classList.remove('done'); hint.textContent = '点一下即可'; }, 3000);
+  } else {
+    hint.textContent = '自动复制失败，请用下方文本框手动复制';
+  }
+});
+</script>
+</body>
+</html>

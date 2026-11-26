@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>明亚保单批量下载 · 使用说明</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 20px 60px;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f5f5f3; color: #2c2c2a; line-height: 1.7;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 6px; }
+  .sub { color: #5f5e5a; font-size: 14px; margin-bottom: 28px; }
+  .card {
+    background: #fff; border: 1px solid #e2e0d8; border-radius: 12px;
+    padding: 24px 26px; margin-bottom: 18px;
+  }
+  .step { display: flex; gap: 14px; margin-bottom: 20px; }
+  .step:last-child { margin-bottom: 0; }
+  .num {
+    flex: 0 0 26px; height: 26px; border-radius: 50%;
+    background: #534ab7; color: #fff; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 2px;
+  }
+  .step-body { flex: 1; }
+  .step-title { font-weight: 600; font-size: 15px; margin-bottom: 3px; }
+  .step-desc { font-size: 14px; color: #5f5e5a; }
+  kbd {
+    background: #f1efe8; border: 1px solid #d3d1c7; border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 6px; font-size: 12.5px;
+    font-family: ui-monospace, Menlo, monospace; color: #2c2c2a;
+  }
+  code {
+    background: #f1efe8; border-radius: 4px; padding: 1px 5px;
+    font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;
+  }
+  .copy-btn {
+    width: 100%; padding: 15px; font-size: 16px; font-weight: 600;
+    color: #fff; background: #534ab7; border: none; border-radius: 10px;
+    cursor: pointer; font-family: inherit; transition: background .15s;
+  }
+  .copy-btn:hover { background: #3c3489; }
+  .copy-btn.done { background: #0f6e56; }
+  .hint { font-size: 13px; color: #888780; margin-top: 9px; text-align: center; }
+  .warn {
+    background: #faeeda; border: 1px solid #ef9f27; border-radius: 10px;
+    padding: 14px 16px; font-size: 13.5px; color: #412402; margin-top: 16px;
+  }
+  .warn b { color: #854f0b; }
+  textarea {
+    width: 100%; height: 90px; margin-top: 12px; padding: 10px;
+    border: 1px solid #d3d1c7; border-radius: 8px; font-size: 12px;
+    font-family: ui-monospace, Menlo, monospace; color: #5f5e5a;
+    resize: vertical;
+  }
+  .link-btn {
+    display: inline-block; padding: 11px 20px; background: #fff;
+    border: 1px solid #b5d4f4; color: #185fa5; border-radius: 9px;
+    text-decoration: none; font-size: 14px; font-weight: 500;
+  }
+  .link-btn:hover { background: #e6f1fb; }
+  .tip { font-size: 13px; color: #5f5e5a; }
+  .tip li { margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>明亚保单批量下载</h1>
+  <p class="sub">全程 4 步，脚本复制到浏览器控制台运行，不需要 token。</p>
+
+  <div class="card">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <div class="step-title">打开工作台，确认已登录</div>
+        <div class="step-desc">
+          浏览器里打开明亚工作台，能看到「我的任务」列表就说明登录正常。
+          <br><a class="link-btn" style="margin-top:10px" href="https://d.mingya.com.cn/workbench-web/#/workBench/myTask/index" target="_blank" rel="noopener">打开工作台</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <div class="step-title">打开开发者工具的控制台</div>
+        <div class="step-desc">
+          按 <kbd>F12</kbd>，或 Mac 上按 <kbd>⌥</kbd>+<kbd>⌘</kbd>+<kbd>I</kbd>，
+          然后点顶部那个 <b>Console</b>（控制台）标签。
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body">
+        <div class="step-title">复制脚本</div>
+        <div class="step-desc">点下面这个按钮，脚本会自动复制到剪贴板。</div>
+        <button class="copy-btn" id="copyBtn" style="margin-top:12px">复制脚本</button>
+        <div class="hint" id="hint">点一下即可</div>
+        <div class="warn">
+          <b>如果按钮没反应</b>（某些预览环境限制剪贴板），点下面的文本框全选，再按 <kbd>⌘</kbd>+<kbd>C</kbd> 复制：
+          <textarea id="fallback" readonly onclick="this.select()"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">4</div>
+      <div class="step-body">
+        <div class="step-title">粘贴到控制台，按回车</div>
+        <div class="step-desc">
+          在控制台里按 <kbd>⌘</kbd>+<kbd>V</kbd> 粘贴，然后按 <kbd>Enter</kbd>。
+          <br>浏览器若提示「是否允许下载多个文件」，点<b>允许</b>。
+        </div>
+        <div class="warn" style="margin-top:12px">
+          <b>重要：</b>如果控制台提示 <code>Warning: Don't paste code…</code>，
+          需要先在控制台里输入 <code>allow pasting</code> 再按回车，然后才能粘贴。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="step-title" style="margin-bottom:10px">运行后会看到什么</div>
+    <ul class="tip">
+      <li>先打印「登录态有效 ✓」</li>
+      <li>再打印一张<b>分类分布表</b>，列出每个分类下有多少任务</li>
+      <li>然后按「保单 / 续期 / 投保 / 缴费 / 合同…」筛选，逐个取附件</li>
+      <li>最后逐个下载 PDF，文件在浏览器的<b>下载</b>目录里</li>
+    </ul>
+    <div class="warn" style="margin-top:14px">
+      <b>建议先空跑：</b>用文本编辑器打开脚本，把开头的
+      <code>DRY_RUN = false</code> 改成 <code>true</code>，
+      先只扫描不下载，看清分类表再改回来。这样避免下错东西。
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="step-title" style="margin-bottom:10px">常见问题</div>
+    <ul class="tip">
+      <li><b>提示"未登录"</b> → 回工作台刷新页面，确认能看到任务列表再跑</li>
+      <li><b>只下了几个就停</b> → 浏览器拦截了多文件下载，点地址栏右侧图标选「始终允许」，再跑一次，已下的会自动跳过</li>
+      <li><b>一个文件都没找到</b> → 说明这些任务下没有 PDF 附件，或分类关键词没命中，把分类表发我看</li>
+      <li><b>想重新全部下载</b> → 控制台输入 <code>localStorage.clear()</code> 回车再跑</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const SCRIPT = "/* =========================================================================
+ * 明亚工作台 · 保单 PDF 批量下载 v2
+ *
+ * 用法：工作台页面（已登录，能看到任务列表）→ F12 → Console → 粘贴全部 → 回车
+ *       首次会提示\"允许多个下载\"，点允许
+ *
+ * v2 修正（依据真实接口响应）：
+ *   - 列表数据在 data.records（MyBatis-Plus Page），不是 data.list
+ *   - pageNum/page/pageSize 等参数服务端不认，改为自动探测 + listUser 兜底
+ *   - 按 menuName 分类过滤，默认只取保单/续期/投保类任务
+ *   - 已处理任务 id 存 localStorage，可断点续跑
+ * ========================================================================= */
+(async () => {
+  const API = 'https://wps.mingya.com.cn/workbench';
+
+  /* ---------------- 可调参数 ---------------- */
+  const ONLY_PDF   = true;      // 只下 PDF
+  const DRY_RUN    = false;     // true = 只扫描列清单，不下载
+  const FIRST_TYPES = ['1', '2', '3', '4', '5'];  // 6=全部通知(12772条)太重，需要时自己加
+  // null = 不过滤，全部任务都要
+  const MENU_FILTER = ['保单', '续期', '投保', '缴费', '合同', '保障', '保险', '回执', '核保'];
+  const MAX_DETAIL = 2500;      // 最多查多少个任务的详情（防止跑太久）
+  const GAP = 650;              // 每个文件下载间隔 ms
+  const SLEEP = 130;            // 详情接口间隔 ms
+  /* ------------------------------------------ */
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const log  = (...a) => console.log('%c[明亚]', 'color:#0f6e56;font-weight:bold', ...a);
+  const warn = (...a) => console.warn('[明亚]', ...a);
+
+  const jget = async (path, params = {}) => {
+    const q = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+    ).toString();
+    const r = await fetch(`${API}${path}${q ? '?' + q : ''}`, {
+      credentials: 'include',
+      headers: { platform: 'WEB', Accept: 'application/json' }
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status} @ ${path}`);
+    const j = await r.json();
+    if (j.code && j.code !== 200) throw new Error(`${j.msg || j.message || '接口错误'} @ ${path}`);
+    return j;
+  };
+
+  const clean = (s, max = 70) =>
+    String(s || '未命名').replace(/[\\/:*?\"<>|\r\n\t]/g, '_').trim().slice(0, max) || '未命名';
+
+  const extOf = (f, url) => {
+    const t = (f.type || '').toLowerCase();
+    const m = { pdf: '.pdf', jpg: '.jpg', jpeg: '.jpg', png: '.png',
+                xlsx: '.xlsx', xls: '.xls', doc: '.doc', docx: '.docx' };
+    if (m[t]) return m[t];
+    const x = String(url || '').match(/\.([A-Za-z0-9]{2,5})(?:\?|$)/);
+    return x ? '.' + x[1].toLowerCase() : '';
+  };
+
+  /* ---------- 1. 登录态 ---------- */
+  try {
+    await jget('/task/list', { firstType: '1' });
+    log('登录态有效 ✓');
+  } catch (e) {
+    console.error('%c[明亚] 未登录/会话过期：' + e.message, 'color:#a32d2d;font-weight:bold');
+    return;
+  }
+
+  /* ---------- 2. 探测分页是否生效 ---------- */
+  let paginationWorks = false;
+  {
+    const j = await jget('/task/list', { firstType: '1', size: 100 });
+    const d = j.data || {};
+    if (d.size === 100) { paginationWorks = true; log('分页参数生效（size/current）'); }
+    else log(`分页参数不生效（服务端返回 size=${d.size}），改用 listUser 全量拉取`);
+  }
+
+  /* ---------- 3. 收集任务 ---------- */
+  const tasks = new Map();   // id -> task
+
+  const collectFromList = async (ft) => {
+    let page = 1, added = 0, total = null;
+    while (page <= 200) {
+      const j = await jget('/task/list', { firstType: ft, current: page, size: 100 });
+      const d = j.data || {};
+      const recs = d.records || [];
+      total = d.total;
+      if (!recs.length) break;
+      for (const t of recs) {
+        if (t && t.id && !tasks.has(t.id)) { tasks.set(t.id, t); added++; }
+      }
+      if (paginationWorks && (page * 100) >= (total || 0)) break;
+      if (!paginationWorks) break;   // 不生效时只拿第一页
+      page++;
+      await sleep(120);
+    }
+    return { added, total };
+  };
+
+  const collectFromUser = async (ft) => {
+    // /task/listUser 一次返回该用户名下全部 tasks
+    const j = await jget('/task/listUser', { firstType: ft });
+    const d = j.data || {};
+    const groups = d.records || (Array.isArray(d) ? d : []);
+    let added = 0;
+    for (const g of groups) {
+      for (const t of (g.tasks || [])) {
+        if (t && t.id && !tasks.has(t.id)) { tasks.set(t.id, t); added++; }
+      }
+    }
+    return { added, total: groups.reduce((s, g) => s + (g.tasks || []).length, 0) };
+  };
+
+  for (const ft of FIRST_TYPES) {
+    try {
+      const r = paginationWorks ? await collectFromList(ft) : await collectFromUser(ft);
+      log(`类型${ft} → 新增 ${r.added}（该分类共 ${r.total ?? '?'}，累计 ${tasks.size}）`);
+    } catch (e) {
+      warn(`类型${ft} 拉取失败：${e.message}`);
+    }
+  }
+
+  if (!tasks.size) { warn('没有取到任何任务'); return; }
+
+  /* ---------- 4. 按 menuName 分类统计 ---------- */
+  const all = [...tasks.values()];
+  const byMenu = new Map();
+  for (const t of all) {
+    const k = t.menuName || '(无分类)';
+    byMenu.set(k, (byMenu.get(k) || 0) + 1);
+  }
+  const table = [...byMenu.entries()].sort((a, b) => b[1] - a[1]);
+  log(`共 ${all.length} 个去重任务，分类分布如下：`);
+  console.table(table.map(([menu, n]) => ({ 分类: menu, 任务数: n })));
+
+  /* ---------- 5. 筛选 ---------- */
+  const hit = (t) => !MENU_FILTER ||
+    MENU_FILTER.some(k => (t.menuName || '').includes(k) || (t.title || '').includes(k));
+
+  let targets = all.filter(hit);
+  log(`命中筛选条件 ${targets.length} 个任务（关键词：${MENU_FILTER ? MENU_FILTER.join('/') : '不过滤'}）`);
+
+  if (targets.length > MAX_DETAIL) {
+    warn(`超过上限 ${MAX_DETAIL}，只处理前 ${MAX_DETAIL} 个。如需全量请调大 MAX_DETAIL。`);
+    targets = targets.slice(0, MAX_DETAIL);
+  }
+
+  if (DRY_RUN) {
+    console.table(targets.slice(0, 60).map(t => ({
+      标题: (t.title || '').slice(0, 40),
+      分类: t.menuName, 时间: t.pushTime, id: t.id
+    })));
+    log('DRY_RUN 已开启，未下载。把 DRY_RUN 改成 false 再跑一次即可。');
+    return;
+  }
+
+  /* ---------- 6. 逐个取附件 ---------- */
+  const files = [];
+  const doneKey = 'mya_done_files';
+  const doneFiles = new Set(JSON.parse(localStorage.getItem(doneKey) || '[]'));
+  const detailDone = new Set(JSON.parse(localStorage.getItem('mya_done_tasks') || '[]'));
+
+  let i = 0;
+  for (const t of targets) {
+    i++;
+    const tid = t.id;
+    if (detailDone.has(String(tid))) continue;
+    try {
+      const j = await jget('/task/taskDetail', { id: tid });
+      const d = j.data || {};
+      for (const f of (d.fileInfo || [])) {
+        let url = f.url;
+        if (!url) {
+          try { url = (await jget('/file/view', { fileId: f.id, taskId: tid })).data; }
+          catch { }
+        }
+        if (!url) continue;
+        const ext = extOf(f, url);
+        if (ONLY_PDF && ext.toLowerCase() !== '.pdf') continue;
+        const key = `${tid}/${f.id}`;
+        if (doneFiles.has(key)) continue;
+        files.push({
+          key, task: clean(t.title || `task-${tid}`), menu: t.menuName || '',
+          name: clean(f.name || 'unnamed'), ext, url
+        });
+      }
+      detailDone.add(String(tid));
+      localStorage.setItem('mya_done_tasks', JSON.stringify([...detailDone]));
+    } catch (e) {
+      if (i % 50 === 0) warn(`任务 ${tid} 详情失败：${e.message}`);
+    }
+    if (i % 25 === 0) log(`详情进度 ${i}/${targets.length}，已找到 ${files.length} 个 PDF`);
+    await sleep(SLEEP);
+  }
+
+  log(`扫描完成：共找到 ${files.length} 个待下载 PDF`);
+  if (!files.length) { warn('这些任务下没有 PDF 附件。可把 ONLY_PDF 改 false 看全部类型。'); return; }
+
+  /* ---------- 7. 下载 ---------- */
+  let ok = 0, fail = 0;
+  const failed = [];
+  for (const f of files) {
+    try {
+      const r = await fetch(f.url, { credentials: 'omit' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const blob = await r.blob();
+      if (blob.size < 200) throw new Error('文件过小，可能不是有效 PDF');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = f.name + f.ext;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
+      doneFiles.add(f.key);
+      localStorage.setItem(doneKey, JSON.stringify([...doneFiles]));
+      ok++;
+      log(`✓ ${ok}/${files.length}  ${f.name}${f.ext}  (${f.menu})`);
+    } catch (e) {
+      fail++; failed.push(f);
+      warn(`✗ ${f.name}${f.ext} — ${e.message}`);
+    }
+    await sleep(GAP);
+  }
+
+  log(`全部完成：成功 ${ok}，失败 ${fail}`);
+  if (failed.length) {
+    console.table(failed.map(f => ({ 任务: f.task.slice(0, 30), 文件: f.name + f.ext, 直链: f.url })));
+  }
+  log('若浏览器提示\"已阻止多个下载\"，点地址栏右侧图标选『始终允许』后重跑，已下的会自动跳过。');
+})();
+";
+
+document.getElementById('fallback').value = SCRIPT;
+
+const btn = document.getElementById('copyBtn');
+const hint = document.getElementById('hint');
+
+btn.addEventListener('click', async () => {
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(SCRIPT);
+    ok = true;
+  } catch (e) {
+    const ta = document.getElementById('fallback');
+    ta.focus();
+    ta.select();
+    try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+  }
+  if (ok) {
+    btn.textContent = '已复制 ✓';
+    btn.classList.add('done');
+    hint.textContent = '现在去控制台按 ⌘V 粘贴';
+    setTimeout(() => {
+      btn.textContent = '复制脚本';
+      btn.classList.remove('done');
+      hint.textContent = '点一下即可';
+    }, 3000);
+  } else {
+    hint.textContent = '自动复制失败，请用下方文本框手动复制';
+  }
+});
+</script>
+</body>
+</html>

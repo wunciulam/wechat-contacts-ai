@@ -7,7 +7,7 @@ interface QuickFollowUpModalProps {
   isOpen: boolean;
   onClose: () => void;
   contacts: Contact[];
-  onSave: (contactId: string | null, date: string, content: string, status: 'following' | 'contacted', newContactName?: string, existingRecordId?: string, completed?: boolean) => void;
+  onSave: (contactId: string | null, date: string, content: string, status: 'following', newContactName?: string, existingRecordId?: string, completed?: boolean) => void;
   initialContactId?: string;
   initialRecord?: ProgressRecord;
 }

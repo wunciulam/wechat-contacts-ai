@@ -45,7 +45,7 @@ export interface Contact {
 
   policies?: Policy[];
 
-  followUpStatus?: 'idle' | 'following' | 'contacted';
+  followUpStatus?: 'idle' | 'following';
 }
 
 export type NewContact = Omit<Contact, 'id' | 'addedAt'>;

@@ -6,6 +6,76 @@ export interface ProgressRecord {
   completed?: boolean;
 }
 
+export interface SopAnswerOption {
+  id: string;
+  label: string;
+  meaning?: string;
+  responseStrategy?: string;
+  talkTrack: string;
+  followUps: string[];
+}
+
+export interface SopStep {
+  id: string;
+  order: number;
+  title: string;
+  purpose: string;
+  question: string;
+  options: SopAnswerOption[];
+  materials: string[];
+}
+
+export interface SopTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  version: number;
+  steps: SopStep[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SopStepDraft {
+  selectedOptionIds: string[];
+  customerQuote: string;
+  judgment: string;
+  nextAction: string;
+  customTalkTracks?: Record<string, string>;
+}
+
+export interface SopDraft {
+  contactId: string;
+  templateId: string;
+  activeStepId: string;
+  steps: Record<string, SopStepDraft>;
+  updatedAt: number;
+}
+
+export interface SopSession {
+  id: string;
+  contactId: string;
+  templateId: string;
+  templateName: string;
+  templateSnapshot: SopTemplate;
+  steps: Record<string, SopStepDraft>;
+  createdAt: number;
+  completedAt: number;
+}
+
+export interface SopProfile {
+  source?: string;
+  motivation?: string;
+  originalFundDestination?: string;
+  availableDuration?: string;
+  coreNeeds?: string[];
+  mainConcern?: string;
+  decisionMakers?: string;
+  nextAction?: string;
+  materialsToPrepare?: string[];
+  nextOpeningLine?: string;
+  updatedAt?: number;
+}
+
 export interface Policy {
   id: string;
   policyNumber: string;
@@ -58,6 +128,7 @@ export interface Contact {
 
   followUpStatus?: 'idle' | 'following';
   categoryId?: string;
+  sopProfile?: SopProfile;
 }
 
 // 跟进状态标签映射

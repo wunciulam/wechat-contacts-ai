@@ -1,0 +1,40 @@
+diff --git a/components/ImportModal.tsx b/components/ImportModal.tsx
+index 4d98538..4796b01 100644
+--- a/components/ImportModal.tsx
++++ b/components/ImportModal.tsx
+@@ -360,22 +360,23 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+ 
+   return (
+     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
+-      <div className={`bg-white shadow-2xl w-full ${!initialData&&activeTab==='policies'?'max-w-3xl':'max-w-5xl'} overflow-hidden flex flex-col max-h-[90vh] rounded-2xl border border-gray-200`}>
+-        <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
++      <div className={`bg-white shadow-2xl w-full ${!initialData&&activeTab==='policies'?'max-w-3xl':'max-w-5xl'} overflow-hidden flex flex-col max-h-[90dvh] rounded-2xl border border-gray-200`}>
++        <div className="px-5 py-4 border-b border-gray-100 flex shrink-0 justify-between items-center">
+           <h2 className="text-base font-semibold text-gray-800">{initialData ? '编辑联系人资料' : '添加 / 导入'}</h2>
+           <button disabled={profileBusy||historyBusy} onClick={requestClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
+             <X size={20} />
+           </button>
+         </div>
+         {!initialData && (
+-          <div className="px-5 pt-4 pb-0 flex gap-2 overflow-x-auto">
++          <div className="px-5 pt-4 pb-0 flex shrink-0 gap-2 overflow-x-auto">
+             <button onClick={() => setActiveTab('policies')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors whitespace-nowrap ${activeTab === 'policies' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}>明亚采集</button>
+             <button onClick={() => setActiveTab('ai')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'ai' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>Excel导入</button>
+             <button onClick={() => setActiveTab('table')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'table' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>截图识别</button>
+             <button onClick={() => setActiveTab('manual')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'manual' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>手动录入</button>
+           </div>
+         )}
+-        <fieldset disabled={profileBusy} className="min-w-0 flex-1 overflow-y-auto p-5 space-y-4">
++        <div data-contact-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
++        <fieldset disabled={profileBusy} className="min-w-0 p-5 space-y-4">
+           {error && activeTab!=='manual' && <div className="p-4 bg-red-50 text-red-700 rounded-xl flex gap-2 text-sm border border-red-100"><AlertCircle size={18} />{error}</div>}
+ 
+           {activeTab === 'policies' && onMingyaImport && (
+@@ -816,6 +817,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+              </div>
+            )}
+          </fieldset>
++         </div>
+ 
+          {/* 底部操作区 - 仅在手动录入时显示 */}
+          {(activeTab === 'manual' || initialData) && (

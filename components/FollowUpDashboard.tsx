@@ -7,20 +7,19 @@ import { PageHeader } from './PageHeader';
 interface FollowUpDashboardProps {
   contacts: Contact[];
   filterTags: Set<string>;
-  followUpFilter: 'idle' | 'following' | 'contacted' | null;
+  followUpFilter: 'idle' | 'following' | null;
   onAddProgress: (contactId?: string) => void;
   onEditContact: (contact: Contact) => void;
   onDeleteProgress: (contactId: string, progressId: string) => void;
   onToggleProgress: (contactId: string, progressId: string) => void;
-  onUpdateStatus: (contactId: string, newStatus: 'following' | 'contacted' | 'idle') => void;
-  onSaveQuickFollowUp: (contactId: string | null, date: string, content: string, status: 'following' | 'contacted', newContactName?: string, existingRecordId?: string, completed?: boolean) => void;
+  onUpdateStatus: (contactId: string, newStatus: 'following' | 'idle') => void;
+  onSaveQuickFollowUp: (contactId: string | null, date: string, content: string, status: 'following', newContactName?: string, existingRecordId?: string, completed?: boolean) => void;
   onEditProgressRecord?: (contactId: string, record: ProgressRecord) => void;
 }
 
 const FollowUpDashboard: React.FC<FollowUpDashboardProps> = ({ 
   contacts, filterTags, followUpFilter, onAddProgress, onEditContact, onDeleteProgress, onToggleProgress, onUpdateStatus, onSaveQuickFollowUp, onEditProgressRecord
 }) => {
-  const [activeTab, setActiveTab] = useState<'following' | 'contacted'>('following');
   const [expandedHistoryIds, setExpandedHistoryIds] = useState<Set<string>>(new Set());
   const dashboardRef = useRef<HTMLDivElement>(null);
 
@@ -45,8 +44,7 @@ const FollowUpDashboard: React.FC<FollowUpDashboardProps> = ({
 
   const counts = useMemo(() => {
     const following = contacts.filter(c => c.followUpStatus === 'following').length;
-    const contacted = contacts.filter(c => c.followUpStatus === 'contacted').length;
-    return { following, contacted };
+    return { following };
   }, [contacts]);
 
   const visibleContacts = useMemo(() => {
@@ -56,11 +54,7 @@ const FollowUpDashboard: React.FC<FollowUpDashboardProps> = ({
       if (followUpFilter !== null) {
         matchesFollowUpStatus = c.followUpStatus === followUpFilter;
       } else {
-        // 使用 activeTab 过滤
-        const status = c.followUpStatus || 'idle';
-        const isFollowing = status === 'following';
-        const isContacted = status === 'contacted';
-        matchesFollowUpStatus = activeTab === 'following' ? isFollowing : isContacted;
+        matchesFollowUpStatus = c.followUpStatus === 'following';
       }
       
       const matchesTag = filterTags.size === 0 || c.tags.some(tag => filterTags.has(tag));
@@ -70,7 +64,7 @@ const FollowUpDashboard: React.FC<FollowUpDashboardProps> = ({
       const timeB = b.lastDate ? new Date(b.lastDate).getTime() : 0;
       return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
     });
-  }, [contacts, activeTab, filterTags, followUpFilter]);
+  }, [contacts, filterTags, followUpFilter]);
 
   const handleSetIdle = (e: React.MouseEvent, contactId: string) => {
     e.stopPropagation();
@@ -91,7 +85,7 @@ const FollowUpDashboard: React.FC<FollowUpDashboardProps> = ({
     <div ref={dashboardRef} className="flex-1 h-full w-full overflow-hidden flex flex-col bg-white relative">
       <div className="sticky top-0 z-20 shrink-0 bg-white border-b border-gray-100">
         <PageHeader
-          title={activeTab === 'following' ? '跟进中' : '已沟通'}
+          title="跟进中"
           count={visibleContacts.length}
           actionButton={
             <button 
@@ -104,11 +98,8 @@ const FollowUpDashboard: React.FC<FollowUpDashboardProps> = ({
         />
         <div className="px-5 pb-4">
           <div className="flex p-0.5 bg-gray-100 rounded-md w-fit">
-            <button onClick={() => setActiveTab('following')} className={`px-4 py-1.5 rounded text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'following' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+            <button className="px-4 py-1.5 rounded text-sm font-medium flex items-center gap-2 transition-all bg-white text-gray-900">
               <CircleDashed size={14} />跟进中 <span className="opacity-50 text-xs">{counts.following}</span>
-            </button>
-            <button onClick={() => setActiveTab('contacted')} className={`px-4 py-1.5 rounded text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'contacted' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-              <CheckCircle2 size={14} />已沟通 <span className="opacity-50 text-xs">{counts.contacted}</span>
             </button>
           </div>
         </div>
@@ -146,11 +137,11 @@ const FollowUpDashboard: React.FC<FollowUpDashboardProps> = ({
                     </div>
                     <div className="flex items-center gap-1 md:gap-2" onClick={e => e.stopPropagation()}>
                       <button 
-                        onClick={() => onUpdateStatus(contact.id, activeTab === 'following' ? 'contacted' : 'following')} 
+                        onClick={() => onUpdateStatus(contact.id, 'idle')} 
                         className="text-[9px] md:text-[10px] font-medium px-2 md:px-3 py-1 md:py-1.5 rounded-md bg-white border border-gray-200 hover:border-gray-300 transition-all flex items-center gap-1 md:gap-1.5 text-gray-700"
                       >
-                        {activeTab === 'following' ? <CheckCircle2 size={12} className="text-gray-500 md:w-[14px] md:h-[14px]" strokeWidth={2.5} /> : <Clock size={12} className="text-gray-500 md:w-[14px] md:h-[14px]" strokeWidth={2.5} />}
-                        {activeTab === 'following' ? '移到已沟通' : '重新开始跟进'}
+                        <Clock size={12} className="text-gray-500 md:w-[14px] md:h-[14px]" strokeWidth={2.5} />
+                        移出跟进
                       </button>
                       <button 
                         onClick={() => onAddProgress(contact.id)} 

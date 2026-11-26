@@ -17,8 +17,8 @@ interface SidebarProps {
   policyCount: number;
   currentView: 'contacts' | 'followups' | 'policies';
   onChangeView: (view: 'contacts' | 'followups' | 'policies') => void;
-  followUpFilter?: 'idle' | 'following' | 'contacted' | null;
-  onFollowUpFilter?: (filter: 'idle' | 'following' | 'contacted' | null) => void;
+  followUpFilter?: 'idle' | 'following' | null;
+  onFollowUpFilter?: (filter: 'idle' | 'following' | null) => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
 }

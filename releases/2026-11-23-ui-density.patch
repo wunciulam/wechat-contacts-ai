@@ -1,0 +1,163 @@
+diff --git a/components/ContactCard.tsx b/components/ContactCard.tsx
+index d294739..5abd238 100644
+--- a/components/ContactCard.tsx
++++ b/components/ContactCard.tsx
+@@ -93,7 +93,6 @@ const ContactCard: React.FC<ContactCardProps> = ({
+             {contact.remarkName || contact.nickname}
+           </h3>
+ 
+-          {contact.followUpStatus === 'following' && <span className="follow-status mt-1"><span/>跟进中</span>}
+ 
+           <CustomerTags tags={contact.tags}/>
+         </div>
+diff --git a/components/ImportModal.tsx b/components/ImportModal.tsx
+index 8d93b75..8375dd6 100644
+--- a/components/ImportModal.tsx
++++ b/components/ImportModal.tsx
+@@ -419,13 +419,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+                 <div className="space-y-1.5 relative" ref={tagInputContainerRef}>
+                   <label className="block text-xs font-medium text-gray-700">标签管理</label>
+                   <div
+-                    className={`flex flex-wrap gap-2 p-3 min-h-[50px] border rounded-lg transition-colors ${showTagSuggestions ? 'border-gray-900 ring-1 ring-gray-900/10' : 'border-gray-200'}`}
++                    className={`ui-token-field flex flex-wrap gap-2 p-3 min-h-[50px] border rounded-lg transition-colors ${showTagSuggestions ? 'border-gray-900 ring-1 ring-gray-900/10' : 'border-gray-200'}`}
+                     onClick={() => setShowTagSuggestions(true)}
+                   >
+                     {formData.tags.map(t => <span key={t} className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700">{t}<IconButton onClick={(e) => { e.stopPropagation(); setFormData({...formData, tags: formData.tags.filter(x => x !== t)}); }} className="hover:text-gray-900 transition-colors" aria-label="关闭"><X size={10} strokeWidth={3}/></IconButton></span>)}
+                     <Input
+                       type="text"
+-                      placeholder="输入标签…"
++                      appearance="embedded" aria-label="标签" placeholder="输入标签…"
+                       className="flex-1 min-w-[120px]"
+                       value={tagInput}
+                       onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
+@@ -628,7 +628,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+ 
+                 <div className="space-y-1.5">
+                   <label className="block text-xs font-medium text-gray-700">意向产品</label>
+-                  <div className="flex flex-wrap gap-2 p-3 min-h-[50px] border border-gray-200 rounded-lg">
++                  <div className="ui-token-field flex flex-wrap gap-2 p-3 min-h-[50px] border border-gray-200 rounded-lg">
+                     {(formData.intentProducts || []).map((product, idx) => (
+                       <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 border border-blue-100 rounded-full text-xs font-medium text-blue-700">
+                         {product}
+@@ -637,7 +637,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+                     ))}
+                     <Input
+                       type="text"
+-                      placeholder="添加意向产品…"
++                      appearance="embedded" aria-label="意向产品" placeholder="添加意向产品…"
+                       className="flex-1 min-w-[120px]"
+                       onKeyDown={e => {
+                         if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+@@ -718,7 +718,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+                   </div>
+                 )}
+ 
+-                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
++                <div data-followup-history className="space-y-2">
+                   {[...(formData.progressHistory || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((record) => (
+                     <div key={record.id} className="p-4 bg-white border border-gray-200 rounded-lg group relative hover:border-gray-300 transition-colors">
+                       {editingHistoryId === record.id ? (
+diff --git a/components/PolicyFieldsForm.tsx b/components/PolicyFieldsForm.tsx
+index 78920b4..5c9fa53 100644
+--- a/components/PolicyFieldsForm.tsx
++++ b/components/PolicyFieldsForm.tsx
+@@ -31,11 +31,11 @@ export default function PolicyFieldsForm({value,onChange,contacts,identityReadon
+       return <div key={k} className="min-w-0"><label htmlFor={`${formId}-${k}`} className="block text-xs font-medium text-gray-500">
+         {label}{(k==='productName'||requireApplicant&&k==='applicant')&&<span aria-hidden="true"> *</span>}
+         </label>
+-        {k==='applicant'||k==='insured'?<Select id={`${formId}-${k}`} required={requireApplicant&&k==='applicant'} className="mt-1.5" value={value[k==='applicant'?'applicantId':'insuredId']||''} onValueChange={selectedValue => {
++        {k==='applicant'||k==='insured'?<Select searchable id={`${formId}-${k}`} required={requireApplicant&&k==='applicant'} className="mt-1.5" value={value[k==='applicant'?'applicantId':'insuredId']||''} onValueChange={selectedValue => {
+           const c=contacts.find(c=>c.id===selectedValue);
+           onChange({...value,[k]:c?c.remarkName||c.nickname:value[k],[k==='applicant'?'applicantId':'insuredId']:c?.id});
+         }}>
+-          <option value="">{textValue||'选择客户'}</option>
++          <option value="" disabled>{textValue||'选择客户'}</option>
+           {contacts.map(c=><option value={c.id} key={c.id}>{c.remarkName||c.nickname}{c.phoneNumber?` · 尾号${String(c.phoneNumber).slice(-4)}`:''}</option>)}
+         </Select>:k==='status'?<Select id={`${formId}-${k}`} className="mt-1.5" value={textValue} onValueChange={update}>{['正式保单','待生效','中止保单','终止保单','已撤单','已退保','拒保',...(!['正式保单','待生效','中止保单','终止保单','已撤单','已退保','拒保'].includes(textValue)?[textValue]:[])].map(v=><option key={v} value={v}>{v||'待补充'}</option>)}</Select>:k==='paymentFrequency'?<Select id={`${formId}-${k}`} className="mt-1.5" value={textValue} onValueChange={selectedValue => update(selectedValue)}>
+           {['','期交-年','期交-半年','期交-季','期交-月','趸交',...(!['','期交-年','期交-半年','期交-季','期交-月','趸交'].includes(textValue)?[textValue]:[])].map(v=><option key={v} value={v}>{v||'待补充'}</option>)}
+diff --git a/components/ui/Input.tsx b/components/ui/Input.tsx
+index ce89512..909f3e7 100644
+--- a/components/ui/Input.tsx
++++ b/components/ui/Input.tsx
+@@ -4,9 +4,10 @@ import DateInput from "./DateInput";
+ 
+ export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
+   leadingIcon?: React.ElementType;
++  appearance?: "default" | "embedded";
+ };
+ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
+-  { leadingIcon: Icon, className = "", type = "text", ...props },
++  { leadingIcon: Icon, appearance="default", className = "", type = "text", ...props },
+   ref,
+ ) {
+   if (type === "date")
+@@ -22,7 +23,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
+       </span>
+     );
+   return (
+-    <input {...props} ref={ref} type={type} className={`input ${className}`} />
++    <input {...props} ref={ref} type={type} className={`${appearance==="embedded"?"ui-input-embedded":"input"} ${className}`} />
+   );
+ });
+ export default Input;
+diff --git a/docs/2026-11-23-ui-density-followup.md b/docs/2026-11-23-ui-density-followup.md
+new file mode 100644
+index 0000000..17e4ddf
+--- /dev/null
++++ b/docs/2026-11-23-ui-density-followup.md
+@@ -0,0 +1,8 @@
++# 跟进工作台与录入密度修正
++
++- 工作台ContactCard移除“跟进中”和蓝点。所在工作台已表达跟进归属，重复标签不再占一行。全部联系人列表及客户编辑中的状态操作保留，仍用于筛选和修改。
++- 公共Input新增embedded外观，在已有标签/意向产品组合框内不再画第二层边框；外层统一焦点反馈，输入和回车添加保持。
++- 投保人、被保人复用公共Select的搜索能力，不再只能滚动长名单；占位提示项禁用，不作为可选客户。
++- 跟进历史移除300px独立滚动上限，随弹窗正文自然展开，消除有记录却空出大块区域的情况；标题及底部操作固定。
++
++59项业务检查、类型、构建及组件扫描通过。回归增加无工作台状态文案、组合框内边框、标签/产品回车、15条历史自然布局、客户搜索选择；桌面及手机截图走查。测试使用虚拟客户，无真实数据写入。发布核验结果以《线上正式版说明.md》为准。
+diff --git a/index.css b/index.css
+index 84510f1..bfae585 100644
+--- a/index.css
++++ b/index.css
+@@ -385,3 +385,10 @@ select.input { padding-right: 32px; }
+ @layer components {
+  .workspace-dialog.ui-navigation-drawer {position:fixed;inset:0 auto 0 0;margin:0;width:256px;max-width:calc(100vw - 32px);height:100dvh;max-height:100dvh;border-radius:0;border:0;}
+ }
++
++@layer components {
++ .ui-input-embedded {flex:1;min-width:120px;width:auto;height:28px;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:var(--color-gray-900);font-size:14px;line-height:20px;outline:none;}
++ .ui-input-embedded::placeholder {color:var(--color-gray-400);}
++ .ui-input-embedded:focus-visible {outline:none;}
++ .ui-token-field:focus-within {border-color:var(--color-gray-400);outline:1px solid var(--color-gray-200);}
++}
+diff --git a/scripts/check-ui-browser.cjs b/scripts/check-ui-browser.cjs
+index 2fa2c57..dff565b 100644
+--- a/scripts/check-ui-browser.cjs
++++ b/scripts/check-ui-browser.cjs
+@@ -116,6 +116,8 @@ function command(args) {
+   await run("follow-up failure/retry", "followup.js");
+   await run("fixture reset", "setup.js");
+   await run("business entry regression", "workflows.js");
++  await run("fixture reset", "setup.js");
++  await run("density and customer search", "density.js");
+   await run("component acceptance", "acceptance.js");
+   fs.writeFileSync(
+     path.join(out, "results.json"),
+diff --git a/tests/ui/density.js b/tests/ui/density.js
+new file mode 100644
+index 0000000..76caa07
+--- /dev/null
++++ b/tests/ui/density.js
+@@ -0,0 +1,13 @@
++async(page)=>{
++ const d=page.getByRole('dialog',{name:'编辑联系人资料',exact:true});
++ for(const label of ['标签','意向产品']){const input=d.getByRole('textbox',{name:label,exact:true});const border=await input.evaluate(e=>getComputedStyle(e).borderWidth);if(border!=='0px')throw Error('nested input border: '+label);}
++ await d.getByRole('textbox',{name:'标签',exact:true}).fill('回归标签');await page.keyboard.press('Enter');if(!await d.getByText('回归标签',{exact:true}).count())throw Error('embedded tag entry');
++ await d.getByRole('textbox',{name:'意向产品',exact:true}).fill('回归产品');await page.keyboard.press('Enter');if(!await d.getByText('回归产品',{exact:true}).count())throw Error('embedded product entry');
++ await page.screenshot({animations:'disabled',path:'output/ui-regression/embedded-fields.png'});
++ await page.setViewportSize({width:390,height:844});await d.getByRole('textbox',{name:'意向产品',exact:true}).scrollIntoViewIfNeeded();await page.screenshot({animations:'disabled',path:'output/ui-regression/embedded-fields-mobile.png'});await page.setViewportSize({width:1304,height:880});await page.goto('__BASE_URL__/');page._follow.contacts[0].progressHistory=Array.from({length:15},(_,i)=>({id:'history-'+i,date:'2026-11-20',content:'历史记录 '+i,completed:false}));await page.reload();await page.getByRole('heading',{name:'示例客户',exact:true}).click();
++ const history=d.locator('[data-followup-history]');const layout=await history.evaluate(e=>({height:e.getBoundingClientRect().height,overflow:getComputedStyle(e).overflowY}));if(layout.height<=300||layout.overflow==='auto')throw Error('history still independently limited');
++ await history.getByText('历史记录 14',{exact:true}).scrollIntoViewIfNeeded();await page.screenshot({animations:'disabled',path:'output/ui-regression/history-natural-height.png'});await d.getByRole('button',{name:'取消',exact:true}).click();await page.getByRole('button',{name:/跟进工作台/}).click();await page.locator('[data-category-id="__uncategorized__"]').scrollIntoViewIfNeeded();if(await page.locator('[data-category-id]').getByText('跟进中',{exact:true}).count())throw Error('board has redundant followup status');await page.screenshot({animations:'disabled',path:'output/ui-regression/board-without-status.png'});
++ await page.getByRole('button',{name:/保单管理/}).click();await page.getByRole('button',{name:'录入保单',exact:true}).click();const manual=page.getByRole('dialog',{name:'录入新保单',exact:true});await manual.getByLabel(/^投保人/).click();const search=page.getByRole('searchbox',{name:'搜索选项',exact:true});await search.fill('其他');const option=page.getByRole('option',{name:'其他客户',exact:true});await option.waitFor();await option.click();if(await manual.getByLabel(/^投保人/).innerText()!=='其他客户')throw Error('customer search selection');
++ await page.screenshot({animations:'disabled',path:'output/ui-regression/searchable-customer.png'});
++ return {passed:true,embeddedFields:true,history:layout,boardStatusRemoved:true,searchableCustomer:true};
++}

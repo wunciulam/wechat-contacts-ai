@@ -7,7 +7,7 @@ import { PageHeader } from './PageHeader';
 interface PolicyDashboardProps {
   contacts: Contact[];
   filterTags: Set<string>;
-  followUpFilter: 'idle' | 'following' | 'contacted' | null;
+  followUpFilter: 'idle' | 'following' | null;
   onEditContact: (contact: Contact) => void;
   onAddPolicy: () => void;
   onBatchDeleteContacts?: (ids: string[]) => void;

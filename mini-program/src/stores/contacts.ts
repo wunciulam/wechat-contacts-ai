@@ -54,7 +54,7 @@ export const useContactsStore = defineStore('contacts', () => {
   const isLoaded = ref(false);
   const selectedTags = ref<Set<string>>(new Set());
   const selectedContactIds = ref<Set<string>>(new Set());
-  const followUpFilter = ref<'idle' | 'following' | 'contacted' | null>(null);
+  const followUpFilter = ref<'idle' | 'following' | null>(null);
 
   // Getters
   const allTags = computed(() => {
@@ -362,7 +362,7 @@ export const useContactsStore = defineStore('contacts', () => {
     selectedContactIds.value.clear();
   };
 
-  const updateFollowUpStatus = (contactId: string, status: 'idle' | 'following' | 'contacted') => {
+  const updateFollowUpStatus = (contactId: string, status: 'idle' | 'following') => {
     const index = contacts.value.findIndex(c => c.id === contactId);
     if (index !== -1) {
       const updated = { ...contacts.value[index], followUpStatus: status };
@@ -371,7 +371,7 @@ export const useContactsStore = defineStore('contacts', () => {
     }
   };
 
-  const batchUpdateStatus = (status: 'idle' | 'following' | 'contacted') => {
+  const batchUpdateStatus = (status: 'idle' | 'following') => {
     selectedContactIds.value.forEach(contactId => {
       const index = contacts.value.findIndex(c => c.id === contactId);
       if (index !== -1) {

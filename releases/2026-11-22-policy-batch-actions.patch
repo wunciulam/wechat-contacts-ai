@@ -1,0 +1,512 @@
+diff --git a/App.tsx b/App.tsx
+index 5d08b32..063db1f 100644
+--- a/App.tsx
++++ b/App.tsx
+@@ -1,3 +1,4 @@
++import {excludedPolicyImport} from './services/policyImportRules';
+ import {saveFollowup,saveCustomerProfile} from './services/followupStorage';
+ import { rememberRenewalSnapshot } from './services/renewalCache';
+ import { migrate, projectContacts, mergePolicies } from './services/renewal';
+@@ -559,6 +560,7 @@ const App: React.FC = () => {
+       };
+ 
+       const processPolicyItem = (item: any) => {
++          if(excludedPolicyImport(item.status))return;
+           if (!item.policyNumber && !item.applicantName) return;
+            
+           // 按证件号或手机号匹配客户
+diff --git a/components/ImportModal.tsx b/components/ImportModal.tsx
+index 4796b01..7931d63 100644
+--- a/components/ImportModal.tsx
++++ b/components/ImportModal.tsx
+@@ -1,3 +1,4 @@
++import {excludedPolicyImport,mingyaStatusLabel} from '../services/policyImportRules';
+ import PolicyStatus from './PolicyStatus';
+ import {formatMoney} from './PolicyPaymentSummary';
+ import React, { useState, useRef, useEffect, useMemo } from 'react';
+@@ -160,7 +161,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+             company: getRowValue(row, '保险公司', '保险公司') || '',
+             premium: String(getRowValue(row, '保费', '保费') || '0'),
+             effectiveDate: getRowValue(row, '生效日期', '生效日期') ? formatDate(getRowValue(row, '生效日期', '生效日期')) : '',
+-            status: getRowValue(row, '保单状态', '保单状态') || '有效',
++            status: getRowValue(row, '保单状态', '状态') || (getRowValue(row,'保单状态代码')?mingyaStatusLabel(getRowValue(row,'保单状态代码')):'有效'),
+             applicantName: getRowValue(row, '投保人姓名', '投保人姓名') || '',
+             insuredName: getRowValue(row, '被保人', '被保人') || '',
+             phoneNumber: getRowValue(row, '手机号', '手机号') || '',
+@@ -168,7 +169,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+             paymentYears: getRowValue(row, '缴费年限', '缴费年限') || '',
+             insuranceType: getRowValue(row, '险种类型', '险种类型') || '',
+             coverage: getRowValue(row, '保额', '保额') || '',
+-          }))
++          })).filter(item=>!excludedPolicyImport(item.status))
+         };
+       } else if (isCustomerTable || columns.includes('客户姓名')) {
+         const getRowValue = (row: any, ...keys: string[]) => {
+diff --git a/components/MingyaImportModal.tsx b/components/MingyaImportModal.tsx
+index ba6ec2a..1d82a93 100644
+--- a/components/MingyaImportModal.tsx
++++ b/components/MingyaImportModal.tsx
+@@ -44,6 +44,7 @@ export default function MingyaImportModal({open,initialPayload,onClose,onLoad,on
+           <button className="btn btn-primary text-sm" disabled={busy||!snapshot} onClick={()=>input.current?.click()}><Upload size={16}/>选择文件</button>
+         </div> : plan&&<>
+           <p className="text-xs text-gray-500">预览，尚未保存。</p>
++          {plan.filteredPolicies>0&&<p className="text-xs text-gray-500">已过滤 {plan.filteredPolicies} 份终止或撤单保单。</p>}
+           {!payload.status.complete&&<p className="text-sm text-gray-600">这是部分采集结果，仅合并已取得的信息。</p>}
+           <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+             {([['新增客户',plan.addedContacts],['补充客户',plan.updatedContacts],['新增保单',plan.addedPolicies],['更新保单',plan.updatedPolicies]] as const).map(([label,value])=><div key={label}><dt className="text-xs text-gray-500">{label}</dt><dd className="mt-1.5 text-sm font-semibold tabular-nums">{value}</dd></div>)}
+diff --git a/components/PolicyDashboard.tsx b/components/PolicyDashboard.tsx
+index 66e8c9b..ba904d7 100644
+--- a/components/PolicyDashboard.tsx
++++ b/components/PolicyDashboard.tsx
+@@ -1,3 +1,4 @@
++import WorkspaceDialog, {WorkspaceDialogFooter} from './WorkspaceDialog';
+ import PolicyStatus from './PolicyStatus';
+ import CustomerTags from './CustomerTags';
+ import PolicyPaymentSummary, { formatMoney } from './PolicyPaymentSummary';
+@@ -20,13 +21,38 @@ interface PolicyDashboardProps {
+   onAddPolicy: () => void;
+   onBatchDeleteContacts?: (ids: string[]) => void;
+   onDeletePolicy?: (contactId: string, policyId: string) => void;
++  onDeletePolicies?: (contactId:string,policyIds:string[],requestId:string)=>Promise<void>;
+ }
+ 
+-const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags, followUpFilter, onEditContact, onAddPolicy, onBatchDeleteContacts, onDeletePolicy, onPolicyDetail, onReminders, onImport, reminderCount = 0 }) => {
++const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags, followUpFilter, onEditContact, onAddPolicy, onBatchDeleteContacts, onDeletePolicy, onDeletePolicies, onPolicyDetail, onReminders, onImport, reminderCount = 0 }) => {
+   const [searchTerm, setSearchTerm] = useState('');
+   const [expandedContactIds, setExpandedContactIds] = useState<Set<string>>(new Set());
+   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+ 
++  const [selectedPolicies,setSelectedPolicies]=useState<Record<string,Set<string>>>({});
++  const [deleteTarget,setDeleteTarget]=useState<{contactId:string;policies:Policy[];requestId:string}|null>(null);
++  const [deleting,setDeleting]=useState(false),[deleteError,setDeleteError]=useState('');
++  const [compactTable,setCompactTable]=useState(()=>window.innerWidth<640);
++  React.useEffect(()=>{const update=()=>setCompactTable(window.innerWidth<640);window.addEventListener('resize',update);return()=>window.removeEventListener('resize',update);},[]);
++  const widthKey='insurance-policy-actions-width';
++  const clampWidth=(value:number,max=360)=>Math.min(max,Math.max(112,value));
++  const [actionWidth,setActionWidth]=useState(()=>{try{const n=Number(localStorage.getItem(widthKey));return Number.isFinite(n)&&n>=112?clampWidth(n):128;}catch{return 128;}});
++  const widthRef=React.useRef(actionWidth),drag=React.useRef<{x:number;width:number}|null>(null);
++  const resize=(width:number,save=false)=>{const n=clampWidth(width,compactTable?160:360);widthRef.current=n;setActionWidth(n);if(save)try{localStorage.setItem(widthKey,String(n));}catch{}};
++  const visibleActionWidth=compactTable?Math.min(actionWidth,160):actionWidth;
++  const columns=[44,280,240,140,160,260,180,130,120,visibleActionWidth];
++  const togglePolicy=(contactId:string,id:string)=>setSelectedPolicies(prev=>{const ids=new Set(prev[contactId]||[]);if(ids.has(id))ids.delete(id);else ids.add(id);return {...prev,[contactId]:ids};});
++  const askDelete=(contactId:string,policies:Policy[])=>{if(!policies.length||deleting)return;setDeleteError('');setDeleteTarget({contactId,policies,requestId:crypto.randomUUID()});};
++  const confirmDelete=async()=>{
++    if(!deleteTarget||!onDeletePolicies||deleting)return;
++    setDeleting(true);setDeleteError('');
++    try{
++      const ids=deleteTarget.policies.map(p=>p.id);await onDeletePolicies(deleteTarget.contactId,ids,deleteTarget.requestId);
++      const removed=new Set(ids);setSelectedPolicies(prev=>Object.fromEntries((Object.entries(prev) as [string,Set<string>][]).map(([contactId,selected])=>[contactId,new Set([...selected].filter(id=>!removed.has(id)))])));setDeleteTarget(null);
++    }catch(e){setDeleteError(e instanceof Error?e.message:'删除未保存，请重试。');}
++    finally{setDeleting(false);}
++  };
++
+   const toggleExpand = (id: string) => {
+     setExpandedContactIds(prev => {
+       const newSet = new Set(prev);
+@@ -141,6 +167,9 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
+         ) : (
+           filteredContactsWithPolicies.map(contact => {
+             const { count, totalPremium } = getTotals(contact.policies || []);
++            const policyIds=new Set((contact.policies||[]).map(p=>p.id));
++            const checkedPolicies=new Set([...(selectedPolicies[contact.id]||[])].filter(id=>policyIds.has(id)));
++            const policyAllSelected=policyIds.size>0&&checkedPolicies.size===policyIds.size;
+             const isExpanded = expandedContactIds.has(contact.id);
+             const contactReminders = new Set(dueItems((contact.policies || []).map(p => ({...p,payments:(p as ManagedPolicy).payments || []}))).map(t=>t.policy.id)).size;
+             const isSelected = selectedIds.has(contact.id);
+@@ -168,11 +197,17 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
+                 </div>
+                 {isExpanded && (
+                   <div className="border-t border-gray-100 bg-gray-50 p-4 animate-in slide-in-from-top-2">
++                    {onDeletePolicies&&checkedPolicies.size>0&&<div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
++                      <span className="mr-auto text-gray-600">已选 {checkedPolicies.size} 份保单</span>
++                      <button disabled={deleting} className="btn btn-secondary text-sm" onClick={()=>setSelectedPolicies(prev=>({...prev,[contact.id]:new Set()}))}>取消选择</button>
++                      <button disabled={deleting} className="btn btn-primary text-sm" onClick={()=>askDelete(contact.id,(contact.policies||[]).filter(p=>checkedPolicies.has(p.id)))}>删除所选</button>
++                    </div>}
+                     <div className="max-w-full bg-white rounded-lg border border-gray-200 overflow-x-auto">
+-                      <table className="w-full min-w-[1660px] table-fixed text-left text-sm">
+-                        <colgroup>{[280,240,140,160,260,180,130,120,128].map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup>
++                      <table className="w-full table-fixed text-left text-sm" style={{minWidth:columns.slice(onDeletePolicies?0:1).reduce((a,b)=>a+b,0)}}>
++                        <colgroup>{columns.slice(onDeletePolicies?0:1).map((w,i)=><col key={i} style={i===(onDeletePolicies?1:0)?undefined:{width:w}}/>)}</colgroup>
+                         <thead className="bg-gray-50 text-gray-500 font-medium text-xs  border-b border-gray-200">
+                           <tr className="divide-x divide-gray-100">
++                            {onDeletePolicies&&<th className="px-3 py-3"><input type="checkbox" aria-label={`全选${contact.remarkName||contact.nickname}的保单`} disabled={deleting} checked={policyAllSelected} ref={e=>{if(e)e.indeterminate=checkedPolicies.size>0&&!policyAllSelected;}} onChange={()=>setSelectedPolicies(prev=>({...prev,[contact.id]:policyAllSelected?new Set():new Set(policyIds)}))}/></th>}
+                             <th className="px-4 py-3">险种名称</th>
+                             <th className="px-4 py-3">保单号</th>
+                             <th className="px-4 py-3 text-right">保费</th>
+@@ -180,12 +215,23 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
+                             <th className="px-4 py-3">投保人/被保人</th>
+                             <th className="px-4 py-3">生效日期</th>
+                             <th className="px-4 py-3">状态</th>
+-                            <th className="sticky right-0 z-20 border-l border-gray-200 bg-gray-50 px-4 py-3 text-right whitespace-nowrap">操作</th>
++                            <th className="sticky right-0 z-20 border-l border-gray-200 bg-gray-50 px-4 py-3 text-right whitespace-nowrap">操作
++                              <span role="separator" tabIndex={0} aria-orientation="vertical" aria-label="调整操作列宽度" aria-valuemin={112} aria-valuemax={compactTable?160:360} aria-valuenow={visibleActionWidth} title="拖动调整操作列宽度；双击恢复默认"
++                                className="absolute inset-y-0 left-0 w-2 cursor-col-resize touch-none select-none hover:bg-gray-200 focus:bg-gray-200"
++                                onPointerDown={e=>{e.preventDefault();drag.current={x:e.clientX,width:visibleActionWidth};e.currentTarget.setPointerCapture(e.pointerId);}}
++                                onPointerMove={e=>{if(drag.current)resize(drag.current.width+drag.current.x-e.clientX);}}
++                                onPointerUp={e=>{if(!drag.current)return;drag.current=null;resize(widthRef.current,true);e.currentTarget.releasePointerCapture(e.pointerId);}}
++                                onPointerCancel={()=>{drag.current=null;resize(widthRef.current,true);}}
++                                onDoubleClick={()=>resize(128,true)}
++                                onKeyDown={e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();resize(e.key==='Home'?112:e.key==='End'?(compactTable?160:360):visibleActionWidth+(e.key==='ArrowLeft'?16:-16),true);}}}
++                              />
++                            </th>
+                           </tr>
+                         </thead>
+                         <tbody className="divide-y divide-gray-100">
+                           {contact.policies?.map(policy => { const managed={...policy,payments:(policy as ManagedPolicy).payments||[]}; const next=nextPayment(managed);const reminders=dueItems([managed]);return (
+                             <tr key={policy.id} className="group hover:bg-gray-50 transition-colors">
++                              {onDeletePolicies&&<td className="px-3 py-3"><input type="checkbox" aria-label={`选择保单${policy.policyNumber||policy.productName}`} checked={checkedPolicies.has(policy.id)} disabled={deleting} onChange={()=>togglePolicy(contact.id,policy.id)}/></td>}
+                               <td className="px-4 py-3 font-medium text-gray-700"><button className="max-w-full break-words text-left hover:underline" onClick={()=>onPolicyDetail?.(policy)}>{policy.productName}</button></td>
+                               <td title={policy.policyNumber} className="overflow-hidden text-ellipsis px-4 py-3 whitespace-nowrap tabular-nums text-gray-500 text-xs">{policy.policyNumber}</td>
+                               <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums font-medium text-gray-900">{formatMoney(policy.premium, policy.mingya?.currency)}</td>
+@@ -199,7 +245,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
+                                 <button className="btn btn-ghost btn-sm" onClick={()=>onPolicyDetail?.(policy)}>详情</button><button
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+-                                    if (onDeletePolicy) onDeletePolicy(contact.id, policy.id);
++                                    if(onDeletePolicies)askDelete(contact.id,[policy]);else onDeletePolicy?.(contact.id,policy.id);
+                                   }}
+                                   className="text-gray-500 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md transition-colors"
+                                   title="删除保单"
+@@ -220,6 +266,15 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
+         )}
+       </div>
+ 
++      {deleteTarget&&<WorkspaceDialog title={`删除 ${deleteTarget.policies.length} 份保单`} size="confirm" onClose={()=>{if(!deleting)setDeleteTarget(null);}}>
++        <p className="text-sm leading-relaxed text-gray-600">所选保单及缴费记录将从关联客户中移除。</p>
++        <ul className="mt-4 space-y-3">{deleteTarget.policies.map(p=><li key={p.id} className="border-b border-gray-100 pb-3"><p className="text-sm break-words">{p.productName}</p><p className="mt-1 text-xs text-gray-500 break-all">{p.policyNumber||'未填写保单号'}</p></li>)}</ul>
++        {deleteError&&<p role="alert" className="mt-3 text-sm text-danger-600">{deleteError}</p>}
++        <WorkspaceDialogFooter>
++          <button className="btn btn-secondary text-sm" disabled={deleting} onClick={()=>setDeleteTarget(null)}>取消</button>
++          <button className="btn btn-primary text-sm" disabled={deleting} onClick={confirmDelete}>{deleting?'正在删除…':'确认删除'}</button>
++        </WorkspaceDialogFooter>
++      </WorkspaceDialog>}
+       {selectedIds.size > 0 && (
+         <div className="fixed sm:absolute bottom-4 sm:bottom-8 left-4 sm:left-1/2 right-4 sm:right-auto sm:-translate-x-1/2 bg-white shadow-lg border border-gray-200 rounded-lg px-2 py-2 flex items-center gap-2 animate-in slide-in-from-bottom-4 z-50 overflow-x-auto no-scrollbar">
+             <div className="px-3 sm:px-4 py-2 bg-gray-900 rounded text-xs sm:text-sm font-medium text-white whitespace-nowrap">{selectedIds.size} 位客户</div>
+diff --git a/components/RenewalWorkspace.tsx b/components/RenewalWorkspace.tsx
+index 9daac77..93a996e 100644
+--- a/components/RenewalWorkspace.tsx
++++ b/components/RenewalWorkspace.tsx
+@@ -4,7 +4,7 @@ import { ArrowLeft, Settings } from 'lucide-react';
+ import PolicyDashboard from "./PolicyDashboard";
+ import { PageHeader } from "./PageHeader";
+ import PolicyDetail from "./PolicyDetail";
+-import { saveImport, savePolicyMark } from "../services/renewalStorage";
++import { saveImport, savePolicyMark, deleteSelectedPolicies } from "../services/renewalStorage";
+ import React, { useEffect, useState } from "react";
+ import { Contact } from "../types";
+ import { getRenewalSnapshot, hasFreshRenewalSnapshot, loadRenewalSnapshot, rememberRenewalSnapshot, subscribeRenewalSnapshot } from "../services/renewalCache";
+@@ -331,6 +331,18 @@ export default function RenewalWorkspace({
+       return false;
+     } finally { markPending.current = false; setBusy(false); }
+   }
++  async function deletePolicies(contactId:string,policyIds:string[],requestId:string) {
++    if(!cloudReady||busy)throw new Error('请等待数据同步完成后重试。');
++    setBusy(true);
++    try {
++      await beforeSave?.();
++      const removed=new Set(await deleteSelectedPolicies(contactId,policyIds,requestId));
++      const next={...data,policies:data.policies.filter(p=>!removed.has(p.id))};
++      const projected=contactsRef.current.map(c=>({...c,policies:c.policies?.filter(p=>!removed.has(p.id))}));
++      ownSnapshot.current=next;skipContactsMerge.current=projected;
++      rememberRenewalSnapshot(next);onContacts(projected);setData(next);
++    } finally {setBusy(false);}
++  }
+   const syncStatus = syncing || syncError ? (
+     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-5 py-3 text-sm text-gray-600" role="status">
+       <span>{syncing ? "正在同步续期数据…" : syncError}</span>
+@@ -405,6 +417,7 @@ export default function RenewalWorkspace({
+             setRemindersOpen(true);
+           }}
+           onImport={() => fileRef.current?.click()}
++          onDeletePolicies={deletePolicies}
+           onDeletePolicy={async (_contactId, policyId) => {
+             if (!confirm("确定删除这份保单及其缴费记录吗？所有关联客户中的这份保单将同步移除。")) return;
+             await persist({ ...data, policies: data.policies.filter(p => p.id !== policyId) },
+diff --git a/components/WorkspaceDialog.tsx b/components/WorkspaceDialog.tsx
+index 3c20936..526f619 100644
+--- a/components/WorkspaceDialog.tsx
++++ b/components/WorkspaceDialog.tsx
+@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
+ export const DialogFooterContext = React.createContext<HTMLDivElement | null>(null);
+ 
+ export default function WorkspaceDialog({ title, onClose, children, compact = false, size, className = "" }: {
+-  title: string; onClose: () => void; children: React.ReactNode; compact?: boolean; size?: "import"; className?: string;
++  title: string; onClose: () => void; children: React.ReactNode; compact?: boolean; size?: "import" | "confirm"; className?: string;
+ }) {
+   const titleId = useId();
+   const [footer, setFooter] = useState<HTMLDivElement | null>(null);
+@@ -16,7 +16,7 @@ export default function WorkspaceDialog({ title, onClose, children, compact = fa
+     return () => { ref.current?.close(); trigger?.focus(); };
+   }, []);
+   return <dialog aria-labelledby={titleId} ref={ref} onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}
+-    className={`workspace-dialog m-auto w-[calc(100%-2rem)] ${compact ? 'max-w-lg' : size === 'import' ? 'max-w-3xl' : 'max-w-4xl'} ${className} rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-2xl`}>
++    className={`workspace-dialog m-auto w-[calc(100%-2rem)] ${compact ? 'max-w-lg' : size === 'import' ? 'max-w-3xl' : size === 'confirm' ? 'max-w-sm' : 'max-w-4xl'} ${className} rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-2xl`}>
+     <div className="flex max-h-[90dvh] flex-col">
+       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+         <h2 id={titleId} className="text-base font-semibold">{title}</h2>
+diff --git a/docs/2026-11-22-policy-batch-verification.md b/docs/2026-11-22-policy-batch-verification.md
+new file mode 100644
+index 0000000..4ec57c1
+--- /dev/null
++++ b/docs/2026-11-22-policy-batch-verification.md
+@@ -0,0 +1,9 @@
++# 保单导入过滤、批量删除与列宽
++
++范围：终止、最终撤单在导入前过滤；已存在的记录不自动删除。中止、撤单中不视为最终状态。明亚保单列表前端的状态选项核实为16正式、17终止、18中止、21撤单中、22已撤单。JSON及工作簿使用同一规则。
++
++批量删除按客户与保单ID校验，在同一事务更新续期及所有关联客户保单副本，保存所选保单/缴费备份。请求ID支持失败重试。客户、跟进、备注及设置不删除。数据库断言覆盖无效归属整批拒绝、跨客户副本、仅手动保单、备份及重复请求，测试事务全部回滚。
++
++验证：43项测试通过，网页类型检查、构建通过。1304×880浏览器验证全选、半选、取消、失败保留、同请求重试、刷新后保单保持删除，原有跟进不变。鼠标拖动操作列128→228px，刷新保持；水平滚动时操作列固定。390×844限制操作列最大160px，无整页水平溢出，删除确认操作可见。界面测试使用路由替代数据库，未删除真实保单。
++
++文案独立走查：批量工具条仅在勾选后显示数量及两个动作，不增加常驻操作说明；删除后不另堆叠同义成功提示。确认页保留产品名、单号和一次删除范围说明，用于核对对象及影响。导入只新增一行过滤计数，逐单原因在折叠明细中查看。桌面、手机及水平滚动状态截图保存在output目录。
+diff --git a/services/mingyaImport.ts b/services/mingyaImport.ts
+index bf3989a..4623f56 100644
+--- a/services/mingyaImport.ts
++++ b/services/mingyaImport.ts
+@@ -1,3 +1,4 @@
++import {excludedPolicyImport,mingyaStatusLabel} from './policyImportRules';
+ import { financialFromDetail, money } from './mingyaFinancial';
+ import { reconcileMingyaPayments } from './mingyaPayments';
+ import type { Contact, Policy, MingyaPolicyData, MingyaPerson } from '../types';
+@@ -8,7 +9,7 @@ export interface IncomingPolicy { key: string; personKey: string; policy: Policy
+ export interface ImportIssue { key: string; name: string; reason: string; candidates: {id:string;name:string;phone:string}[]; allowNew: boolean; }
+ export interface ImportPlan {
+   contacts: Contact[]; addedContacts: number; updatedContacts: number; addedPolicies: number; updatedPolicies: number;
+-  unchangedPolicies: number; skippedPolicies: number; duplicateRows: number; fieldConflicts: number;
++  unchangedPolicies: number; skippedPolicies: number; filteredPolicies: number; duplicateRows: number; fieldConflicts: number;
+   conflicts: {number:string;field:string;existing:string;incoming:string}[];
+   issues: ImportIssue[]; rows: {key:string;name:string;number:string;product:string;action:string;contact:string}[];
+ }
+@@ -72,7 +73,7 @@ export function normalizeMingya(payload: MingyaPayload): {items: IncomingPolicy[
+     const source=compact(r.detail||{},text(payload.status.finishedAt),key);
+     const policy:Policy={id:`mingya-${encodeURIComponent(key)}`,policyNumber:number,productName:text(p.productName),company,
+       premium:source.periodicPremium||'',effectiveDate:dateKey(p.validDate||p.effectDate),
+-      status:({'16':'正式保单','17':'终止保单'} as Record<string,string>)[text(p.policyState)]||`明亚状态（${text(p.policyState)||'未知'}）`,
++      status:mingyaStatusLabel(p.policyState),
+       applicant:applicant.name,insured:text(p.insuredName)||source.insureds.map(x=>x.name).join('、'),
+       coverage:+p.amount===-1?'详见条款':text(p.amount),paymentYears:[...new Set(source.risks.map(x=>x.paymentPeriod).filter(Boolean))].join('、'),paymentFrequency:source.paymentFrequency||'',paymentEndDate:source.paymentEndDate||'',coveragePeriod:source.coveragePeriod||'',expiryDate:source.expiryDate||'',insuranceType:source.insuranceType||'',mingya:source};
+     const personKey=identity(applicant.idCard)?`id:${identity(applicant.idCard)}`:phoneKey(applicant.phone)?`phone:${phoneKey(applicant.phone)}:${nameKey(applicant.name)}`:`name:${nameKey(applicant.name)}`;
+@@ -87,9 +88,12 @@ function policyMatches(p:Policy,incoming:IncomingPolicy){
+   return !!normalizeId(p.policyNumber)&&!!companyKey(p.company)&&policyKey(p)===policyKey(incoming.policy)&&(!dateKey(p.effectiveDate)||!dateKey(incoming.policy.effectiveDate)||dateKey(p.effectiveDate)===dateKey(incoming.policy.effectiveDate));
+ }
+ export function planMingyaImport(existing: Contact[], payload:MingyaPayload, resolutions:Resolutions={},mode:MergeMode='fill'):ImportPlan {
+-  const {items,duplicates}=normalizeMingya(payload);
++  const normalized=normalizeMingya(payload);
++  const filtered=normalized.items.filter(x=>excludedPolicyImport(x.policy.status));
++  const items=normalized.items.filter(x=>!excludedPolicyImport(x.policy.status)),duplicates=normalized.duplicates;
+   const contacts=structuredClone(existing), touched=new Set<string>(),created=new Set<string>();
+-  const plan:ImportPlan={contacts,addedContacts:0,updatedContacts:0,addedPolicies:0,updatedPolicies:0,unchangedPolicies:0,skippedPolicies:0,duplicateRows:duplicates,fieldConflicts:0,conflicts:[],issues:[],rows:[]};
++  const plan:ImportPlan={contacts,addedContacts:0,updatedContacts:0,addedPolicies:0,updatedPolicies:0,unchangedPolicies:0,skippedPolicies:0,filteredPolicies:filtered.length,duplicateRows:duplicates,fieldConflicts:0,conflicts:[],issues:[],rows:[]};
++  plan.rows.push(...filtered.map(x=>({key:x.key,name:x.applicant.name||'未提供投保人',number:x.policy.policyNumber,product:x.policy.productName,action:`已过滤（${x.policy.status}）`,contact:''})));
+   const anchors=new Map<string,Set<string>>();
+   const multipleTerms=new Set(items.filter((x,_,arr)=>arr.filter(y=>policyKey(x.policy)===policyKey(y.policy)).length>1).map(x=>policyKey(x.policy)));
+   const ambiguousTerm=(p:Policy,incoming:IncomingPolicy)=>!dateKey(p.effectiveDate)&&multipleTerms.has(policyKey(incoming.policy));
+diff --git a/services/policyImportRules.ts b/services/policyImportRules.ts
+new file mode 100644
+index 0000000..2df083c
+--- /dev/null
++++ b/services/policyImportRules.ts
+@@ -0,0 +1,10 @@
++export function excludedPolicyImport(status:unknown):boolean {
++  const value=String(status??'').trim();
++  return /终止/.test(value)||/撤单/.test(value)&&!/撤单中|撤单失败/.test(value);
++}
++// Verified against Mingya's policy-list status choices, not order/risk statuses.
++export function mingyaStatusLabel(value:unknown):string {
++  const status=String(value??'').trim();
++  if(/[\u4e00-\u9fff]/.test(status))return status;
++  return ({'16':'正式保单','17':'终止保单','18':'中止保单','21':'撤单中','22':'已撤单'} as Record<string,string>)[status]||`明亚状态（${status||'未知'}）`;
++}
+diff --git a/services/renewal.ts b/services/renewal.ts
+index e2e4960..0ce683a 100644
+--- a/services/renewal.ts
++++ b/services/renewal.ts
+@@ -1,3 +1,4 @@
++import {excludedPolicyImport,mingyaStatusLabel} from './policyImportRules.ts';
+ import { detailNextPayment, reconcileMingyaPayments } from './mingyaPayments.ts';
+ import * as XLSX from "xlsx";
+ import type { Contact, Policy } from "../types";
+@@ -68,6 +69,7 @@ export function parseWorkbook(
+ ): ManagedPolicy[] {
+   const w = XLSX.read(buffer, { type: "array" });
+   const output: ManagedPolicy[] = [];
++  let filtered=0;
+   for (const sheet of w.SheetNames) {
+     const rows = XLSX.utils.sheet_to_json<any[]>(w.Sheets[sheet], {
+       header: 1,
+@@ -84,6 +86,8 @@ export function parseWorkbook(
+         }
+         return "";
+       };
++      const status=text(get("保单状态"))||(text(get("保单状态代码"))?mingyaStatusLabel(get("保单状态代码")):"");
++      if(excludedPolicyImport(status)){filtered++;continue;}
+       const num = text(get("保单号"));
+       if (!num) {
+         if (text(get("保单状态")) === "撤单") continue;
+@@ -99,7 +103,7 @@ export function parseWorkbook(
+         productName: text(get("产品名称")),
+         premium: text(get("保费", "应缴保费")),
+         effectiveDate: date(get("生效日期", "承保日期")),
+-        status: text(get("保单状态")),
++        status,
+         applicant: text(get("投保人姓名", "投保人")),
+         insured: text(get("被保人")),
+         phone: text(get("手机号", "投保人手机")),
+@@ -124,7 +128,7 @@ export function parseWorkbook(
+       });
+     }
+   }
+-  if (!output.length) throw new Error(`${source}：未找到含保单号的有效记录`);
++  if (!output.length) throw new Error(filtered?`${source}：没有可导入保单，终止和撤单记录已过滤`:`${source}：未找到含保单号的有效记录`);
+   return output;
+ }
+ const suffix = (s?: string) => text(s).replace(/\s/g, "").slice(-4);
+diff --git a/services/renewalStorage.ts b/services/renewalStorage.ts
+index 3bbcb2e..5610b7f 100644
+--- a/services/renewalStorage.ts
++++ b/services/renewalStorage.ts
+@@ -51,3 +51,14 @@ export async function savePolicyMark(policy: import('./renewal').ManagedPolicy,
+     throw e;
+   } finally { clearTimeout(timeout); }
+ }
++
++export async function deleteSelectedPolicies(contactId:string,policyIds:string[],requestId:string):Promise<string[]> {
++ const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);
++ try {
++  const {data,error}=await supabase.rpc('delete_selected_policies_v1',{p_app_id:appId,p_contact_id:contactId,p_policy_ids:policyIds,p_request_id:requestId}).abortSignal(controller.signal);
++  if(error)throw new Error(error.message||'删除未保存，请重试。');
++  if(!Array.isArray(data?.deletedIds))throw new Error('未收到删除确认，请刷新核对。');
++  return data.deletedIds;
++ }catch(e){if(controller.signal.aborted)throw new Error('删除超时，请核对或重试本次请求。');throw e;}
++ finally{clearTimeout(timer);}
++}
+diff --git a/supabase/migrations/20261122084500_delete_selected_policies.sql b/supabase/migrations/20261122084500_delete_selected_policies.sql
+new file mode 100644
+index 0000000..27ab571
+--- /dev/null
++++ b/supabase/migrations/20261122084500_delete_selected_policies.sql
+@@ -0,0 +1,36 @@
++create or replace function public.delete_selected_policies_v1(p_app_id text,p_contact_id text,p_policy_ids text[],p_request_id uuid)
++returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
++declare c public.app_data%rowtype;r public.app_data%rowtype;prior jsonb;ids text[];valid_ids text[];contact_row record;kept jsonb;removed_contacts jsonb;stamp timestamptz:=clock_timestamp();
++begin
++ select array_agg(distinct id order by id) into ids from unnest(p_policy_ids)id where id is not null and id<>'';
++ if coalesce(cardinality(ids),0)=0 or cardinality(ids)>1000 or p_request_id is null then raise exception using errcode='22023',message='请选择要删除的保单';end if;
++ perform id from public.app_data where app_id=p_app_id and data_type in('contacts','renewal_v1') order by data_type for update;
++ select data into prior from public.app_data where app_id=p_app_id and data_type='policy_delete_backup:'||p_request_id::text;
++ if prior is not null then
++  if prior->>'contactId' is distinct from p_contact_id or prior->'deletedIds' is distinct from to_jsonb(ids) then raise exception using errcode='PT409',message='删除请求已变化，请重新选择';end if;
++  return jsonb_build_object('deletedIds',prior->'deletedIds');
++ end if;
++ select * into c from public.app_data where app_id=p_app_id and data_type='contacts';
++ select * into r from public.app_data where app_id=p_app_id and data_type='renewal_v1';
++ if c.id is null or not exists(select 1 from jsonb_array_elements(coalesce(c.data,'[]'::jsonb))ct where ct->>'id'=p_contact_id) then raise exception using errcode='PT409',message='客户资料已变化，请刷新后重试';end if;
++ select array_agg(distinct id order by id) into valid_ids from (
++  select p->>'id' id from jsonb_array_elements(coalesce(r.data->'policies','[]'::jsonb))p where p->>'id'=any(ids) and (p->>'applicantId'=p_contact_id or p->>'insuredId'=p_contact_id)
++  union select p->>'id' from jsonb_array_elements(c.data)ct cross join lateral jsonb_array_elements(coalesce(ct->'policies','[]'::jsonb))p where ct->>'id'=p_contact_id and p->>'id'=any(ids)
++ ) matched;
++ if valid_ids is distinct from ids then raise exception using errcode='PT409',message='所选保单已变化，请刷新后重新选择';end if;
++ select coalesce(jsonb_agg(jsonb_build_object('contactId',ct->>'id','policies',(select coalesce(jsonb_agg(p),'[]'::jsonb)from jsonb_array_elements(coalesce(ct->'policies','[]'::jsonb))p where p->>'id'=any(ids)))),'[]'::jsonb) into removed_contacts from jsonb_array_elements(c.data)ct where exists(select 1 from jsonb_array_elements(coalesce(ct->'policies','[]'::jsonb))p where p->>'id'=any(ids));
++ insert into public.app_data(app_id,data_type,data,updated_at)values(p_app_id,'policy_delete_backup:'||p_request_id::text,jsonb_build_object('contactId',p_contact_id,'deletedIds',to_jsonb(ids),'at',stamp,'renewalPolicies',(select coalesce(jsonb_agg(p),'[]'::jsonb)from jsonb_array_elements(coalesce(r.data->'policies','[]'::jsonb))p where p->>'id'=any(ids)),'contactPolicies',removed_contacts),stamp);
++ for contact_row in select value,ordinality-1 n from jsonb_array_elements(c.data)with ordinality loop
++  if not exists(select 1 from jsonb_array_elements(coalesce(contact_row.value->'policies','[]'::jsonb))p where p->>'id'=any(ids)) then continue;end if;
++  select coalesce(jsonb_agg(value order by ordinality),'[]'::jsonb)into kept from jsonb_array_elements(contact_row.value->'policies')with ordinality where value->>'id' is null or not(value->>'id'=any(ids));
++  c.data:=jsonb_set(c.data,array[contact_row.n::text,'policies'],kept);
++ end loop;
++ update public.app_data set data=c.data,updated_at=stamp where id=c.id;
++ if r.id is not null then
++  select coalesce(jsonb_agg(value order by ordinality),'[]'::jsonb)into kept from jsonb_array_elements(r.data->'policies')with ordinality where value->>'id' is null or not(value->>'id'=any(ids));
++  update public.app_data set data=jsonb_set(r.data,'{policies}',kept),updated_at=stamp where id=r.id;
++ end if;
++ return jsonb_build_object('deletedIds',to_jsonb(ids));
++end $$;
++revoke all on function public.delete_selected_policies_v1(text,text,text[],uuid) from public;
++grant execute on function public.delete_selected_policies_v1(text,text,text[],uuid) to anon,authenticated;
+diff --git a/tests/mingyaImport.test.cjs b/tests/mingyaImport.test.cjs
+index 101fd41..ca5ae97 100644
+--- a/tests/mingyaImport.test.cjs
++++ b/tests/mingyaImport.test.cjs
+@@ -1,5 +1,5 @@
+ const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const ts=require('typescript');const crypto=require('node:crypto').webcrypto;
+-const moduleCache={};function localRequire(name){name=name.replace(/\.ts$/,'');if(moduleCache[name])return moduleCache[name];if(!['./mingyaFinancial','./mingyaPayments','./mingyaImport','./mingyaRepair'].includes(name))throw Error(name);const exp={};moduleCache[name]=exp;vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/'+name.slice(2)+'.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exp,require:localRequire,structuredClone});return exp;}
++const moduleCache={};function localRequire(name){name=name.replace(/\.ts$/,'');if(moduleCache[name])return moduleCache[name];if(!['./mingyaFinancial','./mingyaPayments','./mingyaImport','./mingyaRepair','./policyImportRules'].includes(name))throw Error(name);const exp={};moduleCache[name]=exp;vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/'+name.slice(2)+'.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exp,require:localRequire,structuredClone});return exp;}
+ const exportsObject={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/mingyaImport.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsObject,crypto,structuredClone,console,require:localRequire});
+ const {planMingyaImport,parseMingyaPayload}=exportsObject;
+ const contact=(extra={})=>({id:'c1',wxid:'wechat',nickname:'客户甲',remarkName:'客户甲',remarkInfo:'手动备注',tags:['重点'],addedAt:1,dealProducts:[],intentProducts:['养老'],progressHistory:[{id:'h',date:'2026-01-01',content:'保留跟进'}],policies:[],...extra});
+@@ -31,7 +31,7 @@ test('input duplicates are collapsed, unknown states stay explicit, encrypted su
+  assert.throws(()=>parseMingyaPayload({records:[]}));
+ });
+ test('renewal terms sharing a policy number remain separate; repeat import stays idempotent',()=>{
+- const p=payload([record({policyIndexId:'term2026',effectDate:'2026-01-01'}),record({policyIndexId:'term2025',effectDate:'2025-01-01',policyState:'17'})]);
++ const p=payload([record({policyIndexId:'term2026',effectDate:'2026-01-01'}),record({policyIndexId:'term2025',effectDate:'2025-01-01',policyState:'16'})]);
+  const first=planMingyaImport([],p);assert.equal(first.addedContacts,1);assert.equal(first.addedPolicies,2);assert.equal(first.duplicateRows,0);
+  const again=planMingyaImport(first.contacts,p);assert.equal(again.addedPolicies,0);assert.equal(again.unchangedPolicies,2);
+ });
+@@ -70,3 +70,14 @@ test('coverage does not infer expiry from payment end or unknown risk codes',()=
+  const p=planMingyaImport([],payload([record({payEndDate:'2023-05-19',riskList:[{mainRiskFlag:'01',payPeriod:15,payPeriodUnit:'Y',insurancePeriod:108,insurancePeriodUnit:'UNKNOWN',risk:{riskType:'01'}}]})])).contacts[0].policies[0];
+  assert.equal(p.coveragePeriod,'');assert.equal(p.expiryDate,'');assert.equal(p.insuranceType,'');
+ });
++
++test('filters ended and cancelled policies before customer matching, retaining the existing database',()=>{
++ const r=record({policyState:'17'}),cancel=record({policyIndexId:'cancel',policyCode:'CANCEL',policyState:'22'});
++ const old={id:'old',policyNumber:'000001',company:'公司甲',productName:'旧保单',premium:'90',status:'正式保单'};
++ const before=contact({policies:[old]});const plan=planMingyaImport([before],payload([r,cancel]));
++ assert.equal(plan.filteredPolicies,2);assert.equal(plan.issues.length,0);assert.equal(plan.addedContacts,0);assert.equal(plan.updatedContacts,0);assert.equal(plan.addedPolicies,0);assert.equal(JSON.stringify(plan.contacts),JSON.stringify([before]));
++ const mixed=planMingyaImport([],payload([r,cancel,record({policyIndexId:'active',policyCode:'ACTIVE'})]));assert.equal(mixed.filteredPolicies,2);assert.equal(mixed.addedPolicies,1);assert.equal(mixed.contacts[0].policies[0].policyNumber,'ACTIVE');
++});
++test('does not confuse suspended or cancellation-in-progress with final cancellation',()=>{
++ const plan=planMingyaImport([],payload([record({policyState:'18'}),record({policyIndexId:'pending',policyCode:'PENDING',policyState:'21'})]));assert.equal(plan.filteredPolicies,0);assert.equal(plan.addedPolicies,2);
++});
+diff --git a/tests/policy-batch-delete.sql b/tests/policy-batch-delete.sql
+new file mode 100644
+index 0000000..be0bdd3
+--- /dev/null
++++ b/tests/policy-batch-delete.sql
+@@ -0,0 +1,24 @@
++begin;
++insert into app_data(app_id,data_type,data)values
++('test_policy_batch_delete','contacts','[{"id":"c1","remarkName":"投保人","remarkInfo":"保留备注","tags":["客户"],"progressHistory":[{"id":"r1","date":"2026-11-21","content":"必须保留"}],"policies":[{"id":"p1","premium":"100"},{"id":"p2","premium":"200"},{"id":"manual","premium":"300"},{"productName":"无ID历史资料"}]},{"id":"c2","remarkName":"被保人","policies":[{"id":"p1","premium":"100"},{"id":"p3","premium":"500"}]}]'),
++('test_policy_batch_delete','renewal_v1','{"policies":[{"id":"p1","applicantId":"c1","insuredId":"c2","payments":[{"date":"2026-11-21","amount":"100","status":"已缴费"}]},{"id":"p2","applicantId":"c1","payments":[]},{"id":"p3","applicantId":"c2","payments":[]}],"settings":{"enabled":true},"imports":[{"count":3}]}');
++set local role anon;
++do $$declare result jsonb;c jsonb;r jsonb;backup jsonb;req uuid:=gen_random_uuid();begin
++ begin perform delete_selected_policies_v1('test_policy_batch_delete','c1',array['p2','p3'],gen_random_uuid());raise exception 'mixed owner selection accepted';exception when sqlstate 'PT409' then null;end;
++ select data into r from app_data where app_id='test_policy_batch_delete'and data_type='renewal_v1';if jsonb_array_length(r->'policies')<>3 then raise exception 'partial delete';end if;
++ result:=delete_selected_policies_v1('test_policy_batch_delete','c1',array['p1','p2','p1'],req);
++ if jsonb_array_length(result->'deletedIds')<>2 then raise exception 'incorrect selection';end if;
++ select data into c from app_data where app_id='test_policy_batch_delete'and data_type='contacts';
++ select data into r from app_data where app_id='test_policy_batch_delete'and data_type='renewal_v1';
++ if jsonb_array_length(c)<>2 or c->0->>'remarkInfo'<>'保留备注' or c->0->'progressHistory'->0->>'content'<>'必须保留' then raise exception 'customer data changed';end if;
++ if jsonb_array_length(c->0->'policies')<>2 or c->0->'policies'->1->>'productName'<>'无ID历史资料' then raise exception 'unselected policies lost';end if;
++ if jsonb_array_length(c->1->'policies')<>1 or c->1->'policies'->0->>'id'<>'p3' then raise exception 'related copy not removed';end if;
++ if jsonb_array_length(r->'policies')<>1 or r->'policies'->0->>'id'<>'p3' or r->'settings'->>'enabled'<>'true' or jsonb_array_length(r->'imports')<>1 then raise exception 'renewal data changed';end if;
++ select data into backup from app_data where app_id='test_policy_batch_delete'and data_type='policy_delete_backup:'||req::text;
++ if jsonb_array_length(backup->'renewalPolicies')<>2 or backup->'renewalPolicies'->0->'payments'->0->>'status'<>'已缴费' then raise exception 'backup missing';end if;
++ perform delete_selected_policies_v1('test_policy_batch_delete','c1',array['p2','p1'],req);
++ if (select count(*)from app_data where app_id='test_policy_batch_delete'and data_type like 'policy_delete_backup:%')<>1 then raise exception 'retry duplicated backup';end if;
++ perform delete_selected_policies_v1('test_policy_batch_delete','c1',array['manual'],gen_random_uuid());
++ select data into c from app_data where app_id='test_policy_batch_delete'and data_type='contacts';if jsonb_array_length(c->0->'policies')<>1 then raise exception 'contact-only policy not removed';end if;
++end $$;
++reset role;rollback;
+diff --git a/tests/renewal.test.ts b/tests/renewal.test.ts
+index 9077d4c..da56a2a 100644
+--- a/tests/renewal.test.ts
++++ b/tests/renewal.test.ts
+@@ -230,3 +230,17 @@ test('merging a detail-paid installment preserves its source audit rather than t
+  const detail:any={...old,mingya:{mappingVersion:2,key:'sample',capturedAt:'2026-11-21T03:35:47Z'},payments:[{date:'2026-11-18',amount:'12000',status:'已缴费',source:'明亚保单详情',history:[{at:'2026-11-21T03:35:47Z',from:'未缴费',to:'已缴费',source:'明亚保单详情·上期实缴'}]}]};
+  const result=mergePolicies([old],[detail]);assert.equal(result[0].payments[0].history!.length,1);assert.match(result[0].payments[0].history![0].source,/^明亚/);
+ });
++
++test('policy workbook filters terminal and cancellation rows before checking identifiers',()=>{
++ const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([
++  ['保单号','保单状态'],['A','正式保单'],['','撤单'],['END','终止保单'],['PENDING','撤单中'],['SUSPEND','中止保单'],
++ ]),'保单');
++ const result=parseWorkbook(XLSX.write(book,{type:'array',bookType:'xlsx'}),'filter.xlsx');
++ assert.deepEqual(result.map(p=>p.policyNumber),['A','PENDING','SUSPEND']);
++});
++test('Mingya workbook status codes use the verified cancellation mapping',()=>{
++ const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([
++  ['保单号','保单状态代码'],['A',16],['END',17],['CANCEL',22],['PENDING',21],
++ ]),'保单');
++ assert.deepEqual(parseWorkbook(XLSX.write(book,{type:'array',bookType:'xlsx'}),'codes.xlsx').map(p=>p.policyNumber),['A','PENDING']);
++});

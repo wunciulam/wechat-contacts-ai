@@ -129,7 +129,7 @@ const ProductSpecModal: React.FC<ProductSpecModalProps> = ({ isOpen, onClose }) 
                          </h4>
                          <ul className="list-disc pl-5 text-sm text-slate-600 space-y-1">
                             <li>快速记录：支持“一键写跟进”，记录沟通内容与日期。</li>
-                            <li>状态流转：将联系人标记为“跟进中”或“已沟通/归档”。</li>
+                            <li>状态流转：将联系人标记为“跟进中”或“暂未跟进”。</li>
                             <li>业务字段：支持记录“成交产品”和“意向产品”。</li>
                          </ul>
                       </div>

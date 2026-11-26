@@ -11,10 +11,16 @@ import QuickFollowUpModal from './components/QuickFollowUpModal';
 import ManualPolicyModal from './components/ManualPolicyModal';
 import CategoryBoard from './components/CategoryBoard';
 import CategoryManager from './components/CategoryManager';
-import { Contact, NewContact, ProgressRecord, ExtractedTableData, Policy, Category } from './types';
-import { saveToCloud, loadFromCloud, isSupabaseConfigured, loadLegacyContactsTable, subscribeToDataChanges, broadcastDataChange } from './services/supabaseService';
+import SopWorkspace from './components/SopWorkspace';
+import ContactDetailSidebar from './components/ContactDetailSidebar';
+import { DEFAULT_SOP_TEMPLATES } from './constants/sopTemplates';
+import { Contact, NewContact, ProgressRecord, ExtractedTableData, Policy, Category, SopDraft, SopSession, SopTemplate, SopProfile } from './types';
+import { saveToCloud, loadFromCloud, loadLatestFromCloud, isSupabaseConfigured, loadLegacyContactsTable, subscribeToDataChanges, broadcastDataChange } from './services/supabaseService';
 
 const CATEGORIES_STORAGE_KEY = 'wechat-categories';
+const SOP_TEMPLATES_STORAGE_KEY = 'wechat-sop-templates';
+const SOP_SESSIONS_STORAGE_KEY = 'wechat-sop-sessions';
+const SOP_DRAFTS_STORAGE_KEY = 'wechat-sop-drafts';
 
 // 默认类目
 const DEFAULT_CATEGORIES: Category[] = [
@@ -67,6 +73,16 @@ const applyAutoTags = (contact: Contact): Contact => {
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
+const normalizeFollowUpStatus = (status: unknown): Contact['followUpStatus'] => {
+  if (status === 'following') return 'following';
+  return 'idle';
+};
+
+const normalizeContact = (contact: Contact): Contact => ({
+  ...contact,
+  followUpStatus: normalizeFollowUpStatus(contact.followUpStatus)
+});
+
 const App: React.FC = () => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
@@ -75,12 +91,19 @@ const App: React.FC = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
   // 跟进状态筛选
-  const [followUpFilter, setFollowUpFilter] = useState<'idle' | 'following' | 'contacted' | null>(null);
+  const [followUpFilter, setFollowUpFilter] = useState<'idle' | 'following' | null>(null);
 
   // 类目状态
   const [categories, setCategories] = useState<Category[]>([]);
+  const [isCategoriesLoaded, setIsCategoriesLoaded] = useState(false);
+  const [shouldSyncCategories, setShouldSyncCategories] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+  const [sopTemplates, setSopTemplates] = useState<SopTemplate[]>([]);
+  const [sopSessions, setSopSessions] = useState<SopSession[]>([]);
+  const [sopDrafts, setSopDrafts] = useState<SopDraft[]>([]);
+  const [activeSopContactId, setActiveSopContactId] = useState<string | null>(null);
+  const [detailContactId, setDetailContactId] = useState<string | null>(null);
   
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -160,7 +183,7 @@ const App: React.FC = () => {
                 intentProducts: Array.isArray(c.intentProducts) ? c.intentProducts : [],
                 policies: c.policies || []
               };
-              return applyAutoTags(baseContact);
+              return applyAutoTags(normalizeContact(baseContact));
             });
             setContacts(migratedData);
             localStorage.setItem('wechat-contacts', JSON.stringify(migratedData));
@@ -191,10 +214,10 @@ const App: React.FC = () => {
                 progress: r.progress || undefined,
                 dealProducts: Array.isArray(r.deal_products) ? r.deal_products : (r.dealProducts ? (Array.isArray(r.dealProducts) ? r.dealProducts : [r.dealProducts]) : []),
                 intentProducts: Array.isArray(r.intent_products) ? r.intent_products : (r.intentProducts || []),
-                followUpStatus: r.follow_up_status || r.followUpStatus,
+                followUpStatus: normalizeFollowUpStatus(r.follow_up_status || r.followUpStatus),
                 policies: []
               };
-              return applyAutoTags(baseContact);
+              return applyAutoTags(normalizeContact(baseContact));
             });
 
             console.log('旧版 contacts 表恢复成功，联系人数量:', migratedData.length);
@@ -229,7 +252,7 @@ const App: React.FC = () => {
                 intentProducts: Array.isArray(c.intentProducts) ? c.intentProducts : [],
                 policies: c.policies || []
               };
-              return applyAutoTags(baseContact);
+              return applyAutoTags(normalizeContact(baseContact));
             });
             setContacts(migratedData);
             
@@ -254,8 +277,9 @@ const App: React.FC = () => {
           const parsedData = JSON.parse(backup);
           if (Array.isArray(parsedData) && parsedData.length > 0) {
             console.log('从备份恢复数据...');
-            setContacts(parsedData);
-            localStorage.setItem('wechat-contacts', JSON.stringify(parsedData));
+            const migratedData = parsedData.map((contact: Contact) => normalizeContact(contact));
+            setContacts(migratedData);
+            localStorage.setItem('wechat-contacts', JSON.stringify(migratedData));
             setIsLoaded(true);
             console.log('从备份恢复数据...');
             return;
@@ -297,15 +321,19 @@ const App: React.FC = () => {
 
   // 4. 加载类目数据 - 优先从云端加载
   useEffect(() => {
+    if (!isLoaded || isCategoriesLoaded) return;
+
     const loadCategories = async () => {
       // 优先从云端加载
       if (isSupabaseConfigured()) {
         try {
-          const cloudData = await loadFromCloud('categories');
+          // 分类以 Supabase 最新的跟进工作台配置为准，避免浏览器旧 app_id 读到过期分类。
+          const cloudData = await loadLatestFromCloud('categories') || await loadFromCloud('categories');
           if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
             console.log('从云端加载类目成功:', cloudData.length);
             setCategories(cloudData);
             localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(cloudData));
+            setIsCategoriesLoaded(true);
             return;
           }
         } catch (e) {
@@ -320,20 +348,23 @@ const App: React.FC = () => {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setCategories(parsed);
+            setIsCategoriesLoaded(true);
             return;
           }
         } catch (e) {
           console.error('类目数据解析失败:', e);
         }
       }
+
       setCategories(DEFAULT_CATEGORIES);
+      setIsCategoriesLoaded(true);
     };
     loadCategories();
-  }, []);
+  }, [contacts, isLoaded, isCategoriesLoaded]);
 
   // 5. 保存类目数据 - 同时保存到云端
   useEffect(() => {
-    if (categories.length > 0) {
+    if (isCategoriesLoaded && shouldSyncCategories && categories.length > 0) {
       localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
       if (isSupabaseConfigured()) {
         saveToCloud('categories', categories).then(success => {
@@ -341,12 +372,133 @@ const App: React.FC = () => {
         });
       }
     }
-  }, [categories]);
+  }, [categories, isCategoriesLoaded, shouldSyncCategories]);
+
+  // 6. 加载 SOP 模板、会话和草稿
+  useEffect(() => {
+    const loadSopData = async () => {
+      const loadList = async <T,>(storageKey: string, cloudKey: string, fallback: T[]): Promise<T[]> => {
+        if (isSupabaseConfigured()) {
+          try {
+            const cloudData = await loadFromCloud(cloudKey);
+            if (Array.isArray(cloudData) && cloudData.length > 0) {
+              localStorage.setItem(storageKey, JSON.stringify(cloudData));
+              return cloudData;
+            }
+          } catch (e) {
+            console.error(`从云端加载 ${cloudKey} 失败:`, e);
+          }
+        }
+
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          } catch (e) {
+            console.error(`${cloudKey} 本地数据解析失败:`, e);
+          }
+        }
+
+        return fallback;
+      };
+
+      const [templates, sessions, drafts] = await Promise.all([
+        loadList<SopTemplate>(SOP_TEMPLATES_STORAGE_KEY, 'sopTemplates', DEFAULT_SOP_TEMPLATES),
+        loadList<SopSession>(SOP_SESSIONS_STORAGE_KEY, 'sopSessions', []),
+        loadList<SopDraft>(SOP_DRAFTS_STORAGE_KEY, 'sopDrafts', [])
+      ]);
+
+      setSopTemplates(templates);
+      setSopSessions(sessions);
+      setSopDrafts(drafts);
+    };
+
+    loadSopData();
+  }, []);
+
+  useEffect(() => {
+    if (sopTemplates.length > 0) {
+      localStorage.setItem(SOP_TEMPLATES_STORAGE_KEY, JSON.stringify(sopTemplates));
+      if (isSupabaseConfigured()) saveToCloud('sopTemplates', sopTemplates);
+    }
+  }, [sopTemplates]);
+
+  useEffect(() => {
+    localStorage.setItem(SOP_SESSIONS_STORAGE_KEY, JSON.stringify(sopSessions));
+    if (isSupabaseConfigured()) saveToCloud('sopSessions', sopSessions);
+  }, [sopSessions]);
+
+  useEffect(() => {
+    localStorage.setItem(SOP_DRAFTS_STORAGE_KEY, JSON.stringify(sopDrafts));
+    if (isSupabaseConfigured()) saveToCloud('sopDrafts', sopDrafts);
+  }, [sopDrafts]);
 
   // Derived State
   const allTags = Array.from(new Set(contacts.flatMap(c => c.tags))).sort();
+  const activeSopContact = activeSopContactId ? contacts.find(c => c.id === activeSopContactId) || null : null;
+  const detailContact = detailContactId ? contacts.find(c => c.id === detailContactId) || null : null;
 
   // --- Actions ---
+
+  const buildSopProfile = (session: SopSession): SopProfile => {
+    const getLabels = (stepId: string) => {
+      const step = session.templateSnapshot.steps.find(s => s.id === stepId);
+      const draft = session.steps[stepId];
+      if (!step || !draft) return [];
+      return draft.selectedOptionIds
+        .map(id => step.options.find(option => option.id === id)?.label)
+        .filter(Boolean) as string[];
+    };
+
+    const getDraftText = (stepId: string) => {
+      const draft = session.steps[stepId];
+      return draft?.judgment || draft?.customerQuote || draft?.nextAction || '';
+    };
+
+    const nextStep = session.steps.next_step;
+    const materialsToPrepare = session.templateSnapshot.steps
+      .filter(step => session.steps[step.id]?.selectedOptionIds?.length || session.steps[step.id]?.customerQuote)
+      .flatMap(step => step.materials || []);
+
+    return {
+      source: getLabels('relationship').join('、') || getDraftText('relationship'),
+      motivation: getLabels('motivation').join('、') || getDraftText('motivation'),
+      originalFundDestination: getLabels('fund_destination').join('、') || getDraftText('fund_destination'),
+      availableDuration: getLabels('duration').join('、') || getDraftText('duration'),
+      coreNeeds: getLabels('needs'),
+      mainConcern: getLabels('decision').join('、') || getDraftText('decision'),
+      decisionMakers: getLabels('decision').join('、') || getDraftText('decision'),
+      nextAction: nextStep?.nextAction || getLabels('next_step').join('、') || nextStep?.customerQuote,
+      materialsToPrepare: Array.from(new Set(materialsToPrepare)).slice(0, 8),
+      nextOpeningLine: nextStep?.customerQuote || nextStep?.nextAction,
+      updatedAt: Date.now()
+    };
+  };
+
+  const handleSaveSopDraft = (draft: SopDraft) => {
+    setSopDrafts(prev => {
+      const withoutCurrent = prev.filter(item => item.contactId !== draft.contactId);
+      return [draft, ...withoutCurrent];
+    });
+  };
+
+  const handleCompleteSop = (session: SopSession) => {
+    const profile = buildSopProfile(session);
+    setSopSessions(prev => [session, ...prev]);
+    setSopDrafts(prev => prev.filter(draft => draft.contactId !== session.contactId));
+    setContacts(prev => prev.map(contact => {
+      if (contact.id !== session.contactId) return contact;
+      const updated: Contact = {
+        ...contact,
+        sopProfile: profile,
+        followUpStatus: 'following'
+      };
+      return applyAutoTags(updated);
+    }));
+    setActiveSopContactId(null);
+    setDetailContactId(session.contactId);
+  };
 
   const handleToggleTag = (tag: string | null) => {
     if (tag === null) {
@@ -614,7 +766,7 @@ const App: React.FC = () => {
     contactId: string | null, 
     date: string, 
     content: string, 
-    newStatus: 'following' | 'contacted',
+    newStatus: 'following',
     newContactName?: string,
     existingRecordId?: string,
     completed?: boolean
@@ -928,10 +1080,12 @@ const App: React.FC = () => {
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
+    setShouldSyncCategories(true);
     setCategories(prev => [...prev, newCategory]);
   };
 
   const handleUpdateCategory = (id: string, updates: Partial<Category>) => {
+    setShouldSyncCategories(true);
     setCategories(prev => prev.map(c =>
       c.id === id ? { ...c, ...updates, updatedAt: Date.now() } : c
     ));
@@ -939,6 +1093,7 @@ const App: React.FC = () => {
 
   const handleReorderCategories = (reorderedCategories: Category[]) => {
     const now = Date.now();
+    setShouldSyncCategories(true);
     setCategories(reorderedCategories.map((category, index) => ({
       ...category,
       order: index,
@@ -948,6 +1103,7 @@ const App: React.FC = () => {
 
   const handleDeleteCategory = (id: string) => {
     // 删除类目时，将该类目下的联系人移到"无类目"
+    setShouldSyncCategories(true);
     setContacts(prev => prev.map(c =>
       c.categoryId === id ? { ...c, categoryId: undefined } : c
     ));
@@ -995,8 +1151,7 @@ const App: React.FC = () => {
                      followUpFilter={followUpFilter}
                      categoryFilter={categoryFilter}
                      onContactClick={(contact) => {
-                         setEditingContact(contact);
-                         setIsModalOpen(true);
+                         setDetailContactId(contact.id);
                      }}
                      onStatusChange={handleUpdateStatus}
                      onContactMove={handleMoveContactToCategory}
@@ -1160,6 +1315,43 @@ const App: React.FC = () => {
         onDelete={handleDeleteCategory}
         onReorder={handleReorderCategories}
       />
+
+      <ContactDetailSidebar
+        contact={detailContact}
+        isOpen={!!detailContact}
+        onClose={() => setDetailContactId(null)}
+        onEdit={(contact) => {
+          setEditingContact(contact);
+          setIsModalOpen(true);
+        }}
+        onDelete={handleDeleteContact}
+        onAddProgress={(contactId) => {
+          setQuickFollowUpContactId(contactId);
+          setEditingRecord(null);
+          setIsQuickFollowUpOpen(true);
+        }}
+        onDeleteProgress={handleDeleteProgress}
+        onUpdateStatus={handleUpdateStatus}
+        onAddToFollowing={(contactId) => handleAddToFollowUp(contactId, '__uncategorized__')}
+        onRemoveTag={handleRemoveTagFromContact}
+        onQuickAddProgress={(contactId, date, content) => handleQuickAddProgress(contactId, date, content, 'following')}
+        onAddPolicy={() => setIsManualPolicyOpen(true)}
+        onDeletePolicy={handleDeletePolicy}
+        onStartSop={(contactId) => setActiveSopContactId(contactId)}
+        sopSessions={sopSessions}
+      />
+
+      {activeSopContact && sopTemplates.length > 0 && (
+        <SopWorkspace
+          contact={activeSopContact}
+          templates={sopTemplates}
+          draft={sopDrafts.find(draft => draft.contactId === activeSopContact.id)}
+          onBack={() => setActiveSopContactId(null)}
+          onSaveDraft={handleSaveSopDraft}
+          onComplete={handleCompleteSop}
+          onUpdateTemplates={setSopTemplates}
+        />
+      )}
     </div>
   );
 };

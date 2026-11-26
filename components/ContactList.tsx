@@ -5,7 +5,6 @@ import { PageHeader } from './PageHeader';
 
 const FOLLOW_UP_STATUS = [
   { value: 'following', label: '跟进中' },
-  { value: 'contacted', label: '已沟通' },
   { value: 'idle', label: '暂未跟进' }
 ] as const;
 
@@ -14,7 +13,7 @@ interface ContactListProps {
   onEdit: (contact: Contact) => void;
   onDelete: (id: string) => void;
   filterTags: Set<string>;
-  followUpFilter: 'idle' | 'following' | 'contacted' | null;
+  followUpFilter: 'idle' | 'following' | null;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   onSelectAll: (ids: string[]) => void;
@@ -24,8 +23,8 @@ interface ContactListProps {
   onBatchDelete: () => void;
   onRemoveTagFromContact: (contactId: string, tag: string) => void;
   onClearTags: () => void;
-  onUpdateStatus?: (contactId: string, newStatus: 'following' | 'contacted' | 'idle') => void;
-  onBatchUpdateStatus?: (ids: string[], newStatus: 'following' | 'contacted' | 'idle') => void;
+  onUpdateStatus?: (contactId: string, newStatus: 'following' | 'idle') => void;
+  onBatchUpdateStatus?: (ids: string[], newStatus: 'following' | 'idle') => void;
 }
 
 export const ContactList: React.FC<ContactListProps> = ({
@@ -50,7 +49,7 @@ export const ContactList: React.FC<ContactListProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [expandedRemarkIds, setExpandedRemarkIds] = useState<Set<string>>(new Set());
   const [copiedWxid, setCopiedWxid] = useState<string | null>(null);
-  const [localFollowUpFilter, setLocalFollowUpFilter] = useState<'idle' | 'following' | 'contacted' | null>(null);
+  const [localFollowUpFilter, setLocalFollowUpFilter] = useState<'idle' | 'following' | null>(null);
   const [showBatchStatusMenu, setShowBatchStatusMenu] = useState(false);
 
   const toggleRemarkExpand = (id: string, e: React.MouseEvent) => {
@@ -79,7 +78,7 @@ export const ContactList: React.FC<ContactListProps> = ({
     setLocalFollowUpFilter(null);
   };
 
-  const handleFollowUpFilterChange = (value: 'idle' | 'following' | 'contacted' | null) => {
+  const handleFollowUpFilterChange = (value: 'idle' | 'following' | null) => {
     setLocalFollowUpFilter(value);
   };
 
@@ -155,12 +154,6 @@ export const ContactList: React.FC<ContactListProps> = ({
                   className={`px-2 py-1 rounded text-xs font-medium transition-all ${localFollowUpFilter === 'following' || followUpFilter === 'following' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   跟进中
-                </button>
-                <button
-                  onClick={() => handleFollowUpFilterChange('contacted')}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${localFollowUpFilter === 'contacted' || followUpFilter === 'contacted' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
-                >
-                  已沟通
                 </button>
                 <button
                   onClick={() => handleFollowUpFilterChange('idle')}
@@ -271,13 +264,9 @@ export const ContactList: React.FC<ContactListProps> = ({
 
                           <div className="flex flex-wrap gap-1 mt-1.5">
                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium ${
-                              contact.followUpStatus === 'following' ? 'bg-blue-100 text-blue-700' :
-                              contact.followUpStatus === 'contacted' ? 'bg-green-100 text-green-700' :
-                              'bg-gray-100 text-gray-600'
+                              contact.followUpStatus === 'following' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
                             }`}>
-                              {contact.followUpStatus === 'following' ? '跟进中' :
-                               contact.followUpStatus === 'contacted' ? '已沟通' :
-                               '暂未跟进'}
+                              {contact.followUpStatus === 'following' ? '跟进中' : '暂未跟进'}
                             </span>
                           </div>
                         </div>
@@ -459,13 +448,9 @@ export const ContactList: React.FC<ContactListProps> = ({
                           <td className="px-4 py-3 hidden sm:table-cell">
                             <div className="flex flex-wrap gap-1">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                contact.followUpStatus === 'following' ? 'bg-blue-100 text-blue-700' :
-                                contact.followUpStatus === 'contacted' ? 'bg-green-100 text-green-700' :
-                                'bg-gray-100 text-gray-600'
+                                contact.followUpStatus === 'following' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
                               }`}>
-                                {contact.followUpStatus === 'following' ? '跟进中' :
-                                 contact.followUpStatus === 'contacted' ? '已沟通' :
-                                 '暂未跟进'}
+                                {contact.followUpStatus === 'following' ? '跟进中' : '暂未跟进'}
                               </span>
                             </div>
                           </td>
@@ -530,12 +515,6 @@ export const ContactList: React.FC<ContactListProps> = ({
                   className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 transition-colors"
                 >
                   跟进中
-                </button>
-                <button
-                  onClick={() => { onBatchUpdateStatus?.(Array.from(selectedIds), 'contacted'); setShowBatchStatusMenu(false); }}
-                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 transition-colors"
-                >
-                  已沟通
                 </button>
                 <button
                   onClick={() => { onBatchUpdateStatus?.(Array.from(selectedIds), 'idle'); setShowBatchStatusMenu(false); }}

@@ -393,7 +393,6 @@ const contact = computed(() => {
 // 跟进状态选项
 const followUpStatuses = [
   { value: 'following', label: '跟进中' },
-  { value: 'contacted', label: '已沟通' },
   { value: 'idle', label: '暂未跟进' }
 ];
 
@@ -466,7 +465,7 @@ const saveContact = () => {
 };
 
 // 更新跟进状态
-const updateStatus = (status: 'idle' | 'following' | 'contacted') => {
+const updateStatus = (status: 'idle' | 'following') => {
   store.updateFollowUpStatus(contactId.value, status);
 };
 

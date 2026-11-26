@@ -1,0 +1,741 @@
+diff --git a/App.tsx b/App.tsx
+index 063db1f..ad05589 100644
+--- a/App.tsx
++++ b/App.tsx
+@@ -1,5 +1,6 @@
++import {categoryIds,contactKey,contactNameKey} from './services/contactIdentity';
+ import {excludedPolicyImport} from './services/policyImportRules';
+-import {saveFollowup,saveCustomerProfile} from './services/followupStorage';
++import {saveFollowup,saveCustomerProfile,saveContactCategory} from './services/followupStorage';
+ import { rememberRenewalSnapshot } from './services/renewalCache';
+ import { migrate, projectContacts, mergePolicies } from './services/renewal';
+ import RenewalWorkspace from './components/RenewalWorkspace';
+@@ -452,6 +453,7 @@ const App: React.FC = () => {
+     for(const [index,data] of newContactDataArray.entries()){
+       const previous=editingContact&&newContactDataArray.length===1?editingContact:undefined;
+       const input:Contact=previous?{...previous,...data,id:previous.id}:applyAutoTags({...data,id:requestId?`${requestId}-${index}`:crypto.randomUUID(),addedAt:Date.now(),tags:data.tags?.length?data.tags:['潜在客户'],followUpStatus:'following',policies:data.policies||[]});
++      if(contactsRef.current.some(c=>c.id!==input.id&&contactKey(c)===contactKey(input)))throw new Error('同名联系人已存在，请编辑已有联系人；跟进分类可在工作台中添加。');
+       const saved=await saveCustomerProfile(input,previous);
+       acceptSavedFollowup(saved);
+     }
+@@ -674,7 +676,8 @@ const App: React.FC = () => {
+     });
+   };
+   const handleQuickAddProgress: import('./types').FollowUpSave = async (contactId,date,content,newStatus,newContactName,existingRecordId,completed,requestId,newContactId) => {
+-    const id=contactId||newContactId||crypto.randomUUID();
++    const existingByName=!contactId&&newContactName?contactsRef.current.find(c=>contactKey(c)===contactNameKey(newContactName)):undefined;
++    const id=contactId||existingByName?.id||newContactId||crypto.randomUUID();
+     const current=contactsRef.current.find(c=>c.id===id);
+     const expected=existingRecordId?current?.progressHistory?.find(r=>r.id===existingRecordId):undefined;
+     if(existingRecordId&&!expected)throw new Error('原记录已变化，请刷新后重试。');
+@@ -861,49 +864,14 @@ const App: React.FC = () => {
+       }));
+   };
+ 
+-  // 从跟进工作台移除联系人，状态变为"暂未跟进"
+-  const handleRemoveFromFollowUp = (contactId: string) => {
+-      setContacts(prev => prev.map(c => {
+-          if (c.id === contactId) {
+-              return { ...c, followUpStatus: 'idle', categoryId: undefined };
+-          }
+-          return c;
+-      }));
+-  };
+-
+-  // 添加联系人到跟进工作台
+-  const handleAddToFollowUp = (contactId: string, categoryId: string) => {
+-      setContacts(prev => prev.map(c => {
+-          if (c.id === contactId) {
+-              return {
+-                  ...c,
+-                  followUpStatus: 'following',
+-                  categoryId: categoryId === '__uncategorized__' ? undefined : categoryId
+-              };
+-          }
+-          return c;
+-      }));
+-  };
+-
+-  // 快捷创建联系人并添加到跟进工作台
+-  const handleQuickCreateContact = (name: string, categoryId: string) => {
+-      const newContact: Contact = {
+-          id: generateId(),
+-          addedAt: Date.now(),
+-          wxid: '',
+-          nickname: name,
+-          remarkName: name,
+-          remarkInfo: '快速创建',
+-          tags: [],
+-          dealProducts: [],
+-          intentProducts: [],
+-          progressHistory: [],
+-          followUpStatus: 'following',
+-          categoryId: categoryId === '__uncategorized__' ? undefined : categoryId,
+-          policies: []
+-      };
+-      setContacts(prev => [newContact, ...prev]);
++  const categoryWriteRef=useRef<Promise<void>>(Promise.resolve());
++  const updateContactCategory=(contactId:string|null,name:string|null,target:string|null,source?:string,remove=false)=>{
++    const task=categoryWriteRef.current.catch(()=>{}).then(async()=>{await beforePolicySave();acceptSavedFollowup(await saveContactCategory(contactId,name,target,source,remove));});
++    categoryWriteRef.current=task;return task;
+   };
++  const handleRemoveFromFollowUp=(contactId:string,source?:string)=>updateContactCategory(contactId,null,null,source,true);
++  const handleAddToFollowUp=(contactId:string,target:string)=>updateContactCategory(contactId,null,target);
++  const handleQuickCreateContact=(name:string,target:string)=>updateContactCategory(null,name,target);
+ 
+   // 类目相关处理函数
+   const handleAddCategory = (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => {
+@@ -934,16 +902,12 @@ const App: React.FC = () => {
+   const handleDeleteCategory = (id: string) => {
+     // 删除类目时，将该类目下的联系人移到"无类目"
+     setContacts(prev => prev.map(c =>
+-      c.categoryId === id ? { ...c, categoryId: undefined } : c
++      categoryIds(c).includes(id) ? { ...c, categoryId: undefined, categoryIds:categoryIds(c).filter(x=>x!==id) } : c
+     ));
+     setCategories(prev => prev.filter(c => c.id !== id));
+   };
+ 
+-  const handleMoveContactToCategory = (contactId: string, newCategoryId: string | null) => {
+-    setContacts(prev => prev.map(c =>
+-      c.id === contactId ? { ...c, categoryId: newCategoryId || undefined } : c
+-    ));
+-  };
++  const handleMoveContactToCategory=(contactId:string,target:string|null,source?:string)=>updateContactCategory(contactId,null,target,source);
+ 
+   const renderContent = () => {
+       switch (currentView) {
+diff --git a/components/CategoryBoard.tsx b/components/CategoryBoard.tsx
+index 7378c50..2a287ba 100644
+--- a/components/CategoryBoard.tsx
++++ b/components/CategoryBoard.tsx
+@@ -1,3 +1,5 @@
++import {PageHeader} from './PageHeader';
++import {categoryIds,parseBoardCardId} from '../services/contactIdentity';
+ import React, { useState, useMemo } from 'react';
+ import {
+   DndContext,
+@@ -33,10 +35,10 @@ interface CategoryBoardProps {
+   categoryFilter: string | null;
+   onContactClick: (contact: Contact) => void;
+   onStatusChange: (contactId: string, status: 'idle' | 'following') => void;
+-  onContactMove: (contactId: string, newCategoryId: string | null) => void;
+-  onRemoveFromFollowUp: (contactId: string) => void;
+-  onAddToFollowUp: (contactId: string, categoryId: string) => void;
+-  onQuickCreateContact: (name: string, categoryId: string) => void;
++  onContactMove: (contactId: string, newCategoryId: string | null, source?:string) => void | Promise<void>;
++  onRemoveFromFollowUp: (contactId: string, categoryId?:string) => void | Promise<void>;
++  onAddToFollowUp: (contactId: string, categoryId: string) => void | Promise<void>;
++  onQuickCreateContact: (name: string, categoryId: string) => void | Promise<void>;
+   onCategoryFilter: (categoryId: string | null) => void;
+   onCategoryReorder: (categories: Category[]) => void;
+   onOpenCategoryManager: () => void;
+@@ -50,9 +52,9 @@ interface SortableCategoryColumnProps {
+   isFiltered?: boolean;
+   onContactClick: (contact: Contact) => void;
+   onStatusChange: (contactId: string, status: 'idle' | 'following') => void;
+-  onRemoveFromFollowUp: (contactId: string) => void;
+-  onAddToFollowUp: (contactId: string, categoryId: string) => void;
+-  onQuickCreateContact: (name: string, categoryId: string) => void;
++  onRemoveFromFollowUp: (contactId: string, categoryId?:string) => void | Promise<void>;
++  onAddToFollowUp: (contactId: string, categoryId: string) => void | Promise<void>;
++  onQuickCreateContact: (name: string, categoryId: string) => void | Promise<void>;
+   availableContacts: Contact[];
+   onFilterClick: () => void;
+ }
+@@ -99,7 +101,7 @@ const SortableCategoryColumn: React.FC<SortableCategoryColumnProps> = ({
+         isFiltered={isFiltered}
+         onContactClick={onContactClick}
+         onStatusChange={onStatusChange}
+-        onRemoveFromFollowUp={onRemoveFromFollowUp}
++        onRemoveFromFollowUp={id=>onRemoveFromFollowUp(id,category.id)}
+         onAddToFollowUp={onAddToFollowUp}
+         onQuickCreateContact={onQuickCreateContact}
+         availableContacts={availableContacts}
+@@ -141,6 +143,8 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
+     })
+   );
+ 
++  const [moveError,setMoveError]=useState('');
++  const [movePending,setMovePending]=useState(false);
+   // 自动显示所有跟进中的联系人（不需要 categoryId）
+   const filteredContacts = useMemo(() => {
+     return contacts.filter(c => {
+@@ -153,7 +157,7 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
+ 
+   // 可添加到跟进工作台的联系人（尚未跟进）
+   const availableContacts = useMemo(() => {
+-    return contacts.filter(c => c.followUpStatus !== 'following');
++    return contacts;
+   }, [contacts]);
+ 
+   const contactsByCategory = useMemo(() => {
+@@ -163,9 +167,8 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
+     });
+     groups['__uncategorized__'] = [];
+     filteredContacts.forEach(contact => {
+-      const key = contact.categoryId || '__uncategorized__';
+-      if (!groups[key]) groups[key] = [];
+-      groups[key].push(contact);
++      const ids=categoryIds(contact).filter(id=>categories.some(c=>c.id===id));
++      for(const key of ids.length?ids:['__uncategorized__'])groups[key].push(contact);
+     });
+     return groups;
+   }, [filteredContacts, categories]);
+@@ -188,7 +191,7 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
+       return;
+     }
+ 
+-    const contact = filteredContacts.find(c => c.id === active.id);
++    const contact = filteredContacts.find(c => c.id === parseBoardCardId(activeId)?.contactId);
+     if (contact) {
+       setActiveContact(contact);
+     }
+@@ -224,43 +227,29 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
+ 
+     if (activeId.startsWith('category-sort-')) return;
+ 
+-    const contactId = active.id as string;
++    const card=parseBoardCardId(activeId);if(!card)return;
++    const contactId=card.contactId;
+     let newCategoryId: string | null = null;
+ 
+     if (overId === '__uncategorized__') {
+       newCategoryId = null;
++    } else if(overId.startsWith('category-sort-')) {
++      newCategoryId=overId.replace('category-sort-','');
+     } else if (overId.startsWith('category-')) {
+       newCategoryId = overId.replace('category-', '');
+     } else {
+-      const targetContact = filteredContacts.find(c => c.id === overId);
+-      if (targetContact) {
+-        newCategoryId = targetContact.categoryId || null;
+-      }
++      const target=parseBoardCardId(overId);if(!target)return;newCategoryId=target.category==='__uncategorized__'?null:target.category;
+     }
++    setMoveError('');
++    if(card.category!==(newCategoryId||'__uncategorized__')){setMovePending(true);Promise.resolve(onContactMove(contactId,newCategoryId,card.category)).catch(e=>setMoveError(e instanceof Error?e.message:'分类未保存，请重试。')).finally(()=>setMovePending(false));}
+ 
+-    if (newCategoryId !== undefined) {
+-      const currentContact = filteredContacts.find(c => c.id === contactId);
+-      if (currentContact && currentContact.categoryId !== newCategoryId) {
+-        onContactMove(contactId, newCategoryId);
+-      }
+-    }
+   };
+ 
+   return (
+     <div className="flex-1 h-full min-h-0 flex flex-col overflow-hidden">
+-      <div className="shrink-0 px-4 md:px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
+-        <div className="flex items-center gap-3">
+-          <h1 className="text-lg font-bold text-gray-900">跟进工作台</h1>
+-          <span className="text-xs text-gray-500">{filteredContacts.length} 位联系人</span>
+-        </div>
+-        <button
+-          onClick={onOpenCategoryManager}
+-          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all"
+-          title="管理类目"
+-        >
+-          <Settings size={20} />
+-        </button>
+-      </div>
++      {movePending&&<p role="status" className="px-5 py-3 text-sm text-gray-500">正在保存分类…</p>}
++      {moveError&&<p role="alert" className="px-5 py-3 text-sm text-danger-600">{moveError}</p>}
++      <div className="shrink-0 border-b border-gray-100 bg-white"><PageHeader compactActions title="跟进工作台" count={filteredContacts.length} actionButton={<button onClick={onOpenCategoryManager} className="icon-btn" aria-label="管理分类" title="管理分类"><Settings size={20}/></button>}/></div>
+ 
+       <DndContext
+         sensors={sensors}
+@@ -303,7 +292,7 @@ const CategoryBoard: React.FC<CategoryBoardProps> = ({
+               isFiltered={categoryFilter === null}
+               onContactClick={onContactClick}
+               onStatusChange={onStatusChange}
+-              onRemoveFromFollowUp={onRemoveFromFollowUp}
++              onRemoveFromFollowUp={id=>onRemoveFromFollowUp(id,'__uncategorized__')}
+               onAddToFollowUp={onAddToFollowUp}
+               onQuickCreateContact={onQuickCreateContact}
+               availableContacts={availableContacts}
+diff --git a/components/CategoryColumn.tsx b/components/CategoryColumn.tsx
+index 7c8d213..2751a49 100644
+--- a/components/CategoryColumn.tsx
++++ b/components/CategoryColumn.tsx
+@@ -1,3 +1,4 @@
++import {boardCardId,contactKey,contactNameKey} from '../services/contactIdentity';
+ import React, { useState } from 'react';
+ import { useDroppable } from '@dnd-kit/core';
+ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+@@ -12,13 +13,13 @@ interface CategoryColumnProps {
+   count: number;
+   isOver?: boolean;
+   isFiltered?: boolean;
+-  onContactClick: (contact: Contact) => void;
+-  onStatusChange: (contactId: string, status: 'idle' | 'following') => void;
+-  onRemoveFromFollowUp: (contactId: string) => void;
+-  onAddToFollowUp?: (contactId: string, categoryId: string) => void;
+-  onQuickCreateContact?: (name: string, categoryId: string) => void;
++  onContactClick: (contact: Contact) => void | Promise<void>;
++  onStatusChange: (contactId: string, status: 'idle' | 'following') => void | Promise<void>;
++  onRemoveFromFollowUp: (contactId: string) => void | Promise<void>;
++  onAddToFollowUp?: (contactId: string, categoryId: string) => void | Promise<void>;
++  onQuickCreateContact?: (name: string, categoryId: string) => void | Promise<void>;
+   availableContacts?: Contact[];
+-  onFilterClick: () => void;
++  onFilterClick: () => void | Promise<void>;
+   isUncategorized?: boolean;
+   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
+ }
+@@ -40,6 +41,7 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
+   dragHandleProps
+ }) => {
+   const [isAdding, setIsAdding] = useState(false);
++  const [saving,setSaving]=useState(false),[error,setError]=useState('');
+   const [searchQuery, setSearchQuery] = useState('');
+ 
+   const droppableId = isUncategorized ? '__uncategorized__' : `category-${category?.id}`;
+@@ -58,21 +60,10 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
+     onStatusChange(contactId, status);
+   };
+ 
+-  const handleAddContact = (contactId: string) => {
+-    const targetCategoryId = isUncategorized ? '__uncategorized__' : category?.id || '__uncategorized__';
+-    onAddToFollowUp?.(contactId, targetCategoryId);
+-    setIsAdding(false);
+-    setSearchQuery('');
+-  };
+-
+-  const handleQuickCreate = () => {
+-    if (searchQuery.trim()) {
+-      const targetCategoryId = isUncategorized ? '__uncategorized__' : category?.id || '__uncategorized__';
+-      onQuickCreateContact?.(searchQuery.trim(), targetCategoryId);
+-      setSearchQuery('');
+-      setIsAdding(false);
+-    }
+-  };
++  const targetCategoryId=isUncategorized?'__uncategorized__':category!.id;
++  const perform=async(work:()=>void|Promise<void>)=>{if(saving)return;setSaving(true);setError('');try{await work();setIsAdding(false);setSearchQuery('');}catch(e){setError(e instanceof Error?e.message:'分类未保存，请重试。');}finally{setSaving(false);}};
++  const handleAddContact=(id:string)=>perform(()=>onAddToFollowUp?.(id,targetCategoryId));
++  const handleQuickCreate=()=>{if(searchQuery.trim())return perform(()=>onQuickCreateContact?.(searchQuery.trim(),targetCategoryId));};
+ 
+   const filteredAvailableContacts = availableContacts.filter(c =>
+     !contacts.some(ac => ac.id === c.id) &&
+@@ -81,6 +72,7 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
+ 
+   return (
+     <div
++      data-category-id={isUncategorized?'__uncategorized__':category?.id}
+       className={`w-72 h-full min-h-0 shrink-0 flex flex-col bg-gray-50 rounded-xl transition-all ${
+         isOver || isDropOver ? 'ring-2 ring-gray-900 ring-offset-2' : ''
+       }`}
+@@ -126,9 +118,9 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
+             {/* 添加联系人按钮 */}
+             {onAddToFollowUp && (
+               <button
+-                onClick={(e) => { e.stopPropagation(); setIsAdding(!isAdding); }}
++                disabled={saving} onClick={(e) => { e.stopPropagation(); setIsAdding(!isAdding); }}
+                 className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all"
+-                title="添加联系人"
++                title="添加联系人" aria-label={`添加联系人到${isUncategorized?'未分类':category?.name}`}
+               >
+                 <Plus size={16} />
+               </button>
+@@ -148,12 +140,12 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
+                 value={searchQuery}
+                 onChange={e => setSearchQuery(e.target.value)}
+                 placeholder="搜索联系人..."
+-                className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-gray-400"
++                className="input pl-7" disabled={saving}
+                 autoFocus
+               />
+             </div>
+             <button
+-              onClick={() => { setIsAdding(false); setSearchQuery(''); }}
++              disabled={saving} aria-label="关闭添加联系人" onClick={() => { setIsAdding(false); setSearchQuery('');setError(''); }}
+               className="p-1 text-gray-400 hover:text-gray-600"
+             >
+               <X size={14} />
+@@ -161,23 +153,23 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
+           </div>
+           <div className="max-h-40 overflow-y-auto space-y-1">
+             {filteredAvailableContacts.length === 0 ? (
+-              searchQuery.trim() ? (
++              searchQuery.trim() && !contacts.some(c=>contactKey(c)===contactNameKey(searchQuery)) ? (
+                 /* 搜索无结果时，直接创建 */
+                 <button
+-                  onClick={handleQuickCreate}
++                  disabled={saving} onClick={handleQuickCreate}
+                   className="w-full text-left px-2 py-2 text-xs hover:bg-gray-100 rounded transition-all flex items-center gap-2 text-gray-600"
+                 >
+                   <UserPlus size={14} />
+-                  <span>创建 "<span className="font-medium text-gray-900">{searchQuery.trim()}</span>"</span>
++                  <span>添加 "<span className="font-medium text-gray-900">{searchQuery.trim()}</span>"</span>
+                 </button>
+               ) : (
+-                <p className="text-xs text-gray-400 text-center py-2">无更多联系人</p>
++                <p className="text-xs text-gray-500 text-center py-2">{searchQuery.trim()?'已在此分类':'无更多联系人'}</p>
+               )
+             ) : (
+               filteredAvailableContacts.slice(0, 10).map(contact => (
+                 <button
+                   key={contact.id}
+-                  onClick={() => handleAddContact(contact.id)}
++                  disabled={saving} onClick={() => handleAddContact(contact.id)}
+                   className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-100 rounded transition-all flex items-center gap-2"
+                 >
+                   <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-[10px] font-bold">
+@@ -191,6 +183,8 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
+         </div>
+       )}
+ 
++      {saving&&<p role="status" className="px-3 py-2 text-xs text-gray-500">正在保存…</p>}
++      {error&&<p role="alert" className="px-3 py-2 text-xs text-danger-600">{error}</p>}
+       {/* Drop Zone */}
+       <div
+         ref={setNodeRef}
+@@ -199,22 +193,24 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({
+         }`}
+       >
+         <SortableContext
+-          items={contacts.map(c => c.id)}
++          items={contacts.map(c => boardCardId(c.id,targetCategoryId))}
+           strategy={verticalListSortingStrategy}
+         >
+           {contacts.length === 0 ? (
+             <div className="flex flex-col items-center justify-center h-32 text-gray-300 text-sm">
+               <p>暂无联系人</p>
+-              <p className="text-xs">拖拽卡片到这里</p>
++
+             </div>
+           ) : (
+             contacts.map(contact => (
+               <ContactCard
+                 key={contact.id}
+                 contact={contact}
++                sortableId={boardCardId(contact.id,targetCategoryId)}
++                removalLabel={isUncategorized?'移出工作台':'移出此分类'}
+                 onClick={() => onContactClick(contact)}
+                 onStatusChange={handleStatusChange}
+-                onRemoveFromFollowUp={onRemoveFromFollowUp}
++                onRemoveFromFollowUp={id=>perform(()=>onRemoveFromFollowUp(id))}
+               />
+             ))
+           )}
+diff --git a/components/ContactCard.tsx b/components/ContactCard.tsx
+index 704f60f..94d405d 100644
+--- a/components/ContactCard.tsx
++++ b/components/ContactCard.tsx
+@@ -7,6 +7,8 @@ import { Clock, Trash2, Calendar } from 'lucide-react';
+ 
+ interface ContactCardProps {
+   contact: Contact;
++  sortableId?: string;
++  removalLabel?: string;
+   isDragging?: boolean;
+   isOverlay?: boolean;
+   onClick: () => void;
+@@ -16,6 +18,8 @@ interface ContactCardProps {
+ 
+ const ContactCard: React.FC<ContactCardProps> = ({
+   contact,
++  sortableId,
++  removalLabel="移出工作台",
+   isDragging,
+   isOverlay,
+   onClick,
+@@ -29,7 +33,7 @@ const ContactCard: React.FC<ContactCardProps> = ({
+     transform,
+     transition,
+     isDragging: isSortableDragging
+-  } = useSortable({ id: contact.id });
++  } = useSortable({ id: sortableId || contact.id });
+ 
+   const style = {
+     transform: CSS.Transform.toString(transform),
+@@ -54,6 +58,7 @@ const ContactCard: React.FC<ContactCardProps> = ({
+ 
+   return (
+     <div
++      data-contact-id={contact.id}
+       ref={setNodeRef}
+       style={style}
+       {...attributes}
+@@ -70,7 +75,7 @@ const ContactCard: React.FC<ContactCardProps> = ({
+       <button
+         onClick={handleRemove}
+         className="absolute top-2 right-2 p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
+-        title="移出工作台" aria-label="移出工作台"
++        title={removalLabel} aria-label={removalLabel}
+       >
+         <Trash2 size={14} />
+       </button>
+diff --git a/components/PageHeader.tsx b/components/PageHeader.tsx
+index fe13c1e..82eb29d 100644
+--- a/components/PageHeader.tsx
++++ b/components/PageHeader.tsx
+@@ -11,6 +11,7 @@ interface PageHeaderProps {
+   actionButton?: React.ReactNode;
+   searchBox?: React.ReactNode;
+   className?: string;
++  compactActions?: boolean;
+ }
+ 
+ export const PageHeader: React.FC<PageHeaderProps> = ({
+@@ -22,10 +23,11 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
+   onSelectAll,
+   actionButton,
+   searchBox,
+-  className = ''
++  className = '',
++  compactActions = false
+ }) => {
+   return (
+-    <div className={`p-5 flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-4 ${className}`}>
++    <div className={`p-5 flex ${compactActions ? 'flex-row items-center' : 'flex-col sm:flex-row flex-wrap items-start sm:items-center'} justify-between gap-4 ${className}`}>
+       <div className="flex items-center gap-3">
+         {onSelectAll && (
+           <button
+@@ -51,7 +53,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
+         </div>
+       </div>
+ 
+-      <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto ml-auto">
++      <div className={`flex flex-wrap items-center gap-3 ${compactActions?'w-auto':'w-full sm:w-auto'} ml-auto`}>
+         {actionButton}
+         {searchBox}
+       </div>
+diff --git a/design.md b/design.md
+index 3867f6a..1243147 100644
+--- a/design.md
++++ b/design.md
+@@ -157,3 +157,7 @@
+ - 保单详情默认阅读，进入编辑后保存和取消在固定操作栏，未保存修改关闭前确认。WorkspaceDialog 提供原生模态焦点限制与Escape关闭。
+ - 手机续期提醒逐单分组，日期及天数相邻，金额和剩余期数并排，操作位于记录右侧。完整保单及历史表允许容器内横向滚动。
+ - 本轮仅完成本地组件与流程验证，云端写入、邮件及真实保单数据正确性不属于本轮验证结果。
++
++## 联系人与跟进分类
++
++同名联系人只能有一份资料，姓名匹配忽略空白与大小写。跟进分类是联系人关联，可同时有多个，不能通过复制联系人实现。一位联系人跨分类复用同一个ID、跟进历史、标签和保单；工作台总数按联系人去重，分类分别计数。添加已有姓名复用资料，移出此分类只移除当前关联，拖动只更换来源分类，保留其他分类。未分类只显示没有有效分类的跟进中联系人。保存失败保留输入，成功收到数据库确认后更新；已有同名资料不得通过导入的“新建”绕过唯一性限制。
+diff --git a/docs/2026-11-23-contact-memberships-verification.md b/docs/2026-11-23-contact-memberships-verification.md
+new file mode 100644
+index 0000000..58dc576
+--- /dev/null
++++ b/docs/2026-11-23-contact-memberships-verification.md
+@@ -0,0 +1,11 @@
++# 联系人唯一、多分类关联
++
++同名联系人（忽略空白、大小写，以备注名优先、昵称兜底）只保留一条，分类使用categoryIds关联；兼容旧categoryId。数据库触发器拒绝所有写入路径重复姓名，旧浏览器快照也不能重新插入重复记录。明亚导入同名归属必须确认合并，不能选择另建同名客户；手工录入、改名与跟进快捷创建也受约束。
++
++分类变更通过单联系人事务保存，添加按姓名复用已有ID；重试不重复加入。拖动只移除来源关联、添加目标，移出只影响当前分类。最后一个分类移除才退出跟进。列表计数按人去重，每列独立计数；拖动ID包含分类，避免同一联系人多列出现时冲突。页面内分类请求串行提交，避免返回顺序覆盖界面。
++
++正式数据：在事务回滚试运行验证跟进内容、保单ID均保留后，备份并合并两组同名记录。当前162位联系人、62条跟进。“郭子豪”的两个分类合并到同一ID；“吴琛”五条跟进保留。数据库contact_merge_backup:前缀存完整合并前客户、续期和ID映射；合并后的联系人也保留原资料快照。保单归属ID在客户与续期视图同步映射，不修改缴费记录。
++
++验证：47项测试、网页类型检查和构建通过。数据库匿名角色事务回滚断言覆盖按姓名复用、重复添加、跨分类移动、单列移出、末列移出、记录/标签/保单保留、拒绝重复名字及失效分类。1304×880浏览器验证两列同人、第三列添加、失败重试、单列移出、真实鼠标拖动、共享资料打开和刷新；390×844验证标题/设置单行、工作台容器横向滚动且整页不溢出。界面测试使用虚拟数据。
++
++规范复用：PageHeader、ContactCard、CustomerTags、input及icon-btn，扩展公共标题栏的紧凑动作模式。正文不增加常驻规则说明；独立文案删减移除了空列的“拖拽卡片到这里”，只保留“暂无联系人”；“创建姓名”改“添加姓名”，避免暗示重复建立资料；移除按钮改“移出此分类”，准确表达范围。处理中与失败反馈各仅一处。
+diff --git a/services/contactIdentity.ts b/services/contactIdentity.ts
+new file mode 100644
+index 0000000..0126f13
+--- /dev/null
++++ b/services/contactIdentity.ts
+@@ -0,0 +1,6 @@
++import type {Contact} from '../types';
++export const contactNameKey=(value:string|undefined)=>String(value||'').replace(/[\s\u3000]+/g,'').toLocaleLowerCase();
++export const contactKey=(c:Pick<Contact,'remarkName'|'nickname'>)=>contactNameKey(c.remarkName?.trim()||c.nickname);
++export const categoryIds=(c:Pick<Contact,'categoryId'> & {categoryIds?:string[]})=>[...new Set(c.categoryIds??(c.categoryId?[c.categoryId]:[]))].filter(Boolean);
++export const boardCardId=(contactId:string,category:string)=>JSON.stringify(['contact',contactId,category]);
++export function parseBoardCardId(id:string):{contactId:string;category:string}|undefined {try{const p=JSON.parse(id);if(p[0]==='contact'&&p.length===3)return{contactId:p[1],category:p[2]};}catch{}return undefined;}
+diff --git a/services/followupStorage.ts b/services/followupStorage.ts
+index 3ce4454..4cb3a9f 100644
+--- a/services/followupStorage.ts
++++ b/services/followupStorage.ts
+@@ -23,3 +23,12 @@ export async function saveCustomerProfile(contact:Contact,expected?:Contact):Pro
+  }catch(e){if(controller.signal.aborted)throw new Error('保存超时，输入已保留，请核对后重试。');throw e;}
+  finally{clearTimeout(timeout);}
+ }
++
++export async function saveContactCategory(contactId:string|null,name:string|null,target:string|null,source?:string|null,remove=false):Promise<Contact>{
++ const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),15000);
++ try{
++  const {data,error}=await supabase.rpc('save_contact_category_v1',{p_app_id:import.meta.env.VITE_APP_ID,p_contact_id:contactId,p_name:name,p_target:target,p_source:source??null,p_remove:remove}).abortSignal(controller.signal);
++  if(error)throw new Error(error.message||'分类未保存，请重试。');
++  if(!data?.id)throw new Error('未收到分类保存确认，请重试。');return data;
++ }catch(e){if(controller.signal.aborted)throw new Error('分类保存超时，请刷新核对后重试。');throw e;}finally{clearTimeout(timeout);}
++}
+diff --git a/services/mingyaImport.ts b/services/mingyaImport.ts
+index 4623f56..a88be76 100644
+--- a/services/mingyaImport.ts
++++ b/services/mingyaImport.ts
+@@ -126,7 +126,7 @@ export function planMingyaImport(existing: Contact[], payload:MingyaPayload, res
+       if(strong.length===1)owner=strong[0];
+       else if(strong.length>1){issue='身份信息匹配到多位客户';candidates=strong;}
+       else if(newOwners.has(incoming.personKey))owner=contacts.find(c=>c.id===newOwners.get(incoming.personKey));
+-      else {candidates=contacts.filter(c=>sameName(c,a.name));if(candidates.length)issue='仅姓名相同，需要确认是否同一人';}
++      else {candidates=contacts.filter(c=>sameName(c,a.name));if(candidates.length){issue='同名联系人已存在，请确认合并归属';allowNew=false;}}
+       // A different known insurer with the same number must not silently become a second record.
+       const numberMatches=contacts.flatMap(c=>(c.policies||[]).filter(x=>normalizeId(x.policyNumber)===normalizeId(p.policyNumber)&&(companyKey(x.company)!==companyKey(p.company)||ambiguousTerm(x,incoming))).map(()=>c));
+       if(numberMatches.length){issue='相同保单号的保险公司不一致，或旧记录缺少年度';candidates=numberMatches;owner=undefined;allowNew=false;}
+diff --git a/supabase/migrations/20261123021900_contact_name_memberships.sql b/supabase/migrations/20261123021900_contact_name_memberships.sql
+new file mode 100644
+index 0000000..9e9d721
+--- /dev/null
++++ b/supabase/migrations/20261123021900_contact_name_memberships.sql
+@@ -0,0 +1,93 @@
++-- Names identify a single contact; category membership is independent of identity.
++create or replace function public.contact_name_key_v1(c jsonb) returns text language sql immutable set search_path=public,pg_temp as $$
++ select lower(regexp_replace(coalesce(nullif(btrim(c->>'remarkName'),''),c->>'nickname',''),'[[:space:]　]+','','g'));
++$$;
++create or replace function public.contact_categories_v1(c jsonb) returns jsonb language sql immutable set search_path=public,pg_temp as $$
++ select coalesce(jsonb_agg(distinct value),'[]'::jsonb) from jsonb_array_elements(case when jsonb_typeof(c->'categoryIds')='array' then c->'categoryIds' when nullif(c->>'categoryId','') is not null then jsonb_build_array(c->>'categoryId') else '[]'::jsonb end) where value<> 'null'::jsonb and value<> '""'::jsonb;
++$$;
++create or replace function public.enforce_contact_names_v1() returns trigger language plpgsql security invoker set search_path=public,pg_temp as $$
++begin
++ if new.data_type='contacts' and jsonb_typeof(new.data)='array' and exists(select 1 from jsonb_array_elements(new.data)c where public.contact_name_key_v1(c)<>'' group by public.contact_name_key_v1(c) having count(*)>1) then
++  raise exception using errcode='PT409',message='同名联系人已存在，请使用已有联系人；可将其添加到多个跟进分类。';
++ end if;return new;
++end $$;
++revoke all on function public.enforce_contact_names_v1() from public;
++create trigger zz_contact_unique_name before insert or update of data on public.app_data for each row execute function public.enforce_contact_names_v1();
++
++create or replace function public.save_contact_category_v1(p_app_id text,p_contact_id text,p_name text,p_target text,p_source text default null,p_remove boolean default false)
++returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
++declare r public.app_data%rowtype;c jsonb;idx integer;cats jsonb;target text:=nullif(p_target,'__uncategorized__');source text:=nullif(p_source,'__uncategorized__');k text;
++begin
++ select * into r from public.app_data where app_id=p_app_id and data_type='contacts' for update;
++ if r.id is null then raise exception using errcode='PT409',message='请先完成客户数据同步';end if;
++ if p_contact_id is not null then
++  select value,(ordinality-1)::integer into c,idx from jsonb_array_elements(r.data)with ordinality where value->>'id'=p_contact_id;
++  if c is null then raise exception using errcode='PT409',message='联系人已变化，请刷新后重试';end if;
++ else
++  k:=public.contact_name_key_v1(jsonb_build_object('remarkName',p_name));if k='' then raise exception using errcode='22023',message='请填写联系人姓名';end if;
++  select value,(ordinality-1)::integer into c,idx from jsonb_array_elements(r.data)with ordinality where public.contact_name_key_v1(value)=k;
++  if c is null then
++   idx:=jsonb_array_length(r.data);c:=jsonb_build_object('id',gen_random_uuid()::text,'remarkName',btrim(p_name),'nickname',btrim(p_name),'wxid','','remarkInfo','','tags','[]'::jsonb,'dealProducts','[]'::jsonb,'intentProducts','[]'::jsonb,'policies','[]'::jsonb,'progressHistory','[]'::jsonb,'addedAt',floor(extract(epoch from clock_timestamp())*1000));
++  end if;
++ end if;
++ if target is not null and not exists(select 1 from public.app_data a cross join lateral jsonb_array_elements(a.data)cat where a.app_id=p_app_id and a.data_type='categories' and cat->>'id'=target) then raise exception using errcode='PT409',message='跟进分类已删除，请刷新后重试';end if;
++ cats:=public.contact_categories_v1(c);
++ if source is not null then select coalesce(jsonb_agg(value),'[]'::jsonb)into cats from jsonb_array_elements(cats)where value<>to_jsonb(source);end if;
++ if target is not null and not p_remove and not(cats?target) then cats:=cats||jsonb_build_array(target);end if;
++ -- Explicit removal only affects the source column; final removal exits follow-up.
++ c:=(c-'categoryId')||jsonb_build_object('categoryIds',cats,'followUpStatus',case when p_remove and jsonb_array_length(cats)=0 then 'idle' else 'following' end);
++ update public.app_data set data=jsonb_set(r.data,array[idx::text],c),updated_at=clock_timestamp() where id=r.id returning data->idx into c;
++ return c;
++end $$;
++revoke all on function public.save_contact_category_v1(text,text,text,text,text,boolean) from public;
++grant execute on function public.save_contact_category_v1(text,text,text,text,text,boolean) to anon,authenticated;
++
++-- Maintenance-only merge: backup first, preserve records/relationships and original snapshots.
++create or replace function public.merge_duplicate_contact_names_v1(p_app_id text,p_apply boolean default false)
++returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
++declare r public.app_data%rowtype;renew public.app_data%rowtype;g record;c jsonb;other jsonb;result jsonb:='[]';members jsonb;values_to_merge jsonb;field text;f record;aliases jsonb:='{}';cat jsonb;hist jsonb;tomb jsonb;policies jsonb;duplicates integer:=0;stamp timestamptz:=clock_timestamp();
++begin
++ perform id from public.app_data where app_id=p_app_id and data_type in('contacts','renewal_v1')order by data_type for update;
++ select * into r from public.app_data where app_id=p_app_id and data_type='contacts';select * into renew from public.app_data where app_id=p_app_id and data_type='renewal_v1';
++ if r.id is null then raise exception 'Missing contacts';end if;
++ for g in select public.contact_name_key_v1(value) k,jsonb_agg(value order by ordinality)group_contacts,min(ordinality) n from jsonb_array_elements(r.data)with ordinality group by public.contact_name_key_v1(value)order by min(ordinality)loop
++  members:=g.group_contacts;c:=members->0;
++  if jsonb_array_length(members)>1 and g.k<>'' then
++   duplicates:=duplicates+jsonb_array_length(members)-1;
++   c:=c||jsonb_build_object('mergedContactSnapshots',coalesce(c->'mergedContactSnapshots','[]'::jsonb)||members);
++   for other in select value from jsonb_array_elements(members)loop
++    aliases:=aliases||jsonb_build_object(other->>'id',c->>'id');
++    for f in select * from jsonb_each(other)loop
++     if (not(c?f.key)or c->f.key in('null'::jsonb,'""'::jsonb))and f.value not in('null'::jsonb,'""'::jsonb) then c:=jsonb_set(c,array[f.key],f.value);end if;
++    end loop;
++   end loop;
++   foreach field in array array['tags','dealProducts','intentProducts','progressDeletedIds']loop
++    select coalesce(jsonb_agg(distinct v),'[]'::jsonb)into values_to_merge from jsonb_array_elements(members)m cross join lateral jsonb_array_elements(coalesce(m->field,'[]'::jsonb))v;
++    c:=jsonb_set(c,array[field],values_to_merge);
++   end loop;
++   select coalesce(jsonb_agg(distinct catid),'[]'::jsonb)into cat from jsonb_array_elements(members)m cross join lateral jsonb_array_elements(public.contact_categories_v1(m))catid;
++   c:=(c-'categoryId')||jsonb_build_object('categoryIds',cat);
++   tomb:=c->'progressDeletedIds';
++   select coalesce(jsonb_agg(record order by record->>'date' desc),'[]'::jsonb)into hist from(select distinct on(coalesce(v->>'id',v::text))v record from jsonb_array_elements(members)m cross join lateral jsonb_array_elements(coalesce(m->'progressHistory','[]'::jsonb))v where not(tomb?coalesce(v->>'id',''))order by coalesce(v->>'id',v::text),v->>'updatedAt' desc nulls last)records;
++   select coalesce(jsonb_agg(policy),'[]'::jsonb)into policies from(select distinct on(coalesce(v->>'id',v::text))v policy from jsonb_array_elements(members)m cross join lateral jsonb_array_elements(coalesce(m->'policies','[]'::jsonb))v)ps;
++   c:=c||jsonb_build_object('progressHistory',hist,'policies',policies);
++   if jsonb_array_length(hist)>0 then c:=c||jsonb_build_object('lastDate',hist->0->>'date');end if;
++   if exists(select 1 from jsonb_array_elements(members)m where m->>'followUpStatus'='following')then c:=c||jsonb_build_object('followUpStatus','following');end if;
++   select string_agg(distinct m->>'remarkInfo',E'\n')into field from jsonb_array_elements(members)m where nullif(m->>'remarkInfo','')is not null;
++   if field is not null then c:=c||jsonb_build_object('remarkInfo',field);end if;
++  elsif jsonb_array_length(members)>1 then result:=result||members;continue;
++  end if;
++  result:=result||jsonb_build_array(c);
++ end loop;
++ if not p_apply or duplicates=0 then return jsonb_build_object('duplicates',duplicates,'contacts',jsonb_array_length(result));end if;
++ insert into public.app_data(app_id,data_type,data,updated_at)values(p_app_id,'contact_merge_backup:'||gen_random_uuid()::text,jsonb_build_object('contacts',r.data,'renewal',renew.data,'aliases',aliases,'at',stamp),stamp);
++ -- Remap owner links everywhere without changing policy identity or payments.
++ select jsonb_agg(case when doc? 'policies' then jsonb_set(doc,'{policies}',(select coalesce(jsonb_agg(p||case when aliases?(p->>'applicantId')then jsonb_build_object('applicantId',aliases->>(p->>'applicantId'))else '{}'::jsonb end||case when aliases?(p->>'insuredId')then jsonb_build_object('insuredId',aliases->>(p->>'insuredId'))else '{}'::jsonb end),'[]'::jsonb)from jsonb_array_elements(doc->'policies')p))else doc end order by n) into result from jsonb_array_elements(result)with ordinality x(doc,n);
++ update public.app_data set data=result,updated_at=stamp where id=r.id;
++ if renew.id is not null then
++  select coalesce(jsonb_agg(p||case when aliases?(p->>'applicantId')then jsonb_build_object('applicantId',aliases->>(p->>'applicantId'))else '{}'::jsonb end||case when aliases?(p->>'insuredId')then jsonb_build_object('insuredId',aliases->>(p->>'insuredId'))else '{}'::jsonb end),'[]'::jsonb)into policies from jsonb_array_elements(coalesce(renew.data->'policies','[]'::jsonb))p;
++  update public.app_data set data=jsonb_set(renew.data,'{policies}',policies),updated_at=stamp where id=renew.id;
++ end if;
++ return jsonb_build_object('duplicates',duplicates,'contacts',jsonb_array_length(result));
++end $$;
++revoke all on function public.merge_duplicate_contact_names_v1(text,boolean) from public,anon,authenticated;
+diff --git a/tests/contact-memberships.sql b/tests/contact-memberships.sql
+new file mode 100644
+index 0000000..59432cf
+--- /dev/null
++++ b/tests/contact-memberships.sql
+@@ -0,0 +1,29 @@
++begin;
++insert into public.app_data(app_id,data_type,data)values
++('test_contact_memberships','contacts','[{"id":"c1","remarkName":"客户甲","categoryId":"a","followUpStatus":"following","progressHistory":[{"id":"r1","date":"2026-11-23","content":"保留跟进"}],"tags":["重要"],"policies":[{"id":"p1"}]}]'),
++('test_contact_memberships','categories','[{"id":"a"},{"id":"b"},{"id":"c"}]');
++set local role anon;
++do $$declare c jsonb;begin
++ c:=public.save_contact_category_v1('test_contact_memberships',null,' 客户甲 ','b');
++ if c->>'id'<>'c1' or jsonb_array_length(c->'categoryIds')<>2 then raise exception 'same name did not reuse membership';end if;
++ c:=public.save_contact_category_v1('test_contact_memberships',null,'客户甲','b');
++ if jsonb_array_length(c->'categoryIds')<>2 then raise exception 'duplicate category';end if;
++ c:=public.save_contact_category_v1('test_contact_memberships','c1',null,'c','a');
++ if c->'categoryIds'?'a' or not(c->'categoryIds'?'b') or not(c->'categoryIds'?'c')then raise exception 'move erased another column';end if;
++ c:=public.save_contact_category_v1('test_contact_memberships','c1',null,null,'b',true);
++ if not(c->'categoryIds'?'c')or c->>'followUpStatus'<>'following' then raise exception 'remove lost other membership';end if;
++ if c->'progressHistory'->0->>'content'<>'保留跟进' or c->'policies'->0->>'id'<>'p1' or not(c->'tags'?'重要')then raise exception 'contact data altered';end if;
++ c:=public.save_contact_category_v1('test_contact_memberships','c1',null,null,'c',true);
++ if c->>'followUpStatus'<>'idle' then raise exception 'last remove failed';end if;
++ c:=public.save_contact_category_v1('test_contact_memberships',null,'新客户','a');
++ c:=public.save_contact_category_v1('test_contact_memberships',null,'新 客户','b');
++ if jsonb_array_length(c->'categoryIds')<>2 then raise exception 'normalized name duplicated';end if;
++ begin
++  update public.app_data set data=data||'[{"id":"duplicate","remarkName":"客户甲"}]'::jsonb where app_id='test_contact_memberships' and data_type='contacts';raise exception 'duplicate accepted';
++ exception when sqlstate 'PT409' then null;end;
++ begin
++  perform public.save_contact_category_v1('test_contact_memberships','c1',null,'deleted');raise exception 'missing category accepted';
++ exception when sqlstate 'PT409' then null;end;
++end $$;
++reset role;
++rollback;
+diff --git a/tests/contactIdentity.test.ts b/tests/contactIdentity.test.ts
+new file mode 100644
+index 0000000..75b52f0
+--- /dev/null
++++ b/tests/contactIdentity.test.ts
+@@ -0,0 +1,6 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import {contactKey,contactNameKey,categoryIds,boardCardId,parseBoardCardId} from '../services/contactIdentity.ts';
++test('names ignore whitespace and case and fall back to nickname',()=>{assert.equal(contactKey({remarkName:' 郭 子豪　',nickname:'other'}),contactNameKey('郭子豪'));assert.equal(contactKey({remarkName:' ',nickname:'SAM'}),'sam');});
++test('explicit multiple memberships supersede the old category without duplication',()=>{assert.deepEqual(categoryIds({categoryId:'old',categoryIds:['a','b','a']}),['a','b']);assert.deepEqual(categoryIds({categoryId:'old'}),['old']);assert.deepEqual(categoryIds({categoryId:'old',categoryIds:[]}),[]);});
++test('same contact has a different drag identifier in every column',()=>{assert.notEqual(boardCardId('c1','a'),boardCardId('c1','b'));assert.deepEqual(parseBoardCardId(boardCardId('a:[x]','b')),{contactId:'a:[x]',category:'b'});assert.equal(parseBoardCardId('category-a'),undefined);});
+diff --git a/tests/mingyaImport.test.cjs b/tests/mingyaImport.test.cjs
+index ca5ae97..44b43cf 100644
+--- a/tests/mingyaImport.test.cjs
++++ b/tests/mingyaImport.test.cjs
+@@ -81,3 +81,5 @@ test('filters ended and cancelled policies before customer matching, retaining t
+ test('does not confuse suspended or cancellation-in-progress with final cancellation',()=>{
+  const plan=planMingyaImport([],payload([record({policyState:'18'}),record({policyIndexId:'pending',policyCode:'PENDING',policyState:'21'})]));assert.equal(plan.filteredPolicies,0);assert.equal(plan.addedPolicies,2);
+ });
++
++test('same-name policy import cannot create an independent duplicate',()=>{const p=payload([record()]),original=[contact()];const pending=planMingyaImport(original,p);assert.equal(pending.issues[0].allowNew,false);const forced=planMingyaImport(original,p,{[pending.issues[0].key]:'new'});assert.equal(forced.contacts.length,1);assert.equal(forced.addedContacts,0);assert.equal(forced.issues.length,1);});
+diff --git a/types.ts b/types.ts
+index 34171fd..17cdc28 100644
+--- a/types.ts
++++ b/types.ts
+@@ -79,6 +79,7 @@ export interface Contact {
+ 
+   followUpStatus?: 'idle' | 'following';
+   categoryId?: string;
++  categoryIds?: string[];
+ }
+ 
+ // 跟进状态标签映射

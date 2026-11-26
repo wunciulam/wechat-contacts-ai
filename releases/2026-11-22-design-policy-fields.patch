@@ -1,0 +1,871 @@
+diff --git a/components/ImportModal.tsx b/components/ImportModal.tsx
+index b7bc436..823a154 100644
+--- a/components/ImportModal.tsx
++++ b/components/ImportModal.tsx
+@@ -363,33 +363,29 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onMingyaImport, onPol
+ 
+   return (
+     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
+-      <div className="bg-white shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh] rounded-2xl border border-gray-200">
++      <div className={`bg-white shadow-2xl w-full ${!initialData&&activeTab==='policies'?'max-w-3xl':'max-w-5xl'} overflow-hidden flex flex-col max-h-[90vh] rounded-2xl border border-gray-200`}>
+         <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+-          <h2 className="text-base font-semibold text-gray-800">{initialData ? '编辑联系人资料' : '添加联系人'}</h2>
++          <h2 className="text-base font-semibold text-gray-800">{initialData ? '编辑联系人资料' : '添加 / 导入'}</h2>
+           <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
+             <X size={20} />
+           </button>
+         </div>
+         {!initialData && (
+           <div className="px-5 pt-4 pb-0 flex gap-2 overflow-x-auto">
+-            <button onClick={() => setActiveTab('policies')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors whitespace-nowrap ${activeTab === 'policies' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}>保单与缴费导入</button>
+-            <button onClick={() => setActiveTab('ai')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'ai' ? 'border-gray-900 bg-white text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>Excel导入</button>
+-            <button onClick={() => setActiveTab('table')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'table' ? 'border-gray-900 bg-white text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>截图识别</button>
+-            <button onClick={() => setActiveTab('manual')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'manual' ? 'border-gray-900 bg-white text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>手动录入</button>
++            <button onClick={() => setActiveTab('policies')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors whitespace-nowrap ${activeTab === 'policies' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}>明亚采集</button>
++            <button onClick={() => setActiveTab('ai')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'ai' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>Excel导入</button>
++            <button onClick={() => setActiveTab('table')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'table' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>截图识别</button>
++            <button onClick={() => setActiveTab('manual')} className={`px-4 py-2 text-sm font-medium rounded-md border transition-colors ${activeTab === 'manual' ? 'border-gray-200 bg-gray-100 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50'} cursor-pointer`}>手动录入</button>
+           </div>
+         )}
+         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+           {error && <div className="p-4 bg-red-50 text-red-700 rounded-xl flex gap-2 text-sm border border-red-100"><AlertCircle size={18} />{error}</div>}
+ 
+-          {activeTab === 'policies' && (
+-            <section className="space-y-4">
+-              <p className="text-sm text-gray-600">支持推广业务保单导出表、经代业务保单导出表、应缴保单明细报表（.xlsx、.xls），可同时选择多份。</p>
+-              <p className="text-sm text-gray-600">保单表更新客户与保单资料；应缴明细更新每期应缴日期、金额和缴费状态。相同保单合并更新，撤单保留历史并退出提醒。上传后先预览，确认后保存。</p>
+-              <label className="btn btn-primary text-sm cursor-pointer">
+-                <Upload size={16} />选择表格
+-                <input type="file" className="hidden" accept=".xlsx,.xls" multiple onChange={e => { if (e.target.files?.length) onPolicyImport?.(e.target.files); }} />
+-              </label>
+-              {onMingyaImport && <button className="btn btn-secondary text-sm" onClick={onMingyaImport}>明亚采集文件</button>}
++          {activeTab === 'policies' && onMingyaImport && (
++            <section>
++              <button type="button" className="btn btn-primary text-sm" onClick={onMingyaImport}>
++                <Upload size={16} />导入采集文件
++              </button>
+             </section>
+           )}
+           {activeTab === 'manual' && (
+diff --git a/components/ManualPolicyModal.tsx b/components/ManualPolicyModal.tsx
+index eeee9c0..5dc04c0 100644
+--- a/components/ManualPolicyModal.tsx
++++ b/components/ManualPolicyModal.tsx
+@@ -1,256 +1,33 @@
+-
+-import React, { useState, useMemo } from 'react';
+-import { X, Shield, Search, Check } from 'lucide-react';
+-import { Contact, Policy } from '../types';
+-
+-interface ManualPolicyModalProps {
+-  isOpen: boolean;
+-  onClose: () => void;
+-  contacts: Contact[];
+-  onSave: (contactId: string, policy: Policy) => void;
+-}
+-
+-const ManualPolicyModal: React.FC<ManualPolicyModalProps> = ({ isOpen, onClose, contacts, onSave }) => {
+-  const [searchTerm, setSearchTerm] = useState('');
+-  const [selectedContactId, setSelectedContactId] = useState<string>('');
+-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+-
+-  const [policyData, setPolicyData] = useState<Partial<Policy>>({
+-    productName: '',
+-    policyNumber: '',
+-    company: '',
+-    premium: '',
+-    effectiveDate: '',
+-    status: '有效',
+-    applicant: '',
+-    insured: ''
+-  });
+-
+-  const filteredContacts = useMemo(() => {
+-    if (!searchTerm) return contacts.slice(0, 50); 
+-    return contacts.filter(c => 
+-      (c.remarkName && c.remarkName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+-      (c.nickname && c.nickname.toLowerCase().includes(searchTerm.toLowerCase()))
+-    );
+-  }, [contacts, searchTerm]);
+-
+-  const selectedContact = contacts.find(c => c.id === selectedContactId);
+-
+-  const handleSelectContact = (contact: Contact) => {
+-    setSelectedContactId(contact.id);
+-    setIsDropdownOpen(false);
+-    setSearchTerm('');
+-    setPolicyData(prev => ({
+-        ...prev,
+-        applicant: prev.applicant || contact.remarkName || contact.nickname || '',
+-        insured: prev.insured || contact.remarkName || contact.nickname || ''
+-    }));
+-  };
+-
+-  const handleSave = () => {
+-    if (selectedContactId && policyData.productName) {
+-        const newPolicy: Policy = {
+-            id: Math.random().toString(36).substr(2, 9),
+-            productName: policyData.productName,
+-            policyNumber: policyData.policyNumber || '暂无单号',
+-            company: policyData.company || '',
+-            premium: policyData.premium || '0',
+-            effectiveDate: policyData.effectiveDate || '',
+-            status: policyData.status || '有效',
+-            applicant: policyData.applicant || '',
+-            insured: policyData.insured || ''
+-        };
+-        onSave(selectedContactId, newPolicy);
+-        handleClose();
+-    }
++import React, {useEffect,useState} from 'react';
++import type {Contact,Policy} from '../types';
++import type {ManagedPolicy} from '../services/renewal';
++import {key} from '../services/renewal';
++import WorkspaceDialog,{WorkspaceDialogFooter} from './WorkspaceDialog';
++import PolicyFieldsForm from './PolicyFieldsForm';
++const blank = ():ManagedPolicy=>({id:'',productName:'',policyNumber:'',company:'',premium:'',effectiveDate:'',status:'正式保单',applicant:'',insured:'',payments:[]});
++export default function ManualPolicyModal({isOpen,onClose,contacts,onSave}:{isOpen:boolean;onClose:()=>void;contacts:Contact[];onSave:(contactId:string,policy:Policy)=>void}) {
++  const [draft,setDraft]=useState(blank);
++  const [error,setError]=useState('');
++  useEffect(()=>{if(isOpen){setDraft(blank());setError('');}},[isOpen]);
++  if(!isOpen)return null;
++  const dirty=Boolean(JSON.stringify(draft)!==JSON.stringify(blank()));
++  const close=()=>{if(!dirty||window.confirm('资料尚未保存，确认放弃修改？'))onClose();};
++  const save=()=>{
++    if(!draft.applicantId||!draft.productName.trim())return;
++    if(draft.premium.trim()&&(!Number.isFinite(Number(draft.premium))||Number(draft.premium)<0)){setError('单期保费应为不小于 0 的金额。');return;}
++    if(draft.effectiveDate&&draft.expiryDate&&draft.expiryDate<draft.effectiveDate){setError('保障到期日不能早于生效日期。');return;}
++    const policy={...draft,id:crypto.randomUUID(),productName:draft.productName.trim()};
++    if(policy.policyNumber.trim()&&policy.company.trim()&&contacts.some(c=>(c.policies||[]).some(p=>key(p)===key(policy)))){setError('该公司与保单号已存在，请在保单详情中编辑。');return;}
++    onSave(draft.applicantId,policy);onClose();
+   };
+-
+-  const handleClose = () => {
+-    setSelectedContactId('');
+-    setSearchTerm('');
+-    setPolicyData({
+-        productName: '',
+-        policyNumber: '',
+-        company: '',
+-        premium: '',
+-        effectiveDate: '',
+-        status: '有效',
+-        applicant: '',
+-        insured: ''
+-    });
+-    onClose();
+-  };
+-
+-  if (!isOpen) return null;
+-
+-  return (
+-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 animate-fade-in">
+-      <div className="bg-white shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] rounded-2xl border border-gray-200">
+-        <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+-          <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+-            <div className="p-1.5 rounded-lg bg-primary-50 text-primary-600">
+-               <Shield size={16} />
+-            </div>
+-            录入新保单
+-          </h3>
+-          <button onClick={handleClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all cursor-pointer">
+-            <X size={20} />
+-          </button>
+-        </div>
+-
+-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+-            <div className="space-y-2 relative">
+-                <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider block">关联客户</label>
+-                {selectedContactId ? (
+-                    <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-lg">
+-                        <div className="flex items-center gap-3">
+-                            <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
+-                                {selectedContact?.remarkName?.[0] || selectedContact?.nickname?.[0] || '?'}
+-                            </div>
+-                            <div>
+-                                <div className="font-medium text-gray-900 text-sm">{selectedContact?.remarkName || selectedContact?.nickname}</div>
+-                            </div>
+-                        </div>
+-                        <button 
+-                            onClick={() => setSelectedContactId('')}
+-                            className="text-xs text-gray-600 hover:text-gray-900 font-medium px-2 py-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+-                        >
+-                            更换
+-                        </button>
+-                    </div>
+-                ) : (
+-                    <div className="relative">
+-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+-                        <input
+-                            type="text"
+-                            placeholder="搜索客户姓名..."
+-                            value={searchTerm}
+-                            onChange={(e) => {
+-                                setSearchTerm(e.target.value);
+-                                setIsDropdownOpen(true);
+-                            }}
+-                            onFocus={() => setIsDropdownOpen(true)}
+-                            className="w-full pl-10 pr-4 py-2.5 rounded-md border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:border-gray-400 transition-all placeholder:text-gray-400"
+-                        />
+-                        {isDropdownOpen && (
+-                            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+-                                {filteredContacts.length === 0 ? (
+-                                    <div className="p-4 text-center text-sm text-gray-400">未找到匹配的客户</div>
+-                                ) : (
+-                                    filteredContacts.map(contact => (
+-                                        <button
+-                                            key={contact.id}
+-                                            onClick={() => handleSelectContact(contact)}
+-                                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors cursor-pointer border-b border-gray-50 last:border-0"
+-                                        >
+-                                            <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
+-                                                {contact.remarkName?.[0] || contact.nickname?.[0] || '?'}
+-                                            </div>
+-                                            <div>
+-                                                <div className="font-medium text-gray-900 text-sm">{contact.remarkName || contact.nickname}</div>
+-                                                {contact.phoneNumber && <div className="text-xs text-gray-400">{contact.phoneNumber}</div>}
+-                                            </div>
+-                                        </button>
+-                                    ))
+-                                )}
+-                            </div>
+-                        )}
+-                    </div>
+-                )}
+-            </div>
+-
+-            <div className="space-y-4">
+-                <div className="grid grid-cols-2 gap-4">
+-                    <div className="space-y-1.5">
+-                        <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider block">险种名称 *</label>
+-                        <input 
+-                            type="text" 
+-                            className="input"
+-                            placeholder="例如：平安福终身寿险"
+-                            value={policyData.productName}
+-                            onChange={e => setPolicyData({...policyData, productName: e.target.value})}
+-                        />
+-                    </div>
+-                    <div className="space-y-1.5">
+-                        <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider block">保单号</label>
+-                        <input 
+-                            type="text" 
+-                            className="input font-mono"
+-                            placeholder="例如：P123456789"
+-                            value={policyData.policyNumber}
+-                            onChange={e => setPolicyData({...policyData, policyNumber: e.target.value})}
+-                        />
+-                    </div>
+-                    <div className="space-y-1.5">
+-                        <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider block">保费</label>
+-                        <input 
+-                            type="text" 
+-                            className="input"
+-                            placeholder="例如：5000"
+-                            value={policyData.premium}
+-                            onChange={e => setPolicyData({...policyData, premium: e.target.value})}
+-                        />
+-                    </div>
+-                    <div className="space-y-1.5">
+-                        <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider block">保险公司</label>
+-                        <input 
+-                            type="text" 
+-                            className="input"
+-                            placeholder="例如：中国平安"
+-                            value={policyData.company}
+-                            onChange={e => setPolicyData({...policyData, company: e.target.value})}
+-                        />
+-                    </div>
+-                    <div className="space-y-1.5">
+-                        <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider block">投保人</label>
+-                        <input 
+-                            type="text" 
+-                            className="input"
+-                            value={policyData.applicant}
+-                            onChange={e => setPolicyData({...policyData, applicant: e.target.value})}
+-                        />
+-                    </div>
+-                    <div className="space-y-1.5">
+-                        <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider block">被保人</label>
+-                        <input 
+-                            type="text" 
+-                            className="input"
+-                            value={policyData.insured}
+-                            onChange={e => setPolicyData({...policyData, insured: e.target.value})}
+-                        />
+-                    </div>
+-                    <div className="col-span-2 space-y-1.5">
+-                        <label className="text-[10px] font-medium text-gray-400 uppercase tracking-wider block">生效日期</label>
+-                        <input 
+-                            type="date" 
+-                            className="input"
+-                            value={policyData.effectiveDate}
+-                            onChange={e => setPolicyData({...policyData, effectiveDate: e.target.value})}
+-                        />
+-                    </div>
+-                 </div>
+-            </div>
+-        </div>
+-
+-        <div className="px-5 py-4 border-t border-gray-100 bg-white flex justify-end gap-2 shrink-0">
+-            <button
+-                onClick={handleClose}
+-                className="btn btn-secondary text-xs py-2"
+-            >
+-                取消
+-            </button>
+-            <button
+-                onClick={handleSave}
+-                disabled={!selectedContactId || !policyData.productName}
+-                className="btn btn-primary text-xs py-2 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+-            >
+-                <Check size={14} />
+-                保存保单
+-            </button>
+-        </div>
+-      </div>
++  return <WorkspaceDialog title="录入新保单" size="import" onClose={close}>
++    <div className="space-y-6">
++      {error&&<p role="alert" className="text-sm text-danger-600">{error}</p>}
++      <PolicyFieldsForm value={draft} onChange={p=>{setDraft(!p.insured&&p.applicantId?{...p,insured:p.applicant,insuredId:p.applicantId}:p);setError('');}} contacts={contacts} requireApplicant/>
+     </div>
+-  );
+-};
+-
+-export default ManualPolicyModal;
++    <WorkspaceDialogFooter>
++      <button className="btn btn-secondary text-sm" onClick={close}>取消</button>
++      <button className="btn btn-primary text-sm" disabled={!draft.applicantId||!draft.productName.trim()} onClick={save}>保存保单</button>
++    </WorkspaceDialogFooter>
++  </WorkspaceDialog>;
++}
+diff --git a/components/MingyaImportModal.tsx b/components/MingyaImportModal.tsx
+index 6b927de..ba6ec2a 100644
+--- a/components/MingyaImportModal.tsx
++++ b/components/MingyaImportModal.tsx
+@@ -1,32 +1,27 @@
+ import React, {useEffect, useMemo, useRef, useState} from 'react';
+-import {X, Upload, Check, AlertCircle} from 'lucide-react';
++import {Upload, Check, AlertCircle} from 'lucide-react';
+ import type {ContactImportSnapshot} from '../services/supabaseService';
+ import {parseMingyaPayload, planMingyaImport, type MingyaPayload, type Resolutions, type MergeMode, type ImportPlan} from '../services/mingyaImport';
+-import './mingyaImport.css';
++import WorkspaceDialog, {WorkspaceDialogFooter} from './WorkspaceDialog';
+ interface Props {
+   open:boolean; initialPayload:unknown; onClose:()=>void;
+   onLoad:()=>Promise<ContactImportSnapshot>;
+   onApply:(snapshot:ContactImportSnapshot,plan:ImportPlan,payload:MingyaPayload)=>Promise<void>;
+ }
+-const labels:Record<string,string>={policyNumber:'保单号',productName:'产品名称',company:'保险公司',premium:'保费',effectiveDate:'生效日期',status:'状态',applicant:'投保人',insured:'被保人',paymentYears:'缴费期间',insuranceType:'险种',coverage:'保额'};
++const labels:Record<string,string>={policyNumber:'保单号',productName:'产品名称',company:'保险公司',premium:'保费',effectiveDate:'生效日期',status:'状态',applicant:'投保人',insured:'被保人',paymentYears:'缴费期间',insuranceType:'险种',coverage:'保额',coveragePeriod:'保障期间',expiryDate:'保障到期日'};
+ export default function MingyaImportModal({open,initialPayload,onClose,onLoad,onApply}:Props){
+   const [payload,setPayload]=useState<MingyaPayload|null>(null),[snapshot,setSnapshot]=useState<ContactImportSnapshot|null>(null);
+   const [resolutions,setResolutions]=useState<Resolutions>({}),[mode,setMode]=useState<MergeMode>('fill');
+   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[done,setDone]=useState(false),[query,setQuery]=useState('');
+-  const input=useRef<HTMLInputElement>(null),dialog=useRef<HTMLDivElement>(null),loadRef=useRef(onLoad);loadRef.current=onLoad;
++  const input=useRef<HTMLInputElement>(null),loadRef=useRef(onLoad);loadRef.current=onLoad;
+   useEffect(()=>{
+     if(!open)return;
+     let active=true;
+     setPayload(null);setSnapshot(null);setResolutions({});setError('');setDone(false);setQuery('');setBusy(true);
+-    const previous=document.activeElement as HTMLElement;dialog.current?.focus();
+     loadRef.current().then(data=>{if(active)setSnapshot(data);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setBusy(false);});
+     if(initialPayload){try{setPayload(parseMingyaPayload(initialPayload));}catch(e){setError((e as Error).message);}}
+-    return()=>{active=false;previous?.focus();};
++    return()=>{active=false;};
+   },[open,initialPayload]);
+-  useEffect(()=>{if(!open)return;const listener=(e:KeyboardEvent)=>{
+-    if(e.key==='Escape'&&!busy)onClose();
+-    if(e.key==='Tab'&&dialog.current){const nodes=Array.from(dialog.current.querySelectorAll<HTMLElement>('button:not(:disabled),input,select,summary,[tabindex="0"]')) as HTMLElement[];const visibleNodes=nodes.filter(n=>n.offsetParent!==null);const first=visibleNodes[0],last=visibleNodes[visibleNodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}
+-  };document.addEventListener('keydown',listener);return()=>document.removeEventListener('keydown',listener);},[open,busy,onClose]);
+   const result=useMemo(()=>{
+     if(!payload||!snapshot)return {plan:null,error:''};
+     try{return {plan:planMingyaImport(snapshot.contacts,payload,resolutions,mode),error:''};}catch{return {plan:null,error:'文件包含无法识别的字段，请重新采集并导出。'};}
+@@ -36,25 +31,54 @@ export default function MingyaImportModal({open,initialPayload,onClose,onLoad,on
+   if(!open)return null;
+   async function choose(file?:File){if(!file)return;setError('');setDone(false);setResolutions({});try{if(file.size>64*1024*1024)throw new Error('文件超过 64 MB，请分批导出。');setPayload(parseMingyaPayload(JSON.parse(await file.text())));}catch(e){setError((e as Error).message);}if(input.current)input.current.value='';}
+   async function apply(){if(!plan||!snapshot||plan.issues.length)return;setBusy(true);setError('');try{await onApply(snapshot,plan,payload!);setDone(true);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+-  return <div className="mingya-overlay"><div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="mingya-title" className="mingya-dialog">
+-    <header><h2 id="mingya-title">明亚保单导入</h2><button onClick={onClose} disabled={busy} aria-label="关闭导入"><X size={20}/></button></header>
+-    <div className="mingya-body">
+-      {done?<div className="mingya-success" role="status"><Check size={28}/><h3>已导入跟单仔</h3><p>新增 {plan?.addedPolicies} 份，补充或更新 {plan?.updatedPolicies} 份保单。</p><button className="mingya-primary" onClick={onClose}>查看客户保单</button></div>:<>
+-        {(error||result.error)&&<p className="mingya-error" role="alert"><AlertCircle size={16}/>{error||result.error}</p>}
+-        {busy&&!plan&&<p role="status">正在读取当前客户…</p>}
+-        {!payload?<div className="mingya-file"><Upload size={28}/><p>选择明亚插件导出的原始 JSON</p><button className="mingya-primary" disabled={busy||!snapshot} onClick={()=>input.current?.click()}>选择文件</button></div>:plan&&<>
+-          {!payload.status.complete&&<p className="mingya-warning">这是部分采集结果，仅合并已取得的信息。</p>}
+-          <dl className="mingya-stats"><div><dt>新增客户</dt><dd>{plan.addedContacts}</dd></div><div><dt>补充客户</dt><dd>{plan.updatedContacts}</dd></div><div><dt>新增保单</dt><dd>{plan.addedPolicies}</dd></div><div><dt>补充 / 更新保单</dt><dd>{plan.updatedPolicies}</dd></div></dl>
+-          <div className="mingya-rule"><label htmlFor="mingya-mode">已有保单</label><select id="mingya-mode" value={mode} onChange={e=>setMode(e.target.value as MergeMode)}><option value="fill">保留人工修改，更新采集字段</option><option value="source">用明亚数据更新保单字段</option></select></div>
+-          <p className="mingya-note">客户按投保人归属。微信备注、标签和跟进记录保留；同号续保按生效日期区分。</p>
+-          {plan.issues.length>0&&<section className="mingya-issues"><h3>需要核对的客户 · {plan.issues.length}</h3>{plan.issues.map(issue=><div key={issue.key} className="mingya-issue"><div><strong>{issue.name||'未提供姓名'}</strong><p>{issue.reason}</p></div><label><span className="mingya-sr">{issue.name}的归属</span><select value={resolutions[issue.key]||''} onChange={e=>setResolutions({...resolutions,[issue.key]:e.target.value})}><option value="">请选择处理方式</option>{issue.allowNew&&issue.candidates.map(c=><option key={c.id} value={c.id}>合并到 {c.name}{c.phone?` · ${c.phone}`:''}</option>)}{issue.allowNew&&<option value="new">建立独立客户</option>}<option value="skip">本次跳过</option></select></label></div>)}</section>}
+-          <details><summary>保单明细 · {plan.rows.length}{plan.duplicateRows?`（另有 ${plan.duplicateRows} 条重复已忽略）`:''}</summary><input aria-label="搜索导入保单" placeholder="搜索客户、保单号或产品" value={query} onChange={e=>setQuery(e.target.value)}/><div className="mingya-table"><table><thead><tr><th>投保人</th><th>保单</th><th>处理结果</th><th>归属客户</th></tr></thead><tbody>{rows.map(r=><tr key={r.key}><td>{r.name}</td><td><span>{r.product}</span><small>{r.number}</small></td><td>{r.action}</td><td>{r.contact||'—'}</td></tr>)}</tbody></table></div></details>
+-          {plan.fieldConflicts>0&&<details><summary>已有字段差异 · {plan.fieldConflicts}</summary><div className="mingya-table"><table><thead><tr><th>保单号</th><th>字段</th><th>跟单仔当前值</th><th>明亚本次值</th></tr></thead><tbody>{plan.conflicts.map((c,i)=><tr key={i}><td>{c.number}</td><td>{labels[c.field]||c.field}</td><td>{c.existing}</td><td>{c.incoming}</td></tr>)}</tbody></table></div></details>}
+-          {(plan.unchangedPolicies>0||!plan.issues.length&&plan.skippedPolicies>0)&&<p className="mingya-note">{[plan.unchangedPolicies>0?`${plan.unchangedPolicies} 份已存在且无变化`:null,!plan.issues.length&&plan.skippedPolicies>0?`${plan.skippedPolicies} 份本次跳过`:null].filter(Boolean).join('，')}。</p>}
++  return <WorkspaceDialog title="明亚保单导入" size="import" className="mingya-dialog" onClose={()=>{if(!busy)onClose();}}>
++    <div className="space-y-4 text-sm">
++      {(error||result.error)&&<p className="flex items-start gap-2 text-danger-600" role="alert"><AlertCircle size={16} className="mt-0.5 shrink-0"/>{error||result.error}</p>}
++      {done ? <div className="space-y-2" role="status">
++        <h3 className="flex items-center gap-2 font-semibold"><Check size={18}/>已导入跟单仔</h3>
++        <p className="text-gray-600">新增 {plan?.addedPolicies} 份，补充或更新 {plan?.updatedPolicies} 份保单。</p>
++      </div> : <>
++        {busy&&!plan&&<p role="status" className="text-gray-500">正在读取当前客户…</p>}
++        {!payload ? <div className="space-y-4">
++          <p className="text-gray-600">选择明亚插件导出的 JSON 文件。</p>
++          <button className="btn btn-primary text-sm" disabled={busy||!snapshot} onClick={()=>input.current?.click()}><Upload size={16}/>选择文件</button>
++        </div> : plan&&<>
++          <p className="text-xs text-gray-500">预览，尚未保存。</p>
++          {!payload.status.complete&&<p className="text-sm text-gray-600">这是部分采集结果，仅合并已取得的信息。</p>}
++          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
++            {([['新增客户',plan.addedContacts],['补充客户',plan.updatedContacts],['新增保单',plan.addedPolicies],['更新保单',plan.updatedPolicies]] as const).map(([label,value])=><div key={label}><dt className="text-xs text-gray-500">{label}</dt><dd className="mt-1.5 text-sm font-semibold tabular-nums">{value}</dd></div>)}
++          </dl>
++          <div className="grid gap-1.5 sm:max-w-md">
++            <label htmlFor="mingya-mode" className="text-xs font-medium text-gray-500">已有保单处理方式</label>
++            <select id="mingya-mode" className="input" disabled={busy} value={mode} onChange={e=>setMode(e.target.value as MergeMode)}>
++              <option value="fill">保留人工修改，更新采集字段</option><option value="source">用明亚数据更新保单字段</option>
++            </select>
++          </div>
++          <details className="border-t border-gray-100 pt-4"><summary className="cursor-pointer text-gray-600">合并规则</summary><p className="mt-3 text-xs leading-relaxed text-gray-500">客户按投保人归属；保留微信备注、标签和跟进记录。同号续保按生效日期区分。</p></details>
++          {plan.issues.length>0&&<section className="space-y-4 border-t border-gray-100 pt-4">
++            <h3 className="font-semibold">需要核对的客户（{plan.issues.length}）</h3>
++            {plan.issues.map(issue=><div key={issue.key} className="grid items-start gap-x-6 gap-y-3 border-b border-gray-100 pb-4 sm:grid-cols-2">
++              <div><h4 className="font-medium">{issue.name||'未提供姓名'}</h4><p className="mt-1.5 text-xs leading-relaxed text-gray-500">{issue.reason}</p></div>
++              <label className="min-w-0"><span className="sr-only">{issue.name}的归属</span><select className="input" disabled={busy} value={resolutions[issue.key]||''} onChange={e=>setResolutions({...resolutions,[issue.key]:e.target.value})}>
++                <option value="">请选择处理方式</option>{issue.allowNew&&issue.candidates.map(c=><option key={c.id} value={c.id}>合并到 {c.name}{c.phone?` · ${c.phone}`:''}</option>)}{issue.allowNew&&<option value="new">建立独立客户</option>}<option value="skip">本次跳过</option>
++              </select></label>
++            </div>)}
++          </section>}
++          <details className="border-t border-gray-100 pt-4"><summary className="cursor-pointer">保单明细（{plan.rows.length}）{plan.duplicateRows?`，已忽略 ${plan.duplicateRows} 条重复`:''}</summary>
++            <input className="input mt-4" aria-label="搜索导入保单" placeholder="搜索客户、保单号或产品" value={query} onChange={e=>setQuery(e.target.value)}/>
++            <div className="mt-4 max-h-80 overflow-auto rounded-lg border border-gray-200"><table className="w-full text-left"><thead className="table-header sticky top-0"><tr>{['投保人','保单','处理结果','归属客户'].map(h=><th key={h} className="px-4 py-3 font-medium whitespace-nowrap">{h}</th>)}</tr></thead><tbody>{rows.map(r=><tr key={r.key} className="table-row"><td className="table-cell whitespace-nowrap">{r.name}</td><td className="table-cell min-w-48"><span>{r.product}</span><small className="mt-1 block text-xs text-gray-500 whitespace-nowrap">{r.number}</small></td><td className="table-cell whitespace-nowrap">{r.action}</td><td className="table-cell whitespace-nowrap">{r.contact||'—'}</td></tr>)}</tbody></table></div>
++          </details>
++          {plan.fieldConflicts>0&&<details className="border-t border-gray-100 pt-4"><summary className="cursor-pointer">已有字段差异（{plan.fieldConflicts}）</summary><div className="mt-4 max-h-80 overflow-auto rounded-lg border border-gray-200"><table className="w-full text-left"><thead className="table-header sticky top-0"><tr>{['保单号','字段','当前值','明亚本次值'].map(h=><th key={h} className="px-4 py-3 font-medium whitespace-nowrap">{h}</th>)}</tr></thead><tbody>{plan.conflicts.map((c,i)=><tr key={i} className="table-row"><td className="table-cell whitespace-nowrap">{c.number}</td><td className="table-cell whitespace-nowrap">{labels[c.field]||c.field}</td><td className="table-cell min-w-32">{c.existing}</td><td className="table-cell min-w-32">{c.incoming}</td></tr>)}</tbody></table></div></details>}
++          {(plan.unchangedPolicies>0||!plan.issues.length&&plan.skippedPolicies>0)&&<p className="text-xs text-gray-500">{[plan.unchangedPolicies>0?`${plan.unchangedPolicies} 份无变化`:null,!plan.issues.length&&plan.skippedPolicies>0?`${plan.skippedPolicies} 份本次跳过`:null].filter(Boolean).join('，')}。</p>}
+         </>}
+       </>}
+       <input hidden ref={input} type="file" accept=".json,application/json" onChange={e=>choose(e.target.files?.[0])}/>
+     </div>
+-    {!done&&<footer><button disabled={busy} onClick={onClose}>取消</button>{payload&&<button disabled={busy} onClick={()=>input.current?.click()}>更换文件</button>}<button className="mingya-primary" disabled={busy||!plan||plan.issues.length>0||!plan.addedPolicies&&!plan.updatedPolicies&&!plan.updatedContacts} onClick={apply}>{busy?'正在保存…':'确认合并导入'}</button></footer>}
+-  </div></div>;
++    <WorkspaceDialogFooter>
++      {done ? <button className="btn btn-primary text-sm" onClick={onClose}>查看客户保单</button> : <>
++        <button className="btn btn-secondary text-sm" disabled={busy} onClick={onClose}>取消</button>
++        {payload&&<><button className="btn btn-secondary text-sm" disabled={busy} onClick={()=>input.current?.click()}>更换文件</button><button className="btn btn-primary text-sm" disabled={busy||!plan||plan.issues.length>0||!plan.addedPolicies&&!plan.updatedPolicies&&!plan.updatedContacts} onClick={apply}>{busy?'正在保存…':'确认合并导入'}</button></>}
++      </>}
++    </WorkspaceDialogFooter>
++  </WorkspaceDialog>;
+ }
+diff --git a/components/MingyaPolicyDetailModal.tsx b/components/MingyaPolicyDetailModal.tsx
+index 58808b9..5f3cf25 100644
+--- a/components/MingyaPolicyDetailModal.tsx
++++ b/components/MingyaPolicyDetailModal.tsx
+@@ -1,26 +1,26 @@
+-import React, {useEffect, useRef, useState} from 'react';
+-import {X, Download} from 'lucide-react';
++import React, {useEffect, useState} from 'react';
++import {Download} from 'lucide-react';
+ import type {Policy, MingyaPerson} from '../types';
+ import {downloadMingyaCapture} from '../services/supabaseService';
+-import './mingyaImport.css';
++import WorkspaceDialog, {WorkspaceDialogFooter} from './WorkspaceDialog';
++import {formatMoney} from './PolicyPaymentSummary';
+ export const currencyLabel=(code?:string)=>code==='USD'?'US$':code&&code!=='CNY'?code:'¥';
+ export default function MingyaPolicyDetailModal({policy,onClose}:{policy:Policy|null;onClose:()=>void}){
+-  const dialog=useRef<HTMLDivElement>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+-  useEffect(()=>{if(!policy)return;setError('');const previous=document.activeElement as HTMLElement;dialog.current?.focus();const handle=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.stopPropagation();onClose();}if(e.key==='Tab'&&dialog.current){const nodes=Array.from(dialog.current.querySelectorAll('button:not(:disabled),summary')) as HTMLElement[];const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};document.addEventListener('keydown',handle);return()=>{document.removeEventListener('keydown',handle);previous?.focus();};},[policy,onClose]);
++  const [error,setError]=useState(''),[busy,setBusy]=useState(false);
++  useEffect(()=>setError(''),[policy]);
+   if(!policy?.mingya)return null;
+   const source=policy.mingya;
+-  const people=(list:MingyaPerson[])=>list.map((p,i)=><div key={i} className="mingya-person"><strong>{p.name||'未提供姓名'}</strong><dl>{[['证件号',p.idCard],['手机号',p.phone],['生日',p.birthday],['地址',p.address],['受益比例',p.share]].filter(([,v])=>v).map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl></div>);
+-  const basic=[['保单号',policy.policyNumber],['保险公司',policy.company],['状态',policy.status],['单期保费',`${currencyLabel(source.currency)} ${source.periodicPremium||policy.premium}`],['缴费期总保费',source.termTotalPremium?`${currencyLabel(source.currency)} ${source.termTotalPremium}`:''],['生效日期',policy.effectiveDate],['保障结束日期',source.endDate],['下次缴费日期',source.nextPayDate],[source.nextPremiumIsReference?'下期参考金额':'下期应缴保费',source.nextPremium?`${currencyLabel(source.currency)} ${source.nextPremium}`:''],['上期实缴日期',source.lastPaidDate||''],['上期实缴保费',source.lastPaidPremium?`${currencyLabel(source.currency)} ${source.lastPaidPremium}`:'']];
++  const people=(list:MingyaPerson[])=>list.map((p,i)=><div key={i} className="mt-4 rounded-lg border border-gray-200 p-4"><strong className="text-sm font-semibold">{p.name||'未提供姓名'}</strong><dl className="mt-3 space-y-3">{[['证件号',p.idCard],['手机号',p.phone],['生日',p.birthday],['地址',p.address],['受益比例',p.share]].filter(([,v])=>v).map(([k,v])=><div key={k} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4"><dt className="text-xs text-gray-500">{k}</dt><dd className="text-sm break-words">{v}</dd></div>)}</dl></div>);
++  const basic=[['保单号',policy.policyNumber],['保险公司',policy.company],['状态',policy.status],['单期保费',formatMoney(source.periodicPremium||policy.premium,source.currency||undefined)],['缴费期总保费',source.termTotalPremium?formatMoney(source.termTotalPremium,source.currency||undefined):''],['生效日期',policy.effectiveDate],['保障期间',source.coveragePeriod],['保障结束日期',source.expiryDate||source.endDate],['险种类型',source.insuranceType],['下次缴费日期',source.nextPayDate],[source.nextPremiumIsReference?'下期参考金额':'下期应缴保费',source.nextPremium?formatMoney(source.nextPremium,source.currency||undefined):''],['上期实缴日期',source.lastPaidDate||''],['上期实缴保费',source.lastPaidPremium?formatMoney(source.lastPaidPremium,source.currency||undefined):'']];
+   async function original(){setBusy(true);setError('');try{const payload=await downloadMingyaCapture(source.captureId!);const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`明亚原始采集_${source.capturedAt.slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+-  return <div className="mingya-overlay"><div className="mingya-dialog" role="dialog" aria-modal="true" aria-labelledby="mingya-detail-title" tabIndex={-1} ref={dialog}>
+-    <header><h2 id="mingya-detail-title">{policy.productName}</h2><button onClick={onClose} aria-label="关闭保单详情"><X size={20}/></button></header>
+-    <div className="mingya-body"><dl className="mingya-info">{basic.filter(([,v])=>v).map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+-      {source.nextPaymentNote&&<p className="mingya-note">{source.nextPaymentNote}</p>}
+-      <details open><summary>投保人</summary>{people([source.applicant])}</details>
+-      {source.insureds.length>0&&<details><summary>被保人 · {source.insureds.length}</summary>{people(source.insureds)}</details>}
+-      {source.beneficiaries.length>0&&<details><summary>受益人 · {source.beneficiaries.length}</summary>{people(source.beneficiaries)}</details>}
+-      {source.risks.length>0&&<details><summary>险种 · {source.risks.length}</summary>{source.risks.map((r,i)=><div className="mingya-person" key={i}><strong>{r.name||'未提供名称'}</strong><dl>{[['保费',`${currencyLabel(source.currency)} ${r.premium}`],['保额',r.coverage],['缴费期间',r.paymentPeriod],['保险期间',r.insurancePeriod],['生效日期',r.effectiveDate],['被保人',r.insureds.join('、')]].filter(([,v])=>v).map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl></div>)}</details>}
+-      {error&&<p role="alert" className="mingya-error">{error}</p>}
+-    </div><footer>{source.captureId&&<button disabled={busy} onClick={original} className="flex items-center gap-2"><Download size={15}/>{busy?'正在读取…':'下载本次原始采集'}</button>}<button className="mingya-primary" onClick={onClose}>关闭</button></footer>
+-  </div></div>;
++  return <WorkspaceDialog title={policy.productName} className="mingya-dialog" onClose={onClose}>
++    <div className="space-y-4 text-sm"><dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">{basic.filter(([,v])=>v).map(([k,v])=><div key={k} ><dt className="text-xs text-gray-500">{k}</dt><dd className="mt-1.5 text-sm break-words tabular-nums">{v}</dd></div>)}</dl>
++      {source.nextPaymentNote&&<p className="text-xs leading-relaxed text-gray-500">{source.nextPaymentNote}</p>}
++      <details open className="border-t border-gray-100 pt-4"><summary className="cursor-pointer font-medium">投保人</summary>{people([source.applicant])}</details>
++      {source.insureds.length>0&&<details className="border-t border-gray-100 pt-4"><summary className="cursor-pointer font-medium">被保人 · {source.insureds.length}</summary>{people(source.insureds)}</details>}
++      {source.beneficiaries.length>0&&<details className="border-t border-gray-100 pt-4"><summary className="cursor-pointer font-medium">受益人 · {source.beneficiaries.length}</summary>{people(source.beneficiaries)}</details>}
++      {source.risks.length>0&&<details className="border-t border-gray-100 pt-4"><summary className="cursor-pointer font-medium">险种 · {source.risks.length}</summary>{source.risks.map((r,i)=><div className="mt-4 rounded-lg border border-gray-200 p-4" key={i}><strong className="text-sm font-semibold">{r.name||'未提供名称'}</strong><dl className="mt-3 space-y-3">{[['保费',formatMoney(r.premium,source.currency||undefined)],['保额',r.coverage],['缴费期间',r.paymentPeriod],['保险期间',r.insurancePeriod],['生效日期',r.effectiveDate],['被保人',r.insureds.join('、')]].filter(([,v])=>v).map(([k,v])=><div key={k} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4"><dt className="text-xs text-gray-500">{k}</dt><dd className="text-sm break-words">{v}</dd></div>)}</dl></div>)}</details>}
++      {error&&<p role="alert" className="text-danger-600">{error}</p>}
++    </div><WorkspaceDialogFooter>{source.captureId&&<button disabled={busy} onClick={original} className="btn btn-secondary text-sm"><Download size={15}/>{busy?'正在读取…':'下载本次原始采集'}</button>}<button className="btn btn-primary text-sm" onClick={onClose}>关闭</button></WorkspaceDialogFooter>
++  </WorkspaceDialog>;
+ }
+diff --git a/components/PolicyDetail.tsx b/components/PolicyDetail.tsx
+index 0041588..77fed31 100644
+--- a/components/PolicyDetail.tsx
++++ b/components/PolicyDetail.tsx
+@@ -1,3 +1,4 @@
++import PolicyFieldsForm, {policyFields} from './PolicyFieldsForm';
+ import MingyaPolicyDetailModal from './MingyaPolicyDetailModal';
+ import { createPortal } from 'react-dom';
+ import { DialogFooterContext } from './WorkspaceDialog';
+@@ -28,25 +29,7 @@ export default function PolicyDetail({
+     [saved, setSaved] = useState(false);
+   React.useEffect(() => setDraft(policy), [policy]);
+   React.useEffect(() => { onDirtyChange?.(editing && JSON.stringify(draft) !== JSON.stringify(policy)); }, [draft, policy, editing, onDirtyChange]);
+-  const fields: [keyof ManagedPolicy, string, string?][] = [
+-    ["productName", "产品名称"],
+-    ["applicant", "投保人"],
+-    ["insured", "被保人"],
+-    ["company", "保险公司"],
+-    ["policyNumber", "保单号"],
+-    ["applicationNumber", "投保单号"],
+-    ["status", "保单状态"],
+-    ["premium", "单期保费"],
+-
+-    ["effectiveDate", "生效日期", "date"],
+-    ["paymentFrequency", "缴费方式"],
+-    ["paymentYears", "缴费期间"],
+-    ["paymentEndDate", "缴费结束日期（不含当天）", "date"],
+-    ["coveragePeriod", "保障期间"],
+-    ["expiryDate", "保障到期日", "date"],
+-    ["coverage", "保额"],
+-    ["insuranceType", "险种类型"],
+-  ];
++  const fields = policyFields;
+   return (
+     <>
+ 
+@@ -67,68 +50,7 @@ export default function PolicyDetail({
+         </div>)}
+       </dl>}
+       {editing && <>
+-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+-        {fields.map(([k, label, type]) => (
+-          <label key={k} className="text-xs text-gray-600">
+-            {label}
+-            {k === "applicant" || k === "insured" ? (
+-              <select className="input mt-1.5" value={draft[k === "applicant" ? "applicantId" : "insuredId"] || ""}
+-                onChange={e => {
+-                  const c = contacts.find(c => c.id === e.target.value);
+-                  setSaved(false);
+-                  setDraft({ ...draft, [k]: c ? c.remarkName || c.nickname : draft[k], [k === "applicant" ? "applicantId" : "insuredId"]: c?.id });
+-                }}>
+-                <option value="">{draft[k] || "选择关联客户"}</option>
+-                {contacts.map(c => <option key={c.id} value={c.id}>{c.remarkName || c.nickname}{c.phoneNumber ? ` · 尾号${String(c.phoneNumber).slice(-4)}` : ""}</option>)}
+-              </select>
+-            ) : k === "paymentFrequency" ? (
+-              <select
+-                className="input mt-1.5"
+-                value={draft.paymentFrequency || ""}
+-                onChange={(e) => {
+-                  setSaved(false);
+-                  setDraft({ ...draft, paymentFrequency: e.target.value });
+-                }}
+-              >
+-                {["", "期交-年", "期交-半年", "期交-季", "期交-月", "趸交"].map(
+-                  (x) => (
+-                    <option key={x} value={x}>
+-                      {x || "待补充"}
+-                    </option>
+-                  ),
+-                )}
+-              </select>
+-            ) : (
+-              <input
+-                readOnly={[
+-                  "policyNumber",
+-                  "company",
+-                  "applicant",
+-                  "insured",
+-                ].includes(k) && Boolean(policy[k])}
+-                className="input mt-1.5 read-only:bg-gray-50"
+-                type={type || "text"}
+-                value={k === 'premium' && draft[k] === policy[k] && String(draft[k] ?? '').trim() !== '' && Number.isFinite(Number(draft[k])) ? Number(draft[k]).toFixed(2) : String(draft[k] ?? "")}
+-                placeholder={
+-                  k === "paymentYears"
+-                    ? "例如：20年"
+-                    : k === "coveragePeriod"
+-                      ? "例如：终身、至70周岁"
+-                      : "待补充"
+-                }
+-                onChange={(e) => {
+-                  setSaved(false);
+-                  setDraft({
+-                    ...draft,
+-                    [k]: e.target.value,
+-                    ...(k === "expiryDate" ? { renewed: false } : {}),
+-                  });
+-                }}
+-              />
+-            )}
+-          </label>
+-        ))}
+-      </div>
++      <PolicyFieldsForm value={draft} onChange={p=>{setSaved(false);setDraft(p);}} contacts={contacts} identityReadonly disabled={busy}/>
+       {footer && createPortal(<div className="flex justify-end gap-3 border-t border-gray-100 bg-white px-5 py-4 items-center">
+         <span className="text-xs text-gray-500">{saved ? "已保存" : ""}</span>
+         <button className="btn btn-secondary text-sm" disabled={busy} onClick={() => { setDraft(policy); setEditing(false); }}>取消</button>
+diff --git a/components/PolicyFieldsForm.tsx b/components/PolicyFieldsForm.tsx
+new file mode 100644
+index 0000000..bd8076d
+--- /dev/null
++++ b/components/PolicyFieldsForm.tsx
+@@ -0,0 +1,48 @@
++import React from 'react';
++import type {Contact} from '../types';
++import type {ManagedPolicy} from '../services/renewal';
++
++// One schema drives new policy entry, detail editing and detail display.
++export const policyFields: [keyof ManagedPolicy, string, string?][] = [
++  ['productName','产品名称'], ['applicant','投保人'], ['insured','被保人'],
++  ['company','保险公司'], ['policyNumber','保单号'], ['applicationNumber','投保单号'],
++  ['status','保单状态'], ['premium','单期保费'], ['effectiveDate','生效日期','date'],
++  ['paymentFrequency','缴费方式'], ['paymentYears','缴费期间'], ['paymentEndDate','缴费结束日期（不含当天）','date'],
++  ['coveragePeriod','保障期间'], ['expiryDate','保障到期日','date'], ['coverage','保额'], ['insuranceType','险种类型'],
++];
++const groups = [
++  {label:'保单信息', keys:['productName','policyNumber','applicationNumber','company','applicant','insured','status','effectiveDate']},
++  {label:'缴费信息',keys:['premium','paymentFrequency','paymentYears','paymentEndDate']},
++  {label:'保障信息',keys:['coveragePeriod','expiryDate','coverage','insuranceType']},
++];
++export default function PolicyFieldsForm({value,onChange,contacts,identityReadonly=false,disabled=false,requireApplicant=false}:{
++  value:ManagedPolicy;onChange:(p:ManagedPolicy)=>void;contacts:Contact[];identityReadonly?:boolean;disabled?:boolean;requireApplicant?:boolean;
++}) {
++  const formId=React.useId();
++  const fieldMap = new Map(policyFields.map(f=>[f[0],f]));
++  return <div className="space-y-6">{groups.map(group=><fieldset key={group.label} disabled={disabled}>
++    <legend className="mb-4 text-sm font-semibold">{group.label}</legend>
++    <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">{group.keys.map(key=>{
++      const [k,label,type] = fieldMap.get(key as keyof ManagedPolicy)!;
++      const update = (v:string) => onChange({...value,[k]:v,...(k==='expiryDate'?{renewed:false}:{})});
++      const textValue=String(value[k]??'');
++      return <div key={k} className="min-w-0"><label htmlFor={`${formId}-${k}`} className="block text-xs font-medium text-gray-500">
++        {label}{(k==='productName'||requireApplicant&&k==='applicant')&&<span aria-hidden="true"> *</span>}
++        </label>
++        {k==='applicant'||k==='insured'?<select id={`${formId}-${k}`} required={requireApplicant&&k==='applicant'} className="input mt-1.5 font-normal text-gray-900" value={value[k==='applicant'?'applicantId':'insuredId']||''} onChange={e=>{
++          const c=contacts.find(c=>c.id===e.target.value);
++          onChange({...value,[k]:c?c.remarkName||c.nickname:value[k],[k==='applicant'?'applicantId':'insuredId']:c?.id});
++        }}>
++          <option value="">{textValue||'选择客户'}</option>
++          {contacts.map(c=><option value={c.id} key={c.id}>{c.remarkName||c.nickname}{c.phoneNumber?` · 尾号${c.phoneNumber.slice(-4)}`:''}</option>)}
++        </select>:k==='paymentFrequency'?<select id={`${formId}-${k}`} className="input mt-1.5 font-normal text-gray-900" value={textValue} onChange={e=>update(e.target.value)}>
++          {['','期交-年','期交-半年','期交-季','期交-月','趸交',...(!['','期交-年','期交-半年','期交-季','期交-月','趸交'].includes(textValue)?[textValue]:[])].map(v=><option key={v} value={v}>{v||'待补充'}</option>)}
++        </select>:<input id={`${formId}-${k}`} className="input mt-1.5 font-normal text-gray-900 read-only:bg-gray-50" type={type||'text'} required={k==='productName'}
++          readOnly={identityReadonly&&['policyNumber','company'].includes(k)&&Boolean(value[k])}
++          inputMode={k==='premium'||k==='coverage'?'decimal':undefined} value={textValue}
++          placeholder={k==='paymentYears'?'例如：20年':k==='coveragePeriod'?'例如：终身、至80周岁':k==='premium'?'例如：12000':undefined}
++          onChange={e=>update(e.target.value)}/>}
++      </div>;
++    })}</div>
++  </fieldset>)}</div>;
++}
+diff --git a/components/WorkspaceDialog.tsx b/components/WorkspaceDialog.tsx
+index 884f74b..3c20936 100644
+--- a/components/WorkspaceDialog.tsx
++++ b/components/WorkspaceDialog.tsx
+@@ -1,11 +1,13 @@
+-import React, { useEffect, useRef, useState } from 'react';
++import React, { useEffect, useRef, useState, useId, useContext } from 'react';
++import { createPortal } from 'react-dom';
+ import { X } from 'lucide-react';
+ 
+ export const DialogFooterContext = React.createContext<HTMLDivElement | null>(null);
+ 
+-export default function WorkspaceDialog({ title, onClose, children, compact = false }: {
+-  title: string; onClose: () => void; children: React.ReactNode; compact?: boolean;
++export default function WorkspaceDialog({ title, onClose, children, compact = false, size, className = "" }: {
++  title: string; onClose: () => void; children: React.ReactNode; compact?: boolean; size?: "import"; className?: string;
+ }) {
++  const titleId = useId();
+   const [footer, setFooter] = useState<HTMLDivElement | null>(null);
+   const ref = useRef<HTMLDialogElement>(null);
+   useEffect(() => {
+@@ -13,11 +15,11 @@ export default function WorkspaceDialog({ title, onClose, children, compact = fa
+     ref.current?.showModal();
+     return () => { ref.current?.close(); trigger?.focus(); };
+   }, []);
+-  return <dialog ref={ref} onCancel={event => { event.preventDefault(); onClose(); }}
+-    className={`workspace-dialog m-auto w-[calc(100%-2rem)] ${compact ? 'max-w-lg' : 'max-w-4xl'} rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-2xl`}>
++  return <dialog aria-labelledby={titleId} ref={ref} onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}
++    className={`workspace-dialog m-auto w-[calc(100%-2rem)] ${compact ? 'max-w-lg' : size === 'import' ? 'max-w-3xl' : 'max-w-4xl'} ${className} rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-2xl`}>
+     <div className="flex max-h-[90dvh] flex-col">
+       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+-        <h2 className="text-base font-semibold">{title}</h2>
++        <h2 id={titleId} className="text-base font-semibold">{title}</h2>
+         <button type="button" className="icon-btn" aria-label="关闭" onClick={onClose}><X size={20}/></button>
+       </header>
+       <DialogFooterContext.Provider value={footer}><div className="min-h-0 overflow-y-auto p-5">{children}</div></DialogFooterContext.Provider>
+@@ -25,3 +27,8 @@ export default function WorkspaceDialog({ title, onClose, children, compact = fa
+     </div>
+   </dialog>;
+ }
++
++export function WorkspaceDialogFooter({ children }: { children: React.ReactNode }) {
++  const host = useContext(DialogFooterContext);
++  return host ? createPortal(<div className="flex flex-wrap items-center justify-end gap-2 border-t border-gray-100 px-5 py-4">{children}</div>, host) : null;
++}
+diff --git a/components/mingyaImport.css b/components/mingyaImport.css
+deleted file mode 100644
+index 1708afa..0000000
+--- a/components/mingyaImport.css
++++ /dev/null
+@@ -1,2 +0,0 @@
+-.mingya-overlay{position:fixed;inset:0;z-index:100;background:#17272c80;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(3px)}.mingya-dialog{width:min(100%,1000px);max-height:90dvh;background:#fff;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;color:#223039;box-shadow:0 24px 80px #10232933;outline:none}.mingya-dialog header{padding:22px 28px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e7ebed}.mingya-dialog h2{font-size:20px;font-weight:650;margin:0}.mingya-dialog header button{padding:4px;border:0;min-height:32px}.mingya-body{padding:24px 28px;overflow-y:auto;overscroll-behavior:contain}.mingya-dialog button,.mingya-dialog select,.mingya-dialog input{font:inherit;font-size:13px;border:1px solid #d4dcdf;border-radius:8px;padding:10px 14px;min-height:40px;background:white}.mingya-dialog button{cursor:pointer;white-space:nowrap}.mingya-dialog button:disabled{opacity:.4;cursor:default}.mingya-dialog .mingya-primary{background:#163e39;color:white;border-color:#163e39}.mingya-dialog button:focus-visible,.mingya-dialog select:focus-visible,.mingya-dialog summary:focus-visible,.mingya-dialog input:focus-visible{outline:2px solid #237f6e;outline-offset:3px}.mingya-dialog footer{display:flex;justify-content:flex-end;gap:10px;padding:18px 28px;border-top:1px solid #e7ebed}.mingya-file,.mingya-success{padding:46px 10px;text-align:center;display:flex;align-items:center;flex-direction:column;gap:18px}.mingya-success h3{font-size:22px}.mingya-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin:0 0 28px}.mingya-stats dt{font-size:12px;color:#66787e;margin-bottom:7px}.mingya-stats dd{font-size:32px;font-weight:600;line-height:1.1;margin:0;font-variant-numeric:tabular-nums;letter-spacing:-1px}.mingya-rule{display:flex;align-items:center;gap:18px;margin-bottom:14px}.mingya-rule label{font-size:13px;color:#66787e}.mingya-note{color:#66787e;font-size:12px;line-height:1.7;margin:10px 0 20px}.mingya-warning,.mingya-error{font-size:13px;padding:12px 14px;border-radius:8px;margin:0 0 18px;background:#fff5e9;color:#9c601a;line-height:1.6}.mingya-error{background:#fff0ed;color:#ab4134;display:flex;align-items:center;gap:8px}.mingya-issues{margin:24px 0}.mingya-issues h3{font-size:14px;font-weight:600;padding-bottom:12px;border-bottom:1px solid #e9edef}.mingya-issue{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 0;border-bottom:1px solid #edf0f1}.mingya-issue strong{font-size:14px;font-weight:550}.mingya-issue p{font-size:12px;color:#8c6748;margin:5px 0 0}.mingya-issue select{max-width:300px;width:100%}.mingya-dialog details{border-top:1px solid #e7ebed;padding:16px 0;font-size:13px}.mingya-dialog summary{cursor:pointer}.mingya-dialog details input{margin-top:14px;width:100%}.mingya-table{overflow:auto;max-height:360px;margin-top:14px;border:1px solid #e7ebed;border-radius:8px}.mingya-table table{width:100%;border-collapse:collapse;font-size:12px;text-align:left}.mingya-table th,.mingya-table td{padding:12px 14px;border-bottom:1px solid #edf0f1;min-width:95px;vertical-align:top}.mingya-table th{position:sticky;top:0;background:#f6f8f8;font-weight:550;color:#66787e}.mingya-table td span{display:block;min-width:200px}.mingya-table small{display:block;color:#7a898f;margin-top:5px;white-space:nowrap}.mingya-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}@media(max-width:640px){.mingya-overlay{padding:0}.mingya-dialog{height:100dvh;max-height:100dvh;border-radius:0}.mingya-dialog header,.mingya-body{padding:20px}.mingya-stats{grid-template-columns:repeat(2,1fr);gap:22px}.mingya-issue{flex-direction:column;align-items:stretch;gap:10px}.mingya-issue select,.mingya-issue label{max-width:none;width:100%}.mingya-dialog footer{padding:14px 20px;flex-wrap:wrap}.mingya-rule{align-items:stretch;flex-direction:column;gap:8px}.mingya-table th,.mingya-table td{padding:10px}.mingya-dialog footer .mingya-primary{flex:1}}
+-.mingya-info{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:24px}.mingya-info dt,.mingya-person dt{font-size:12px;color:#66787e}.mingya-info dd{font-size:14px;margin:6px 0 0;overflow-wrap:anywhere}.mingya-person{margin-top:16px;padding:14px 16px;background:#f6f8f8;border-radius:8px}.mingya-person strong{font-size:14px;font-weight:600}.mingya-person dl>div{display:grid;grid-template-columns:90px minmax(0,1fr);gap:16px;margin-top:10px}.mingya-person dd{font-size:13px;overflow-wrap:anywhere}@media(max-width:640px){.mingya-info{grid-template-columns:1fr}.mingya-dialog header h2{font-size:17px;padding-right:10px}.mingya-dialog header button{flex-shrink:0}}
+diff --git a/docs/2026-11-22-ui-and-coverage-verification.md b/docs/2026-11-22-ui-and-coverage-verification.md
+new file mode 100644
+index 0000000..c8d2752
+--- /dev/null
++++ b/docs/2026-11-22-ui-and-coverage-verification.md
+@@ -0,0 +1,30 @@
++# 明亚导入、新单录入与保障字段核对
++
++范围：添加 / 导入中的明亚页签、明亚预览和原始详情、新单录入及详情编辑。不改变其他未发布页面。
++
++## 原因与修正
++
++- 明亚流程曾自行定义绿色主按钮、13px控件、独立间距与手机全屏样式，没有复用 index.css。已删除 mingyaImport.css，改用 WorkspaceDialog、btn、input、table 公共模式。
++- 明亚页签原来混入了表格上传及两段说明。现只保留导入采集文件入口；Excel、截图、手动录入仍各有原入口。
++- 新单曾只有8个字段，且把空保费记成0、空单号写成“暂无单号”。现在新单与详情读取/编辑共用 PolicyFieldsForm 的16字段定义；未填值保持空，按投保人归属，不虚构金额和号码。
++- 保障字段已经存在于原始JSON，但缺少到 coveragePeriod、expiryDate、insuranceType 的映射。现在读取主险保险期间、明确保障结束日期及主险 riskFlag；不从缴费结束日期推算保障到期，不把未知单位代码转换为猜测值。
++
++## 文案删减（独立检查）
++
++- 明亚页签只需导航与导入动作：删除旧表格说明、报表类型罗列及上传表格按钮。
++- 上传界面只保留文件类型与选择文件操作；没有文件时不显示无法使用的合并按钮。
++- 四项预览数量用于核对影响范围；“预览，尚未保存”用于区分正式数据，保留。
++- 合并规则折叠展示，避免默认堆积说明。处理方式选择用于决定已有数据如何更新，保留。
++- 客户冲突仅展示姓名、需要核对原因及处理选择；理由与选择用途不同，保留。
++- 新单原装饰盾牌与头像、重复的归属客户/投保人选择已移除；16项业务标签各对应独立字段，按保单、缴费、保障三组排列。
++- 原始详情保留“参考金额尚未形成应缴”提示，避免把参考数字误认为账单。
++
++## 验证
++
++本地与发布版本均须核对桌面1304×880、手机390×844。已核对：30行预览、同名客户待核对、长产品名、大金额、空文件、失败后重试、表格内横向滚动、正文滚动时标题与保存按钮保持可达、控件标签与键盘焦点。
++
++实测预览宽768px，下拉高38px、14px字、6px圆角、右内边距32px，主按钮为 rgb(23,23,23)；手机左右留白16px，无整页横向溢出。新单与详情16个控件均38px高、14px字。模拟新单保存后重新打开详情，投保单号、缴费及保障字段均保留。
++
++原始详情Escape仅关闭当前层，焦点返回原详情；新单放弃修改需确认。39项既有与新增映射测试通过，类型检查和构建通过。
++
++正式补全前备份：/Users/apple/.codex/backups/insurance-20261122-coverage/。仅补空字段，原客户资料、保费、缴费状态与历史保持一致。补全后二次计划新增0项。该用户示例：至80周岁、2073-05-18、两全；重疾附加险仍保留在原始详情险种列表。
+diff --git a/services/mingyaImport.ts b/services/mingyaImport.ts
+index 29042c0..bf3989a 100644
+--- a/services/mingyaImport.ts
++++ b/services/mingyaImport.ts
+@@ -27,8 +27,23 @@ const uuid = () => crypto.randomUUID();
+ const has = (v: unknown) => v !== undefined && v !== null && text(v) !== '';
+ const person = (input: Json = {}): MingyaPerson => { const p=input||{};return ({ name:text(p.name),idCard:readable(p.cardNo),phone:readable(p.mobile),birthday:text(p.birthday).slice(0,10),sex:text(p.sex),address:text(p.homeAddress||p.postAddress),share:text(p.bnfRate),order:text(p.bnfOrder) }); };
+ const period = (n: unknown, unit: unknown) => {const s=text(n),u=text(unit);return s ? `${u==='A'?'至':''}${s}${u==='Y'?'年':u==='M'?'月':u==='D'?'天':u==='A'?'周岁':u?`（单位代码 ${u}）`:''}` : '';};
++// Coverage uses insurance periods and explicit end dates, never payment terms.
++export function coverageFromDetail(source: Json) {
++  const risks: Json[] = Array.isArray(source.riskList) ? source.riskList : [];
++  const mains = risks.filter(r => r.mainRiskFlag === true || ['01','1','Y'].includes(text(r.mainRiskFlag)));
++  const readablePeriod = (r: Json) => /[\u4e00-\u9fff]/.test(text(r.insurancePeriodText)) ? text(r.insurancePeriodText)
++    : ['A','Y','M','D'].includes(text(r.insurancePeriodUnit)) ? period(r.insurancePeriod,r.insurancePeriodUnit) : '';
++  const periods = [...new Set((mains.length ? mains : risks).map(readablePeriod).filter(Boolean))];
++  const ends = [...new Set(risks.map(r=>text(r.endDate).slice(0,10)).filter(Boolean))];
++  const validDate = (value: unknown) => { const d=text(value).slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(d)&&!isNaN(Date.parse(d))&&new Date(d+'T00:00:00Z').toISOString().slice(0,10)===d?d:''; };
++  return {
++    coveragePeriod: readablePeriod(source) || (periods.length===1 ? periods[0] : ''),
++    expiryDate: validDate(source.guaranteeEndDate) || validDate(source.endDate) || (ends.length===1 ? validDate(ends[0]) : ''),
++    insuranceType: [...new Set((mains.length ? mains : risks).map(r=>text(r.risk?.riskFlag)).filter(v=>/[\u4e00-\u9fff]/.test(v)))].join('、'),
++  };
++}
+ function compact(source: Json, capturedAt: string, key: string): MingyaPolicyData {
+-  return { ...financialFromDetail(source),key,capturedAt,policyId:text(source.policyId),policyIndexId:text(source.policyIndexId),companyId:text(source.insComId),
++  return { ...financialFromDetail(source),...coverageFromDetail(source),key,capturedAt,policyId:text(source.policyId),policyIndexId:text(source.policyIndexId),companyId:text(source.insComId),
+     currency:text(source.currency),rawStatus:text(source.policyState),endDate:text(source.guaranteeEndDate||source.endDate).slice(0,10),
+     applicant:person(source.appnt),
+     insureds:(source.insureds||[]).map(person),beneficiaries:(source.beneficiaries||[]).map(person),
+@@ -59,7 +74,7 @@ export function normalizeMingya(payload: MingyaPayload): {items: IncomingPolicy[
+       premium:source.periodicPremium||'',effectiveDate:dateKey(p.validDate||p.effectDate),
+       status:({'16':'正式保单','17':'终止保单'} as Record<string,string>)[text(p.policyState)]||`明亚状态（${text(p.policyState)||'未知'}）`,
+       applicant:applicant.name,insured:text(p.insuredName)||source.insureds.map(x=>x.name).join('、'),
+-      coverage:+p.amount===-1?'详见条款':text(p.amount),paymentYears:[...new Set(source.risks.map(x=>x.paymentPeriod).filter(Boolean))].join('、'),paymentFrequency:source.paymentFrequency||'',paymentEndDate:source.paymentEndDate||'',mingya:source};
++      coverage:+p.amount===-1?'详见条款':text(p.amount),paymentYears:[...new Set(source.risks.map(x=>x.paymentPeriod).filter(Boolean))].join('、'),paymentFrequency:source.paymentFrequency||'',paymentEndDate:source.paymentEndDate||'',coveragePeriod:source.coveragePeriod||'',expiryDate:source.expiryDate||'',insuranceType:source.insuranceType||'',mingya:source};
+     const personKey=identity(applicant.idCard)?`id:${identity(applicant.idCard)}`:phoneKey(applicant.phone)?`phone:${phoneKey(applicant.phone)}:${nameKey(applicant.name)}`:`name:${nameKey(applicant.name)}`;
+     items.push({key,personKey,policy,applicant,hasDetail:!!r.detail});
+   }
+@@ -131,10 +146,10 @@ export function planMingyaImport(existing: Contact[], payload:MingyaPayload, res
+     }
+     if(matches.length===1){
+       const old=matches[0].policy;const merged={...old};
+-      for(const key of ['policyNumber','productName','company','premium','effectiveDate','status','applicant','insured','paymentYears','paymentFrequency','paymentEndDate','insuranceType','coverage'] as const){
++      for(const key of ['policyNumber','productName','company','premium','effectiveDate','status','applicant','insured','paymentYears','paymentFrequency','paymentEndDate','coveragePeriod','expiryDate','insuranceType','coverage'] as const){
+         const value=p[key];if(has(old[key])&&has(value)&&text(old[key])!==text(value)){plan.fieldConflicts++;plan.conflicts.push({number:p.policyNumber,field:key,existing:text(old[key]),incoming:text(value)});}
+         const fixOldPremium=key==='premium'&&old.mingya&&old.mingya.mappingVersion!==2&&money(old.premium)!==''&&money(old.premium)===p.mingya?.termTotalPremium;
+-        const sourceField=({premium:'periodicPremium',paymentFrequency:'paymentFrequency',paymentEndDate:'paymentEndDate'} as Record<string,string>)[key];
++        const sourceField=({premium:'periodicPremium',paymentFrequency:'paymentFrequency',paymentEndDate:'paymentEndDate',coveragePeriod:'coveragePeriod',expiryDate:'expiryDate',insuranceType:'insuranceType'} as Record<string,string>)[key];
+         const sourceOwned=old.mingya?.mappingVersion===2&&sourceField&&text(old[key])===text((old.mingya as any)[sourceField]);
+         if(has(value)&&(mode==='source'||!has(old[key])||fixOldPremium||sourceOwned))merged[key]=value;
+       }
+diff --git a/tests/mingyaImport.test.cjs b/tests/mingyaImport.test.cjs
+index 0da30b1..101fd41 100644
+--- a/tests/mingyaImport.test.cjs
++++ b/tests/mingyaImport.test.cjs
+@@ -58,3 +58,15 @@ test('data repair changes only source-linked financial data in both stores, and
+  const result=fix(customers,renewal,source,'original');assert.equal(result.contacts[0].policies[0].premium,'12000');assert.equal(result.renewal.policies[0].payments[0].status,'已缴费');assert.equal(result.contacts[0].wxid,customers[0].wxid);assert.equal(result.contacts[0].remarkInfo,customers[0].remarkInfo);assert.equal(JSON.stringify(result.renewal.imports),JSON.stringify(renewal.imports));assert.equal(customers[0].policies[0].premium,'120000');
+  const repeat=fix(result.contacts,result.renewal,source,'original');assert.equal(repeat.counts.metadata,0);assert.equal(exportsObject.canonicalContactData(repeat.contacts),exportsObject.canonicalContactData(result.contacts));
+ });
++test('trusteeship coverage comes from main risk, not payment period, and fills existing blanks',()=>{
++ const r=record({dataSource:'trusteeship',validDate:'2009-05-19',guaranteeEndDate:'2073-05-18',insurancePeriod:'',insurancePeriodUnit:'A',riskList:[{mainRiskFlag:'01',insurancePeriod:80,insurancePeriodUnit:'A',payPeriod:15,payPeriodUnit:'Y',risk:{riskFlag:'两全'}},{mainRiskFlag:'02',insurancePeriod:80,insurancePeriodUnit:'A',risk:{riskFlag:'重疾'}}]});
++ const source=payload([r]);const first=planMingyaImport([],source);const p=first.contacts[0].policies[0];
++ assert.equal(p.coveragePeriod,'至80周岁');assert.equal(p.expiryDate,'2073-05-18');assert.equal(p.insuranceType,'两全');assert.equal(p.paymentYears,'15年');
++ delete p.coveragePeriod;delete p.expiryDate;delete p.insuranceType;const refreshed=planMingyaImport(first.contacts,source).contacts[0].policies[0];
++ assert.equal(refreshed.coveragePeriod,'至80周岁');assert.equal(refreshed.expiryDate,'2073-05-18');assert.equal(refreshed.insuranceType,'两全');
++ p.coveragePeriod='人工核对期间';assert.equal(planMingyaImport(first.contacts,source).contacts[0].policies[0].coveragePeriod,'人工核对期间');
++});
++test('coverage does not infer expiry from payment end or unknown risk codes',()=>{
++ const p=planMingyaImport([],payload([record({payEndDate:'2023-05-19',riskList:[{mainRiskFlag:'01',payPeriod:15,payPeriodUnit:'Y',insurancePeriod:108,insurancePeriodUnit:'UNKNOWN',risk:{riskType:'01'}}]})])).contacts[0].policies[0];
++ assert.equal(p.coveragePeriod,'');assert.equal(p.expiryDate,'');assert.equal(p.insuranceType,'');
++});
+diff --git a/tools/repair-mingya-coverage.cjs b/tools/repair-mingya-coverage.cjs
+new file mode 100644
+index 0000000..fffb78c
+--- /dev/null
++++ b/tools/repair-mingya-coverage.cjs
+@@ -0,0 +1,21 @@
++// Fill only verified empty coverage fields; preserve all other customer and payment data.
++const fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript'),assert=require('node:assert/strict');
++const cache={};function load(name){const f=name.endsWith('.ts')?name:name+'.ts';if(cache[f])return cache[f];const exp={};cache[f]=exp;const js=ts.transpileModule(fs.readFileSync('services/'+f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;vm.runInNewContext(js,{exports:exp,structuredClone,crypto:require('node:crypto').webcrypto,require:p=>load(p.replace(/^\.\//,''))});return exp;}
++(async()=>{
++ const {loadEnv}=await import('vite');const{createClient}=await import('@supabase/supabase-js');const env=loadEnv('production',process.cwd(),'VITE_');
++ const config=fs.readFileSync('vite.config.ts','utf8');const url=env.VITE_SUPABASE_URL||'https://ulgqiixqaxxgodyowrep.supabase.co';if(new URL(url).hostname!=='ulgqiixqaxxgodyowrep.supabase.co')throw Error('Wrong database');
++ const client=createClient(url,env.VITE_SUPABASE_ANON_KEY||config.match(/env\.VITE_SUPABASE_ANON_KEY \|\| '([^']+)'/)[1],{auth:{persistSession:false}});
++ const appId=env.VITE_APP_ID;if(appId!=='app_yp9dq7mofjm')throw Error('Wrong app');
++ const {data:rows,error}=await client.from('app_data').select('id,app_id,data_type,data,updated_at').eq('app_id',appId).in('data_type',['contacts','renewal_v1']);if(error)throw error;
++ const dir='/Users/apple/.codex/backups/insurance-20261122-coverage';fs.mkdirSync(dir,{recursive:true,mode:0o700});const backup=dir+'/before-'+Date.now()+'.json';fs.writeFileSync(backup,JSON.stringify(rows),{mode:0o600});
++ const payload=JSON.parse(fs.readFileSync('/Users/apple/.codex/backups/insurance-20261121-premium-fix/capture.json','utf8'));
++ const captureId='bf1ef8c554af281a6e6f40dfa5f0ec2b53e1b139d1ce56268927bb28c10ae608';
++ const lookup=new Map(load('mingyaImport').normalizeMingya(payload).items.map(x=>[x.key,x.policy]));
++ const fields=['coveragePeriod','expiryDate','insuranceType'];const counts=Object.fromEntries(fields.map(f=>[f,0]));const strip=p=>{const out=structuredClone(p);for(const f of fields){delete out[f];if(out.mingya)delete out.mingya[f];}return out;};
++ function patch(p){const incoming=lookup.get(p.mingya?.key);if(p.mingya?.captureId!==captureId||!incoming||incoming.policyNumber!==p.policyNumber)return p;const out=structuredClone(p);for(const f of fields){if(!String(out[f]??'').trim()&&incoming[f]){out[f]=incoming[f];counts[f]++;}out.mingya[f]=incoming.mingya[f];}assert.deepEqual(strip(p),strip(out));return out;}
++ const c=rows.find(x=>x.data_type==='contacts'),r=rows.find(x=>x.data_type==='renewal_v1');const contacts=c.data.map(c=>({...c,policies:(c.policies||[]).map(patch)}));const renewal={...r.data,policies:r.data.policies.map(patch)};
++ assert.equal(contacts.length,c.data.length);assert.equal(renewal.policies.length,r.data.policies.length);
++ const target=renewal.policies.find(p=>p.productName==='国寿瑞鑫两全保险（分红型）'&&p.effectiveDate==='2009-05-19');
++ fs.writeFileSync(dir+'/plan.json',JSON.stringify({contacts,renewal}),{mode:0o600});console.log(JSON.stringify({counts,contacts:contacts.length,policies:renewal.policies.length,target:target&&Object.fromEntries(fields.map(f=>[f,target[f]])),backup}));
++ if(process.argv.includes('--apply')){const {error}=await client.rpc('commit_mingya_import_v2',{p_app_id:appId,p_contact_id:c.id,p_contact_revision:c.updated_at,p_renewal_revision:r.updated_at,p_contacts:contacts,p_renewal:renewal});if(error)throw error;console.log('Coverage fields saved atomically.');}
++})().catch(e=>{console.error(e.message);process.exitCode=1;});
+diff --git a/types.ts b/types.ts
+index 2cc13c0..7422d2d 100644
+--- a/types.ts
++++ b/types.ts
+@@ -11,6 +11,7 @@ export interface MingyaPerson {
+   name: string; idCard: string; phone: string; birthday: string; sex: string; address: string; share: string; order: string;
+ }
+ export interface MingyaPolicyData extends Partial<MingyaFinancial> {
++  coveragePeriod?: string; expiryDate?: string; insuranceType?: string;
+   key: string; captureId?: string; capturedAt: string; policyId: string; policyIndexId: string; companyId: string;
+   currency: string; rawStatus: string; endDate: string; nextPayDate: string; nextPremium: string;
+   applicant: MingyaPerson; insureds: MingyaPerson[]; beneficiaries: MingyaPerson[];
+@@ -20,6 +21,7 @@ export interface MingyaPolicyData extends Partial<MingyaFinancial> {
+ export interface Policy {
+   id: string;
+   policyNumber: string;
++  applicationNumber?: string;
+   productName: string;
+   company: string;
+   premium: string;
