@@ -1,0 +1,1 @@
+async(page)=>{await page.getByRole('button',{name:'管理分类',exact:true}).click();const d=page.getByRole('dialog',{name:'管理分类',exact:true});await d.getByRole('button',{name:'新增类目',exact:true}).click();await page.screenshot({path:'output/ui-regression/categories-desktop.png'});return {text:await d.innerText()};}

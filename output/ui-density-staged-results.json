@@ -1,0 +1,93 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "name": "fixture load",
+      "loaded": true
+    },
+    {
+      "name": "desktop date/select/keyboard",
+      "value": "2009-05-19",
+      "status": "待生效",
+      "sizes": {
+        "date": 38,
+        "select": 38
+      },
+      "calendarInsideViewport": true,
+      "errors": []
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "mobile modal/scroll/drawer",
+      "passed": true,
+      "mobileCalendar": true,
+      "stackedFields": true,
+      "scrolling": {
+        "scroll": 511,
+        "height": 626,
+        "total": 1137
+      },
+      "fixedFooter": true,
+      "navigationFocus": true
+    },
+    {
+      "name": "search alignment and filtering",
+      "passed": true,
+      "metrics": [
+        {
+          "gap": 8,
+          "height": 38
+        }
+      ]
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "follow-up failure/retry",
+      "passed": true,
+      "failedInputRetained": true,
+      "retryPersistedAfterReload": true
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "business entry regression",
+      "passed": true,
+      "policyFields": 16,
+      "terminalPoliciesHidden": true,
+      "invalidDateBlocked": true,
+      "newPolicyMobileFooter": true,
+      "categorySearchGap": 8,
+      "mingyaOnlyEntry": true
+    },
+    {
+      "name": "fixture reset",
+      "loaded": true
+    },
+    {
+      "name": "density and customer search",
+      "passed": true,
+      "embeddedFields": true,
+      "history": {
+        "height": 1383.25,
+        "overflow": "visible"
+      },
+      "boardStatusRemoved": true,
+      "searchableCustomer": true
+    },
+    {
+      "name": "component acceptance",
+      "passed": true,
+      "sharedKeyboardSelect": true,
+      "sharedCalendar": true,
+      "desktopAndMobileDialog": true
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+async(page)=>({buttons:await page.getByRole('button').evaluateAll(es=>es.filter(e=>e.checkVisibility()).map(e=>({text:e.innerText,label:e.getAttribute('aria-label')}))),dialogs:await page.getByRole('dialog').evaluateAll(es=>es.map(e=>e.innerText.slice(0,100)))})

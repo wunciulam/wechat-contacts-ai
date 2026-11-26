@@ -1,0 +1,1 @@
+async(page)=>{await page.getByRole('button',{name:'取消',exact:true}).last().click();return {buttons:await page.getByRole('button').evaluateAll(es=>es.filter(e=>e.checkVisibility()).map(e=>({text:e.innerText,label:e.getAttribute('aria-label')})))};}

@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "name": "fixture load",
+      "loaded": true
+    },
+    {
+      "name": "contact basic information",
+      "passed": true,
+      "storedFieldsDisplayed": true,
+      "addressPersistedAfterReload": true,
+      "historyAndPoliciesPreserved": true,
+      "mobileFits": true
+    }
+  ]
+}

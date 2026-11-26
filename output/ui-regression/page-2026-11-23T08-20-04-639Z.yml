@@ -1,0 +1,494 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]: 保险跟单仔
+        - generic [ref=e8]: 组件验收样板 · 本地示例数据
+      - generic [ref=e9]:
+        - link "其他模块验收" [ref=e10] [cursor=pointer]:
+          - /url: /module-acceptance.html
+        - link "返回当前网站" [ref=e11] [cursor=pointer]:
+          - /url: /
+  - main [ref=e12]:
+    - generic [ref=e14]:
+      - generic [ref=e16]:
+        - heading "组件验收样板" [level=2] [ref=e17]
+        - paragraph [ref=e18]: 与业务页面共用基础组件
+      - generic [ref=e19]:
+        - button "打开弹窗" [ref=e20]
+        - searchbox "演示搜索输入框" [ref=e24]
+    - generic [ref=e25]:
+      - strong [ref=e26]: 怎么反馈：
+      - text: 直接选中不满意的组件并留言，像这次一样说明你想要的效果即可；不用逐项回复验收说明。等你明确说“样板确认”后，才会定稿 design.md 并修改业务页面。本页只用示例数据，不写入线上数据库。
+    - navigation "组件分区" [ref=e27]:
+      - link "辅助色" [ref=e28] [cursor=pointer]:
+        - /url: "#palette"
+      - link "字号" [ref=e29] [cursor=pointer]:
+        - /url: "#typography"
+      - link "间距" [ref=e30] [cursor=pointer]:
+        - /url: "#spacing"
+      - link "数字" [ref=e31] [cursor=pointer]:
+        - /url: "#numbers"
+      - link "页面标题" [ref=e32] [cursor=pointer]:
+        - /url: "#title"
+      - link "按钮" [ref=e33] [cursor=pointer]:
+        - /url: "#buttons"
+      - link "输入框" [ref=e34] [cursor=pointer]:
+        - /url: "#inputs"
+      - link "Tab" [ref=e35] [cursor=pointer]:
+        - /url: "#tabs"
+      - link "标签" [ref=e36] [cursor=pointer]:
+        - /url: "#tags"
+      - link "客户卡片" [ref=e37] [cursor=pointer]:
+        - /url: "#cards"
+      - link "保单表格" [ref=e38] [cursor=pointer]:
+        - /url: "#table"
+      - link "弹窗" [ref=e39] [cursor=pointer]:
+        - /url: "#modal"
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - heading "完整色板 · 六个色系" [level=2] [ref=e42]
+        - generic [ref=e43]: 参照：原站黑白灰底色与联系人状态标签
+      - paragraph [ref=e44]: 验收检查：中性灰沿用原站；五个辅助色各有 50–900 十档。状态文字、边框和标签都从同一色系取值，不混用额外的鲜红色。
+      - generic [ref=e45]:
+        - paragraph [ref=e46]: "页面白色 #ffffff。每个色系下方展示 50–900 共十档；实际标签只用 100 作底、700 作文字，表单错误边框用珊瑚红 500。未列出的颜色不进入样板。"
+        - generic [ref=e47]:
+          - generic [ref=e48]:
+            - generic [ref=e50]:
+              - generic [ref=e51]: 中性灰
+              - generic [ref=e52]: 页面、文字、边框和主按钮
+            - generic [ref=e53]:
+              - 'generic "中性灰 50: #fafafa" [ref=e54]': "50"
+              - 'generic "中性灰 100: #f5f5f5" [ref=e57]': "100"
+              - 'generic "中性灰 200: #e5e5e5" [ref=e60]': "200"
+              - 'generic "中性灰 300: #d4d4d4" [ref=e63]': "300"
+              - 'generic "中性灰 400: #a3a3a3" [ref=e66]': "400"
+              - 'generic "中性灰 500: #737373" [ref=e69]': "500"
+              - 'generic "中性灰 600: #525252" [ref=e72]': "600"
+              - 'generic "中性灰 700: #404040" [ref=e75]': "700"
+              - 'generic "中性灰 800: #262626" [ref=e78]': "800"
+              - 'generic "中性灰 900: #171717" [ref=e81]': "900"
+            - generic [ref=e84]: "100 #f5f5f5 · 500 #737373 · 700 #404040"
+          - generic [ref=e85]:
+            - generic [ref=e86]:
+              - generic [ref=e87]:
+                - generic [ref=e88]: 亮蓝
+                - generic [ref=e89]: 客户阶段
+              - generic [ref=e90]: 标签示例
+            - generic [ref=e91]:
+              - 'generic "亮蓝 50: #eff6ff" [ref=e92]': "50"
+              - 'generic "亮蓝 100: #dbeafe" [ref=e95]': "100"
+              - 'generic "亮蓝 200: #bfdbfe" [ref=e98]': "200"
+              - 'generic "亮蓝 300: #93c5fd" [ref=e101]': "300"
+              - 'generic "亮蓝 400: #60a5fa" [ref=e104]': "400"
+              - 'generic "亮蓝 500: #3b82f6" [ref=e107]': "500"
+              - 'generic "亮蓝 600: #2563eb" [ref=e110]': "600"
+              - 'generic "亮蓝 700: #1d4ed8" [ref=e113]': "700"
+              - 'generic "亮蓝 800: #1e40af" [ref=e116]': "800"
+              - 'generic "亮蓝 900: #1e3a8a" [ref=e119]': "900"
+            - generic [ref=e122]: "100 #dbeafe · 500 #3b82f6 · 700 #1d4ed8"
+          - generic [ref=e123]:
+            - generic [ref=e124]:
+              - generic [ref=e125]:
+                - generic [ref=e126]: 翠绿
+                - generic [ref=e127]: 已成交 / 有效
+              - generic [ref=e128]: 标签示例
+            - generic [ref=e129]:
+              - 'generic "翠绿 50: #ecfdf5" [ref=e130]': "50"
+              - 'generic "翠绿 100: #d1fae5" [ref=e133]': "100"
+              - 'generic "翠绿 200: #a7f3d0" [ref=e136]': "200"
+              - 'generic "翠绿 300: #6ee7b7" [ref=e139]': "300"
+              - 'generic "翠绿 400: #34d399" [ref=e142]': "400"
+              - 'generic "翠绿 500: #10b981" [ref=e145]': "500"
+              - 'generic "翠绿 600: #059669" [ref=e148]': "600"
+              - 'generic "翠绿 700: #047857" [ref=e151]': "700"
+              - 'generic "翠绿 800: #065f46" [ref=e154]': "800"
+              - 'generic "翠绿 900: #064e3b" [ref=e157]': "900"
+            - generic [ref=e160]: "100 #d1fae5 · 500 #10b981 · 700 #047857"
+          - generic [ref=e161]:
+            - generic [ref=e162]:
+              - generic [ref=e163]:
+                - generic [ref=e164]: 明琥珀
+                - generic [ref=e165]: 待处理提醒
+              - generic [ref=e166]: 标签示例
+            - generic [ref=e167]:
+              - 'generic "明琥珀 50: #fffbeb" [ref=e168]': "50"
+              - 'generic "明琥珀 100: #fef3c7" [ref=e171]': "100"
+              - 'generic "明琥珀 200: #fde68a" [ref=e174]': "200"
+              - 'generic "明琥珀 300: #fcd34d" [ref=e177]': "300"
+              - 'generic "明琥珀 400: #fbbf24" [ref=e180]': "400"
+              - 'generic "明琥珀 500: #f59e0b" [ref=e183]': "500"
+              - 'generic "明琥珀 600: #d97706" [ref=e186]': "600"
+              - 'generic "明琥珀 700: #b45309" [ref=e189]': "700"
+              - 'generic "明琥珀 800: #92400e" [ref=e192]': "800"
+              - 'generic "明琥珀 900: #78350f" [ref=e195]': "900"
+            - generic [ref=e198]: "100 #fef3c7 · 500 #f59e0b · 700 #b45309"
+          - generic [ref=e199]:
+            - generic [ref=e200]:
+              - generic [ref=e201]:
+                - generic [ref=e202]: 亮紫
+                - generic [ref=e203]: 意向 / 分类
+              - generic [ref=e204]: 标签示例
+            - generic [ref=e205]:
+              - 'generic "亮紫 50: #f5f3ff" [ref=e206]': "50"
+              - 'generic "亮紫 100: #ede9fe" [ref=e209]': "100"
+              - 'generic "亮紫 200: #ddd6fe" [ref=e212]': "200"
+              - 'generic "亮紫 300: #c4b5fd" [ref=e215]': "300"
+              - 'generic "亮紫 400: #a78bfa" [ref=e218]': "400"
+              - 'generic "亮紫 500: #8b5cf6" [ref=e221]': "500"
+              - 'generic "亮紫 600: #7c3aed" [ref=e224]': "600"
+              - 'generic "亮紫 700: #6d28d9" [ref=e227]': "700"
+              - 'generic "亮紫 800: #5b21b6" [ref=e230]': "800"
+              - 'generic "亮紫 900: #4c1d95" [ref=e233]': "900"
+            - generic [ref=e236]: "100 #ede9fe · 500 #8b5cf6 · 700 #6d28d9"
+          - generic [ref=e237]:
+            - generic [ref=e238]:
+              - generic [ref=e239]:
+                - generic [ref=e240]: 珊瑚红
+                - generic [ref=e241]: 七天内 / 待核对 / 表单错误
+              - generic [ref=e242]: 标签示例
+            - generic [ref=e243]:
+              - 'generic "珊瑚红 50: #fff1f2" [ref=e244]': "50"
+              - 'generic "珊瑚红 100: #ffe4e6" [ref=e247]': "100"
+              - 'generic "珊瑚红 200: #fecdd3" [ref=e250]': "200"
+              - 'generic "珊瑚红 300: #fda4af" [ref=e253]': "300"
+              - 'generic "珊瑚红 400: #fb7185" [ref=e256]': "400"
+              - 'generic "珊瑚红 500: #f43f5e" [ref=e259]': "500"
+              - 'generic "珊瑚红 600: #e11d48" [ref=e262]': "600"
+              - 'generic "珊瑚红 700: #be123c" [ref=e265]': "700"
+              - 'generic "珊瑚红 800: #9f1239" [ref=e268]': "800"
+              - 'generic "珊瑚红 900: #881337" [ref=e271]': "900"
+            - generic [ref=e274]: "100 #ffe4e6 · 500 #f43f5e · 700 #be123c"
+    - generic [ref=e275]:
+      - generic [ref=e276]:
+        - heading "字号层级" [level=2] [ref=e277]
+        - generic [ref=e278]: 参照：PageHeader、联系人卡片、新增联系人弹窗
+      - paragraph [ref=e279]: 验收检查：以 18 / 16 / 14 / 12px 四级为候选；原站 9–10px 的标签与进展文字提高到 12px。
+      - generic [ref=e280]:
+        - paragraph [ref=e281]: 字族沿用原站：Inter / PingFang SC / Microsoft YaHei；标题字重 600，正文 400，按钮及标签 500。
+        - generic [ref=e282]:
+          - generic [ref=e283]:
+            - generic [ref=e284]: 页面标题 · 18 / 28 px
+            - generic [ref=e285]: 客户保单
+          - generic [ref=e286]:
+            - generic [ref=e287]: 弹窗 / 区块标题 · 16 / 24 px
+            - generic [ref=e288]: 保单详情
+          - generic [ref=e289]:
+            - generic [ref=e290]: 正文 / 按钮 · 14 / 20 px
+            - generic [ref=e291]: 下次缴费 2026-11-17
+          - generic [ref=e292]:
+            - generic [ref=e293]: 表头 / 辅助文字 · 12 / 16 px
+            - generic [ref=e294]: 待补充资料
+    - generic [ref=e295]:
+      - generic [ref=e296]:
+        - heading "间距与尺寸" [level=2] [ref=e297]
+        - generic [ref=e298]: 参照：现有 btn、input、card 与弹窗
+      - paragraph [ref=e299]: 验收检查：以 4px 网格组织间距；展示实际控件高、圆角和卡片留白，确认后再决定是否统一公共组件。
+      - generic [ref=e300]:
+        - generic [ref=e301]:
+          - generic [ref=e302]: 间距：以 4px 为基础，按内容层级选用
+          - generic [ref=e303]:
+            - generic [ref=e304]: 4px
+            - generic [ref=e307]: 8px
+            - generic [ref=e310]: 12px
+            - generic [ref=e313]: 16px
+            - generic [ref=e316]: 20px
+            - generic [ref=e319]: 24px
+        - generic [ref=e322]:
+          - generic [ref=e323]: 尺寸与圆角：取自现有 btn / input / card / 弹窗
+          - generic [ref=e324]:
+            - generic [ref=e325]:
+              - button "按钮" [ref=e326]
+              - generic [ref=e327]: 高 36px · 圆角 6px
+            - generic [ref=e328]:
+              - textbox [ref=e329]: 输入框
+              - generic [ref=e330]: 高 38px · 圆角 6px
+            - generic [ref=e331]: 卡片圆角 8px · 弹窗圆角 12px · 卡片内边距 16px
+    - generic [ref=e332]:
+      - generic [ref=e333]:
+        - heading "数字显示规则" [level=2] [ref=e334]
+        - generic [ref=e335]: 参照：保单管理的金额列、期数与日期
+      - paragraph [ref=e336]: 验收检查：金额等可带小数的数值统一显示两位小数；期数、剩余天数、日期及保单号保持原格式，缺失值不写成零。
+      - generic [ref=e337]:
+        - generic [ref=e338]:
+          - generic [ref=e339]: 整数金额
+          - generic [ref=e340]: ¥ 2,400.00
+          - generic [ref=e341]: 2400 → 两位小数
+        - generic [ref=e342]:
+          - generic [ref=e343]: 已有小数
+          - generic [ref=e344]: ¥ 12,000.50
+          - generic [ref=e345]: 12000.5 → 补齐两位
+        - generic [ref=e346]:
+          - generic [ref=e347]: 零值
+          - generic [ref=e348]: ¥ 0.00
+          - generic [ref=e349]: 零不是空值
+        - generic [ref=e350]:
+          - generic [ref=e351]: 缺失值
+          - generic [ref=e352]: 待补充
+          - generic [ref=e353]: 缺失不写 0.00
+    - generic [ref=e354]:
+      - generic [ref=e355]:
+        - heading "页面标题" [level=2] [ref=e356]
+        - generic [ref=e357]: 参照：全部联系人 / 保单管理的 PageHeader
+      - paragraph [ref=e358]: 验收检查：保留标题、计数和右侧动作的排列；手机宽度时动作换行，不缩小字体。
+      - generic [ref=e359]:
+        - generic [ref=e360]:
+          - generic [ref=e361]: 正常
+          - generic [ref=e363]:
+            - generic [ref=e365]:
+              - heading "客户保单 共 3" [level=2] [ref=e366]:
+                - text: 客户保单
+                - generic [ref=e367]: 共 3
+              - paragraph [ref=e368]: 示例标题与说明
+            - button "次要操作" [ref=e370]
+        - generic [ref=e371]:
+          - generic [ref=e372]:
+            - generic [ref=e373]: 长标题
+            - generic [ref=e377]:
+              - heading "需要核对投保人与被保人关系的长期保障保单" [level=2] [ref=e378]
+              - paragraph [ref=e379]: 长标题允许换行
+          - generic [ref=e380]:
+            - generic [ref=e381]: 无计数 / 禁用动作
+            - generic [ref=e383]:
+              - heading "暂无待处理记录" [level=2] [ref=e386]
+              - button "暂无可用操作" [disabled] [ref=e388]
+    - generic [ref=e389]:
+      - generic [ref=e390]:
+        - heading "按钮" [level=2] [ref=e391]
+        - generic [ref=e392]: 参照：保单管理顶部主次动作 + 新增联系人弹窗
+      - paragraph [ref=e393]: 验收检查：主次按钮采用同高；长文案换行或截断，不撑破布局。危险操作只在确有删除意义时用红色。
+      - generic [ref=e394]:
+        - generic [ref=e395]:
+          - generic [ref=e396]: 正常
+          - generic [ref=e397]:
+            - button "保存" [ref=e398]
+            - button "取消" [ref=e399]
+        - generic [ref=e400]:
+          - generic [ref=e401]: 长内容
+          - button "导入并检查这份名称非常长的保单明细文件" [ref=e402]
+        - generic [ref=e404]:
+          - generic [ref=e405]: 空 / 弱动作
+          - button "暂无选择" [ref=e406]
+        - generic [ref=e407]:
+          - generic [ref=e408]: 禁用
+          - button "资料未填完整" [disabled] [ref=e409]
+    - generic [ref=e410]:
+      - generic [ref=e411]:
+        - heading "输入框" [level=2] [ref=e412]
+        - generic [ref=e413]: 参照：新增联系人手动录入表单
+      - paragraph [ref=e414]: 验收检查：统一普通输入、下拉和日期的高度；下拉选项采用站内样式并留足箭头边距，错误提示使用色板中的珊瑚红。
+      - generic [ref=e415]:
+        - generic [ref=e416]:
+          - generic [ref=e417]: 正常
+          - textbox "正常" [ref=e418]:
+            - /placeholder: 请输入客户姓名
+        - generic [ref=e419]:
+          - generic [ref=e420]: 长内容
+          - textbox "长内容" [ref=e421]: 家庭医疗与长期保障组合计划（示例长内容）
+        - generic [ref=e422]:
+          - generic [ref=e423]: 空值
+          - textbox "空值" [ref=e424]:
+            - /placeholder: 待补充，不自动填写
+        - generic [ref=e425]:
+          - generic [ref=e426]: 错误
+          - textbox "错误 请核对输入内容" [invalid] [ref=e427]: 示例错误值
+          - generic [ref=e428]: 请核对输入内容
+        - generic [ref=e429]:
+          - generic [ref=e430]: 禁用
+          - textbox "禁用" [disabled] [ref=e431]: 暂不可编辑
+        - generic [ref=e432]:
+          - generic [ref=e433]: 下拉
+          - combobox "缴费方式" [ref=e435]:
+            - generic [ref=e436]: 年缴
+        - generic [ref=e439]:
+          - generic [ref=e440]: 日期
+          - generic [ref=e442]:
+            - textbox "示例日期" [ref=e443]:
+              - /placeholder: 年-月-日
+            - button "选择示例日期" [ref=e444]
+    - generic [ref=e447]:
+      - generic [ref=e448]:
+        - heading "Tab 与列表筛选" [level=2] [ref=e449]
+        - generic [ref=e450]: 参照：新增联系人三选项、联系人状态筛选、续期提醒筛选
+      - paragraph [ref=e451]: 验收检查：内容切换用一套 Tab；同页列表筛选用分段按钮。长标签可在手机 Tab 区域内滚动，禁用项不可点击。
+      - generic [ref=e452]:
+        - generic [ref=e453]:
+          - generic [ref=e454]: 内容切换 Tab：正常、长标题、空状态、禁用
+          - tablist "示例内容分页" [ref=e455]:
+            - tab "概览" [selected] [ref=e456]
+            - tab "保单与缴费（长标题）" [ref=e457]
+            - tab "空状态" [ref=e458]
+            - tab "暂不可用" [disabled] [ref=e459]
+          - tabpanel "概览" [ref=e460]: 概览展示当前客户的基本资料与最近记录。
+        - generic [ref=e461]:
+          - generic [ref=e462]: 列表筛选：沿用联系人页面的分段按钮，不与内容 Tab 混用
+          - generic "示例列表筛选" [ref=e463]:
+            - button "全部" [pressed] [ref=e464]
+            - button "待续缴" [ref=e465]
+            - button "待核对" [ref=e466]
+          - paragraph [ref=e467]: 当前筛选：全部
+    - generic [ref=e468]:
+      - generic [ref=e469]:
+        - heading "标签" [level=2] [ref=e470]
+        - generic [ref=e471]: 参照：全部联系人卡片的浅灰标签
+      - paragraph [ref=e472]: 验收检查：普通、长文案和错误使用同一填充形状；辅助色仅区分种类，待核对和临期仍写清具体含义。
+      - generic [ref=e473]:
+        - generic [ref=e474]:
+          - generic [ref=e475]: 正常
+          - generic [ref=e476]: 成交客户
+        - generic [ref=e477]:
+          - generic [ref=e478]: 长内容
+          - generic [ref=e479]: 需要补充投保人与被保人关系说明
+        - generic [ref=e480]:
+          - generic [ref=e481]: 空值
+          - text: 暂无标签
+        - generic [ref=e482]:
+          - generic [ref=e483]: 错误
+          - generic [ref=e484]: 资料待核对
+    - generic [ref=e485]:
+      - generic [ref=e486]:
+        - heading "客户卡片" [level=2] [ref=e487]
+        - generic [ref=e488]: 参照：全部联系人网格卡片 + 当前工作台的 ContactCard
+      - paragraph [ref=e489]: 验收检查：上方并排展示现行工作台结构与候选样式，明确二者不同；候选把过小的 9–10px 内容提升到 12px，并允许长备注换行。确认前不替换运行页面。
+      - generic [ref=e490]:
+        - generic [ref=e491]:
+          - generic [ref=e492]: 业务工作台卡片
+          - button "移出工作台 林 林女士 成交客户 医疗险 已沟通续缴时间，下周电话确认。 2026-10-21" [ref=e493]:
+            - button "移出工作台" [ref=e494]
+            - generic [ref=e498]:
+              - generic [ref=e499]: 林
+              - generic [ref=e500]:
+                - heading "林女士" [level=3] [ref=e501]
+                - generic [ref=e502]:
+                  - generic [ref=e503]: 成交客户
+                  - generic [ref=e504]: 医疗险
+            - generic [ref=e505]:
+              - paragraph [ref=e506]: 已沟通续缴时间，下周电话确认。
+              - paragraph [ref=e507]: 2026-10-21
+          - status [ref=e511]
+        - generic [ref=e512]:
+          - generic [ref=e513]: 候选客户卡片 · 待确认
+          - article "林女士客户卡片" [ref=e514]:
+            - generic [ref=e515]:
+              - generic [ref=e516]:
+                - generic [ref=e517]: 林
+                - generic [ref=e518]:
+                  - generic [ref=e519]:
+                    - heading "林女士" [level=3] [ref=e520]
+                    - generic [ref=e521]: 跟进中
+                  - generic [ref=e523]:
+                    - generic [ref=e524]: 成交客户
+                    - generic [ref=e525]: 医疗险
+              - paragraph [ref=e526]: 已沟通续缴时间，下周电话确认。
+              - button "查看资料" [ref=e527]
+      - generic [ref=e530]:
+        - generic [ref=e531]:
+          - generic [ref=e532]: 正常
+          - article "林女士客户卡片" [ref=e533]:
+            - generic [ref=e534]:
+              - generic [ref=e535]:
+                - generic [ref=e536]: 林
+                - generic [ref=e537]:
+                  - generic [ref=e538]:
+                    - heading "林女士" [level=3] [ref=e539]
+                    - generic [ref=e540]: 跟进中
+                  - generic [ref=e542]:
+                    - generic [ref=e543]: 成交客户
+                    - generic [ref=e544]: 医疗险
+              - paragraph [ref=e545]: 已沟通续缴时间，下周电话确认。
+              - button "查看资料" [ref=e546]
+        - generic [ref=e549]:
+          - generic [ref=e550]: 长内容
+          - article "周先生（姓名过长时仍保持卡片宽度和操作位置）客户卡片" [ref=e551]:
+            - generic [ref=e552]:
+              - generic [ref=e553]:
+                - generic [ref=e554]: 周
+                - generic [ref=e555]:
+                  - generic [ref=e556]:
+                    - heading "周先生（姓名过长时仍保持卡片宽度和操作位置）" [level=3] [ref=e557]
+                    - generic [ref=e558]: 跟进中
+                  - generic [ref=e560]:
+                    - generic [ref=e561]: 成交客户
+                    - generic [ref=e562]: 家庭保障
+                    - generic [ref=e563]: 长期护理
+              - paragraph [ref=e564]: 客户希望同时了解父母医疗、家庭意外保障和孩子的教育储备，备注内容较长，用来核对多行文本。
+              - button "查看资料" [ref=e565]
+        - generic [ref=e568]:
+          - generic [ref=e569]: 空值
+          - article "陈女士客户卡片" [ref=e570]:
+            - generic [ref=e571]:
+              - generic [ref=e572]:
+                - generic [ref=e573]: 陈
+                - generic [ref=e574]:
+                  - heading "陈女士" [level=3] [ref=e576]
+                  - generic [ref=e577]: 暂无标签
+              - paragraph [ref=e579]: 暂无跟进记录
+              - button "查看资料" [ref=e580]
+    - generic [ref=e583]:
+      - generic [ref=e584]:
+        - heading "保单表格" [level=2] [ref=e585]
+        - generic [ref=e586]: 参照：保单管理展开后的真实 table
+      - paragraph [ref=e587]: 验收检查：保留浅灰表头与轻分割；减少逐字竖排，缺失值写“待补充”，手机只在表格内部横向滚动。
+      - generic [ref=e588]:
+        - generic [ref=e589]:
+          - paragraph [ref=e590]: 包含正常、长内容和资料缺失行；金额与期数保持独立列。
+          - button "查看空状态" [ref=e591]
+        - table [ref=e593]:
+          - rowgroup [ref=e602]:
+            - row [ref=e603]:
+              - columnheader "投保人" [ref=e604]
+              - columnheader "被保人" [ref=e605]
+              - columnheader "保单 / 产品" [ref=e606]
+              - columnheader "下次缴费" [ref=e607]
+              - columnheader "本期应缴" [ref=e608]
+              - columnheader "剩余期数" [ref=e609]
+              - columnheader "操作" [ref=e610]
+          - rowgroup [ref=e611]:
+            - row [ref=e612]:
+              - cell "林女士" [ref=e613]
+              - cell "林女士" [ref=e614]
+              - cell "安心守护医疗保险 DEMO-2026-001" [ref=e615]:
+                - generic [ref=e616]: 安心守护医疗保险
+                - generic [ref=e617]: DEMO-2026-001
+              - cell "2026-11-17 25 天后" [ref=e618]:
+                - generic [ref=e619]: 2026-11-17
+                - generic [ref=e620]: 25 天后
+              - cell "¥ 2,400.00" [ref=e622]
+              - cell "9 期" [ref=e623]
+              - cell [ref=e624]:
+                - button "详情" [ref=e625]
+            - row [ref=e626]:
+              - cell "周先生" [ref=e627]
+              - cell "周先生的家属" [ref=e628]
+              - cell "长期护理与重大疾病综合保障计划（示例长产品名称，用来检查换行与详情入口是否清楚） DEMO-2026-002" [ref=e629]:
+                - generic [ref=e630]: 长期护理与重大疾病综合保障计划（示例长产品名称，用来检查换行与详情入口是否清楚）
+                - generic [ref=e631]: DEMO-2026-002
+              - cell "2026-10-28 剩余 5 天" [ref=e632]:
+                - generic [ref=e633]: 2026-10-28
+                - generic [ref=e634]: 剩余 5 天
+              - cell "¥ 12,000.00" [ref=e636]
+              - cell "3 期" [ref=e637]
+              - cell [ref=e638]:
+                - button "详情" [ref=e639]
+            - row [ref=e640]:
+              - cell "陈女士" [ref=e641]
+              - cell "陈女士" [ref=e642]
+              - cell "家庭保障计划 DEMO-2026-003" [ref=e643]:
+                - generic [ref=e644]: 家庭保障计划
+                - generic [ref=e645]: DEMO-2026-003
+              - cell "待补充 资料待核对" [ref=e646]:
+                - generic [ref=e647]: 待补充
+                - generic [ref=e648]: 资料待核对
+              - cell "待补充" [ref=e650]
+              - cell "待补充" [ref=e651]
+              - cell [ref=e652]:
+                - button "详情" [ref=e653]
+    - generic [ref=e654]:
+      - generic [ref=e655]:
+        - heading "弹窗" [level=2] [ref=e656]
+        - generic [ref=e657]: 参照：新增联系人弹窗的遮罩、标题行、双栏表单
+      - paragraph [ref=e658]: 验收检查：标题和关闭保持同一行；只滚动正文，底部操作固定。可测试必填错误、长内容滚动、保存和关闭。
+      - generic [ref=e659]:
+        - button "打开空值弹窗" [ref=e660]
+        - button "打开长保单示例" [ref=e661]
+    - paragraph [ref=e662]: 验收样板 · 所有姓名、保单号、金额与记录均为演示内容

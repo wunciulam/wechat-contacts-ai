@@ -1,0 +1,5 @@
+async(page)=>{
+ await page.goto("https://insurance-iu0xs0bvt-lamwunciu-2597s-projects.vercel.app/?_vercel_share=vc6vT4BllagebZSr7TFreUOAgRKlqzVX");await page.getByRole('button',{name:/保单管理/}).click();await page.getByText('示例客户',{exact:true}).first().click();
+ const t=page.locator('table').first(),sep=page.getByRole('separator',{name:'调整操作列宽度'});const result={policies:await t.locator('tbody tr').count(),width:await sep.getAttribute('aria-valuenow'),followups:page._follow.contacts[0].progressHistory.length,sameRequest:page._follow.deletes[0].p_request_id===page._follow.deletes[1].p_request_id};
+ await page.setViewportSize({width:390,height:844});await t.locator('..').evaluate(e=>e.scrollLeft=e.scrollWidth-e.clientWidth);await page.screenshot({path:'/Users/apple/Downloads/AI PROGRAM/insurance-mingya-detail-fix/output/staged-batch-mobile.png'});return {...result,mobileWidth:await sep.getAttribute('aria-valuenow'),overflow:await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)};
+}

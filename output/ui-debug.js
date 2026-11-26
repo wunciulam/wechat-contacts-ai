@@ -1,0 +1,1 @@
+async(page)=>({viewport:page.viewportSize(),fields:await page.getByRole('dialog',{name:'编辑联系人资料',exact:true}).getByLabel('生效日期',{exact:true}).evaluate(e=>({rect:e.getBoundingClientRect().toJSON(),html:e.parentElement.parentElement.parentElement.outerHTML.slice(0,4000)})),status:await page.getByRole('combobox',{name:'状态',exact:true}).boundingBox()})

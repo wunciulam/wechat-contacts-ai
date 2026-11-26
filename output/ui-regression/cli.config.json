@@ -1,0 +1,1 @@
+{"browser":{"browserName":"chromium","isolated":true,"launchOptions":{"channel":"chrome","headless":true}},"outputDir":"/Users/apple/Downloads/AI PROGRAM/insurance-mingya-detail-fix/output/ui-regression","outputMode":"file","timeouts":{"action":7000,"navigation":20000}}
