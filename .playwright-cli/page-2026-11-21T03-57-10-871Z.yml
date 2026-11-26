@@ -1,0 +1,63 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - button [ref=e5] [cursor=pointer]
+    - generic [ref=e14]:
+      - heading "保险跟单仔" [level=1] [ref=e15]
+      - paragraph [ref=e16]: 客户管理系统
+    - generic [ref=e17]:
+      - button "添加 / 导入" [ref=e19] [cursor=pointer]
+      - generic [ref=e23]:
+        - paragraph [ref=e24]: 工作台
+        - button "全部联系人 2" [ref=e25] [cursor=pointer]:
+          - generic [ref=e26]: 全部联系人
+          - generic [ref=e33]: "2"
+        - button "跟进工作台 2" [ref=e34] [cursor=pointer]:
+          - generic [ref=e35]: 跟进工作台
+          - generic [ref=e40]: "2"
+        - button "保单管理 1" [active] [ref=e41] [cursor=pointer]:
+          - generic [ref=e42]: 保单管理
+          - generic [ref=e47]: "1"
+      - generic [ref=e48]:
+        - generic [ref=e50]:
+          - button [ref=e51] [cursor=pointer]
+          - paragraph [ref=e54]: 标签筛选
+        - generic [ref=e55] [cursor=pointer]:
+          - generic [ref=e56]: 成交客户
+          - generic [ref=e59]:
+            - button [ref=e60]
+            - button [ref=e63]
+        - generic [ref=e67] [cursor=pointer]:
+          - generic [ref=e68]: 重点
+          - generic [ref=e71]:
+            - button [ref=e72]
+            - button [ref=e75]
+  - generic [ref=e196]:
+    - generic [ref=e198]:
+      - generic [ref=e199]:
+        - button [ref=e200]
+        - heading "客户保单 共 1" [level=2] [ref=e204]:
+          - text: 客户保单
+          - generic [ref=e205]: 共 1
+      - generic [ref=e206]:
+        - generic [ref=e207]:
+          - button "明亚导入" [ref=e208]
+          - button "录入保单" [ref=e209]
+        - textbox "搜索客户、保单号、险种..." [ref=e213]
+    - generic [ref=e216] [cursor=pointer]:
+      - generic [ref=e217]:
+        - button "示" [ref=e218]
+        - generic [ref=e219]:
+          - generic [ref=e220]:
+            - heading "示例客户甲" [level=3] [ref=e221]
+            - generic [ref=e222]: 无手机号
+          - generic [ref=e223]:
+            - generic [ref=e224]: 重点
+            - generic [ref=e225]: 成交客户
+            - button "修改标签" [ref=e226]
+      - generic [ref=e229]:
+        - generic [ref=e230]:
+          - generic [ref=e231]: 保单数量
+          - generic [ref=e232]: 1 份
+        - generic [ref=e233]:
+          - generic [ref=e234]: 总保费
+          - generic [ref=e235]: ¥ 100.00

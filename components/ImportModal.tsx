@@ -286,7 +286,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
       };
       setFormData(prev => ({
         ...prev,
-        dealProducts: [...(prev.dealProducts || []), newPolicy]
+        policies: [...(prev.policies || []), newPolicy],
+        dealProducts: Array.from(new Set([...(prev.dealProducts || []), newPolicy.productName]))
       }));
       setPolicyForm({ policyNumber: '', productName: '', company: '', premium: '', effectiveDate: '', status: '正式保单', applicant: '', insured: '', paymentYears: '', insuranceType: '', coverage: '' });
       setShowPolicyAdd(false);
@@ -294,7 +295,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
   };
 
   const handleEditPolicy = (id: string) => {
-    const policy = formData.dealProducts?.find(p => p.id === id);
+    const policy = formData.policies?.find(p => p.id === id);
     if (policy) {
       setEditingPolicyId(id);
       setPolicyForm({ ...policy });
@@ -303,9 +304,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
 
   const handleSaveEditPolicy = () => {
     if (editingPolicyId && policyForm.productName?.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        dealProducts: (prev.dealProducts || []).map(p =>
+      setFormData(prev => {
+        const oldName = prev.policies?.find(p => p.id === editingPolicyId)?.productName;
+        const policies = (prev.policies || []).map(p =>
           p.id === editingPolicyId ? {
             ...p,
             policyNumber: policyForm.policyNumber || '',
@@ -320,18 +321,29 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
             insuranceType: policyForm.insuranceType || '',
             coverage: policyForm.coverage || ''
           } : p
-        )
-      }));
+        );
+        const productNames = (prev.dealProducts || []).filter(name => name !== oldName || policies.some(p => p.productName === name));
+        return {
+          ...prev,
+          policies,
+          dealProducts: Array.from(new Set([...productNames, policyForm.productName!.trim()]))
+        };
+      });
       setEditingPolicyId(null);
       setPolicyForm({ policyNumber: '', productName: '', company: '', premium: '', effectiveDate: '', status: '正式保单', applicant: '', insured: '', paymentYears: '', insuranceType: '', coverage: '' });
     }
   };
 
   const handleDeletePolicy = (id: string) => {
-    setFormData(prev => ({
-      ...prev,
-      dealProducts: (prev.dealProducts || []).filter(p => p.id !== id)
-    }));
+    setFormData(prev => {
+      const deletedName = prev.policies?.find(p => p.id === id)?.productName;
+      const policies = (prev.policies || []).filter(p => p.id !== id);
+      return {
+        ...prev,
+        policies,
+        dealProducts: (prev.dealProducts || []).filter(name => name !== deletedName || policies.some(p => p.productName === name))
+      };
+    });
   };
 
   const handleTableConfirm = () => {
@@ -531,7 +543,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
                   )}
 
                   {/* 保单列表 */}
-                  {(formData.dealProducts || []).length > 0 ? (
+                  {(formData.policies || []).length > 0 ? (
                     <div className="border border-gray-200 rounded-lg overflow-hidden">
                       <table className="w-full text-xs">
                         <thead className="bg-gray-50 border-b border-gray-200">
@@ -545,7 +557,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onSave, onTa
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {(formData.dealProducts || []).map(policy => (
+                          {(formData.policies || []).map(policy => (
                             <tr key={policy.id} className="hover:bg-gray-50">
                               {editingPolicyId === policy.id ? (
                                 <>

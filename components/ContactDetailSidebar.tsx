@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Contact, ProgressRecord } from '../types';
+import { Contact, ProgressRecord, Policy } from '../types';
 import { X, Edit2, Trash2, Plus, Calendar, Tag, User, Target, ShoppingBag, Clock, RotateCcw, CheckCircle2, CircleDashed, AlertCircle, Gift, ArrowRight, Send, Shield, FileText } from 'lucide-react';
+
+import MingyaPolicyDetailModal, { currencyLabel } from './MingyaPolicyDetailModal';
 
 interface ContactDetailSidebarProps {
   contact: Contact | null;
@@ -37,6 +39,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
   onDeletePolicy,
   onEditPolicy
 }) => {
+  const [sourcePolicy, setSourcePolicy] = useState<Policy|null>(null);
   const [copiedWxid, setCopiedWxid] = useState<string | null>(null);
   
   // 常驻输入框状态
@@ -550,9 +553,9 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
                   <tbody className="divide-y divide-gray-100">
                     {contact.policies.map((policy, idx) => (
                       <tr key={policy.id || idx} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 font-medium text-gray-700">{policy.productName}</td>
+                        <td className="px-3 py-2 font-medium text-gray-700">{policy.mingya ? <button className="text-left underline underline-offset-4" onClick={() => setSourcePolicy(policy)}>{policy.productName}</button> : policy.productName}</td>
                         <td className="px-3 py-2 font-mono text-gray-600 text-xs">{policy.policyNumber || '-'}</td>
-                        <td className="px-3 py-2 text-right font-medium text-gray-900">¥ {policy.premium}</td>
+                        <td className="px-3 py-2 text-right font-medium text-gray-900">{currencyLabel(policy.mingya?.currency)} {policy.premium}</td>
                         <td className="px-3 py-2 text-center">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
                             policy.status.includes('有效') ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
@@ -599,6 +602,7 @@ const ContactDetailSidebar: React.FC<ContactDetailSidebarProps> = ({
           )}
         </div>
       </div>
+      <MingyaPolicyDetailModal policy={sourcePolicy} onClose={() => setSourcePolicy(null)} />
     </>
   );
 };

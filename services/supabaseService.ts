@@ -246,7 +246,8 @@ export const subscribeToDataChanges = async (callback: DataChangeCallback): Prom
         },
         (payload) => {
           console.log('📡 收到实时数据变化:', payload);
-          const { new: newRow, eventType } = payload;
+          const { eventType } = payload;
+          const newRow = payload.new as { data_type?: string; data?: any };
           if (newRow?.data_type && newRow?.data) {
             console.log('  └─ 数据类型:', newRow.data_type, '事件类型:', eventType);
             // 通知所有回调
@@ -292,4 +293,59 @@ export const broadcastDataChange = (dataType: string, data: any) => {
   
   // 如果有 Supabase Realtime，它会自动广播给其他标签页
   // 这里不需要额外操作
+};
+
+export interface ContactImportSnapshot {
+  id: string;
+  appId: string;
+  revision: string;
+  contacts: import('../types').Contact[];
+  localVersion: string;
+}
+
+export const readContactImportSnapshot = async (): Promise<Omit<ContactImportSnapshot, 'localVersion'>> => {
+  const appId = configuredAppId || getStoredAppId();
+  if (!appId) throw new Error('尚未确定当前数据空间，请先加载客户数据。');
+  const {data,error}=await supabase.from('app_data').select('id,app_id,data,updated_at')
+    .eq('app_id',appId).eq('data_type','contacts').single();
+  if(error||!data||!Array.isArray(data.data))throw new Error('无法读取当前云端客户，请检查网络后重试。');
+  return {id:data.id,appId:data.app_id,revision:data.updated_at,contacts:data.data};
+};
+
+export const commitContactImport = async (snapshot: ContactImportSnapshot, contacts: import('../types').Contact[]): Promise<void> => {
+  const appId=configuredAppId||getStoredAppId();
+  if(!appId||snapshot.appId!==appId)throw new Error('数据空间已变化，请重新预览导入。');
+  // Compare-and-set prevents overwriting edits made from another device after the preview.
+  const {data,error}=await supabase.from('app_data').update({data:contacts,updated_at:new Date().toISOString()})
+    .eq('id',snapshot.id).eq('app_id',appId).eq('data_type','contacts').eq('updated_at',snapshot.revision).select('id');
+  if(error)throw new Error('导入未保存到云端，请检查网络后重试。');
+  if(data?.length!==1)throw new Error('云端客户已变化，请重新预览后导入。');
+};
+
+export const archiveMingyaCapture = async (snapshot: ContactImportSnapshot, payload: unknown): Promise<string> => {
+  const appId = configuredAppId || getStoredAppId();
+  if (!appId || appId !== snapshot.appId) throw new Error('数据空间已变化，请重新预览导入。');
+  const raw=new TextEncoder().encode(JSON.stringify(payload));
+  const digest=await crypto.subtle.digest('SHA-256',raw);
+  const hash=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+  const compressed=new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+  let binary='';for(let i=0;i<compressed.length;i+=32768)binary+=String.fromCharCode(...compressed.subarray(i,i+32768));
+  const {error}=await supabase.from('app_data').upsert([
+    {app_id:snapshot.appId,data_type:`mingya_capture:${hash}`,data:{encoding:'gzip-base64',content:btoa(binary),sha256:hash},updated_at:new Date().toISOString()},
+    {app_id:snapshot.appId,data_type:`contacts_backup:mingya:${hash}:${snapshot.revision}`,data:snapshot.contacts,updated_at:new Date().toISOString()}
+  ],{onConflict:'app_id,data_type'});
+  if(error)throw new Error('原始采集信息和导入前备份未保存成功，本次未修改客户。');
+  return hash;
+};
+
+export const downloadMingyaCapture = async (hash: string): Promise<unknown> => {
+  if(!/^[a-f0-9]{64}$/.test(hash))throw new Error('原始信息标识无效。');
+  const appId=configuredAppId||getStoredAppId();if(!appId)throw new Error('数据空间未加载。');
+  const {data,error}=await supabase.from('app_data').select('data').eq('app_id',appId).eq('data_type',`mingya_capture:${hash}`).single();
+  if(error||data?.data?.encoding!=='gzip-base64')throw new Error('无法读取原始采集信息，请检查网络后重试。');
+  const bytes=Uint8Array.from(atob(data.data.content),c=>c.charCodeAt(0));
+  const raw=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+  const digest=await crypto.subtle.digest('SHA-256',raw);
+  if(Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('')!==hash)throw new Error('原始信息校验失败。');
+  return JSON.parse(new TextDecoder().decode(raw));
 };

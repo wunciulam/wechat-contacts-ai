@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Contact, Policy } from '../types';
 import { Search, Shield, ChevronDown, Edit2, Plus, Trash2, CheckSquare, Square, X } from 'lucide-react';
 import { PageHeader } from './PageHeader';
+import MingyaPolicyDetailModal, { currencyLabel } from './MingyaPolicyDetailModal';
 
 interface PolicyDashboardProps {
   contacts: Contact[];
@@ -10,12 +11,14 @@ interface PolicyDashboardProps {
   followUpFilter: 'idle' | 'following' | 'contacted' | null;
   onEditContact: (contact: Contact) => void;
   onAddPolicy: () => void;
+  onImportMingya?: () => void;
   onBatchDeleteContacts?: (ids: string[]) => void;
   onDeletePolicy?: (contactId: string, policyId: string) => void;
 }
 
-const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags, followUpFilter, onEditContact, onAddPolicy, onBatchDeleteContacts, onDeletePolicy }) => {
+const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags, followUpFilter, onEditContact, onAddPolicy, onImportMingya, onBatchDeleteContacts, onDeletePolicy }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [sourcePolicy, setSourcePolicy] = useState<Policy|null>(null);
   const [expandedContactIds, setExpandedContactIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -82,7 +85,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
 
   const getTotals = (policies: Policy[]) => {
     const count = policies.length;
-    let totalPremium = 0;
+    const totals: Record<string,number> = {};
     policies.forEach(p => {
       // 只计算生效的保单（status 包含"有效"或"正式"，排除"终止"、"退保"、"撤单"）
       const status = p.status || '';
@@ -94,10 +97,10 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
       if (isActive) {
         const premiumStr = String(p.premium || '0');
         const val = parseFloat(premiumStr.replace(/[^0-9.]/g, ''));
-        if (!isNaN(val)) totalPremium += val;
+        if (!isNaN(val)) { const code=p.mingya?.currency||'CNY'; totals[code]=(totals[code]||0)+val; }
       }
     });
-    return { count, totalPremium: totalPremium.toFixed(2) };
+    return { count, totalPremium: Object.entries(totals).map(([code,value]) => `${currencyLabel(code)} ${value.toFixed(2)}`).join(' / ') || '¥ 0.00' };
   };
 
   return (
@@ -110,7 +113,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
           allSelected={allSelected}
           onSelectAll={handleSelectAll}
           actionButton={
-            <button onClick={onAddPolicy} className="btn btn-primary text-sm"><Plus size={16} /><span>录入保单</span></button>
+            <div className="flex gap-2 shrink-0">{onImportMingya && <button onClick={onImportMingya} className="btn text-sm border border-gray-200">明亚导入</button>}<button onClick={onAddPolicy} className="btn btn-primary text-sm"><Plus size={16} /><span>录入保单</span></button></div>
           }
           searchBox={
             <div className="relative w-full sm:w-72">
@@ -152,7 +155,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                   </div>
                   <div className="flex items-center gap-6 md:justify-end border-t md:border-t-0 border-gray-100 pt-3 md:pt-0">
                     <div className="text-right"><div className="text-xs text-gray-400 font-medium">保单数量</div><div className="text-lg font-medium text-gray-700">{count} <span className="text-xs font-normal text-gray-400">份</span></div></div>
-                    <div className="text-right pr-4 border-r border-gray-100"><div className="text-xs text-gray-400 font-medium">总保费</div><div className="text-lg font-medium text-gray-900 font-mono">¥ {totalPremium}</div></div>
+                    <div className="text-right pr-4 border-r border-gray-100"><div className="text-xs text-gray-400 font-medium">总保费</div><div className="text-lg font-medium text-gray-900 font-mono">{totalPremium}</div></div>
                     <ChevronDown size={20} className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180 text-gray-900' : ''}`} />
                   </div>
                 </div>
@@ -175,9 +178,9 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
                         <tbody className="divide-y divide-gray-100">
                           {contact.policies?.map(policy => (
                             <tr key={policy.id} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-4 py-3 font-medium text-gray-700">{policy.productName}</td>
+                              <td className="px-4 py-3 font-medium text-gray-700">{policy.mingya ? <button className="text-left underline underline-offset-4" onClick={() => setSourcePolicy(policy)}>{policy.productName}</button> : policy.productName}</td>
                               <td className="px-4 py-3 font-mono text-gray-500 text-xs">{policy.policyNumber}</td>
-                              <td className="px-4 py-3 text-right font-mono font-medium text-gray-900">¥ {policy.premium}</td>
+                              <td className="px-4 py-3 text-right font-mono font-medium text-gray-900">{currencyLabel(policy.mingya?.currency)} {policy.premium}</td>
                               <td className="px-4 py-3 text-gray-500 text-xs">{policy.paymentYears || '-'}</td>
                               <td className="px-4 py-3 text-gray-600">{policy.applicant} / {policy.insured}</td>
                               <td className="px-4 py-3 text-gray-500 text-xs">{policy.effectiveDate}</td>
@@ -211,6 +214,7 @@ const PolicyDashboard: React.FC<PolicyDashboardProps> = ({ contacts, filterTags,
         )}
       </div>
 
+      <MingyaPolicyDetailModal policy={sourcePolicy} onClose={() => setSourcePolicy(null)} />
       {selectedIds.size > 0 && (
         <div className="fixed sm:absolute bottom-4 sm:bottom-8 left-4 sm:left-1/2 right-4 sm:right-auto sm:-translate-x-1/2 bg-white shadow-lg border border-gray-200 rounded-lg px-2 py-2 flex items-center gap-2 animate-in slide-in-from-bottom-4 z-50 overflow-x-auto no-scrollbar">
             <div className="px-3 sm:px-4 py-2 bg-gray-900 rounded text-xs sm:text-sm font-medium text-white whitespace-nowrap">{selectedIds.size} 位客户</div>
