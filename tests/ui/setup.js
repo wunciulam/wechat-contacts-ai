@@ -1,4 +1,5 @@
 async (page) => {
+  if(!page._networkNavigationRetry){page._networkNavigationRetry=true;for(const method of ['goto','reload']){const original=page[method].bind(page);page[method]=async(...args)=>{try{return await original(...args);}catch(e){if(!/ERR_CONNECTION_CLOSED|ERR_CONNECTION_RESET/.test(String(e)))throw e;await page.waitForTimeout(500);return original(...args);}};}}
   page.setDefaultTimeout(10000);
   page.setDefaultNavigationTimeout(30000);
   await page.clock.setFixedTime(new Date("2026-11-23T04:00:00Z"));

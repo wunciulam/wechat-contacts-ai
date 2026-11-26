@@ -1,0 +1,6 @@
+### Result
+{"body":"客户管理 (3)\n全部联系人\n共 3\n示\n示例客户\n高潜\n成交客户\n跟进中\n进展\n\n原有记录\n\n保留备注\n\n其\n其他客户\n续保\n成交客户\n跟进中\n进展\n\n原有记录\n\n保留备注\n\n仅\n仅终止客户\n成交客户\n跟进中\n进展\n\n原有记录\n\n保留备注\n\n联系人\n工作台\n保单\n更多\n示\n示例客户\n跟进\n资料\n保单\n跟进中\n建立联系\n需求确认\n方案比较\n方案确认\n承保\nAI 分析\n尚未分析\n生成分析\n当前判断\n记录沟通后分析当前卡点\n建议行动\n\n先导入聊天或记录沟通。\n\n跟进记录\n导入聊天\n写跟进\n2026\n11月20日\n\n原有记录\n\n渠道未记录\n示例客户\n导入聊天\n原始截图\n1 张\nchat-vision-multiline.png\n添加截图\n重新识别\n识别结果\n2026-11-20\n完整对话\n客户\n09:00\n\n要放弃这次导入吗？\n\n继续编辑\n放弃","requests":[{"path":"/rest/v1/app_data","bytes":475},{"path":"/rest/v1/app_data","bytes":145},{"path":"/rest/v1/rpc/save_customer_profile_v1","bytes":8055},{"path":"/rest/v1/rpc/save_customer_profile_v1","bytes":8055},{"path":"/rest/v1/app_data","bytes":145},{"path":"/rest/v1/rpc/save_followup_v1","bytes":315},{"path":"/rest/v1/rpc/save_followup_v1","bytes":315},{"path":"/rest/v1/app_data","bytes":145}]}
+### Ran Playwright code
+```js
+await (async page => ({body:await page.locator("body").innerText(), requests:page._follow?.requests}))(page);
+```

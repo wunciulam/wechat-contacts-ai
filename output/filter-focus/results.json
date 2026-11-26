@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "name": "fixture load",
+      "loaded": true
+    },
+    {
+      "name": "filter-task-simplify.js",
+      "passed": true,
+      "editableCategories": true,
+      "failedSaveRetained": true,
+      "jointFilters": true,
+      "taskDeleteRetry": true,
+      "historyPreserved": true,
+      "removedChatControls": true,
+      "mobile": true
+    }
+  ]
+}

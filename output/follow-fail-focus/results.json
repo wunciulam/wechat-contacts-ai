@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "name": "fixture load",
+      "loaded": true
+    },
+    {
+      "name": "followup.js",
+      "passed": true,
+      "failedInputRetained": true,
+      "retryPersistedAfterReload": true
+    }
+  ]
+}

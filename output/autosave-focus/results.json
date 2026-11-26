@@ -1,0 +1,26 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "name": "fixture load",
+      "loaded": true
+    },
+    {
+      "name": "autosave-components.js",
+      "passed": true,
+      "autosaveSerial": true,
+      "latestDraftPreserved": true,
+      "failureRetry": true,
+      "closeFlush": true,
+      "typedCategoryCreated": true,
+      "sharedCheckboxMixed": true,
+      "tagSize": {
+        "height": 20,
+        "align": "center"
+      },
+      "overlayIconsEqual": true,
+      "duration": "16s",
+      "originalDialogDesktopMobile": true
+    }
+  ]
+}

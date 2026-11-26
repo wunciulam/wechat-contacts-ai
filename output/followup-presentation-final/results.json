@@ -1,0 +1,36 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "name": "fixture load",
+      "loaded": true
+    },
+    {
+      "name": "followup-presentation.js",
+      "passed": true,
+      "tagColors": [
+        "oklch(0.95 0.052 163.051)",
+        "oklch(0.932 0.032 255.585)",
+        "oklch(0.943 0.029 294.588)",
+        "oklch(0.962 0.059 95.617)"
+      ],
+      "category": {
+        "color": "oklch(0.962 0.059 95.617)",
+        "size": "12px",
+        "tone": true
+      },
+      "yearOnce": true,
+      "dateNodeContentOrder": {
+        "dateRight": 640.5,
+        "markLeft": 652.5,
+        "markRight": 661.5,
+        "textLeft": 673.5,
+        "textBottom": 448,
+        "channelTop": 457
+      },
+      "pastOnlyRed": true,
+      "animatedBorder": true,
+      "reducedMotion": true
+    }
+  ]
+}
