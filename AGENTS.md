@@ -2,7 +2,7 @@
 
 开始任何界面设计或开发前，先读本目录《设计偏好.md》。其中记录用户确认的 Pen 视觉基准与最新评论；新增交互沿用该视觉，不得擅自重排或另造主题。
 
-本目录包含其他未发布改动。开始修改前先读《线上正式版说明.md》，使用其中记录的正式源码 `/Users/apple/Downloads/AI PROGRAM/insurance-mingya-detail-fix` 及对应分支。不要从本目录直接覆盖部署，也不要覆盖这里已有的未发布修改。
+本目录包含其他未发布改动。开始修改前先读《线上正式版说明.md》，使用其中记录的正式源码 `分支 codex/ui-component-enforcement（用 `git -C "/Users/apple/Downloads/AI PROGRAM/insurance" checkout codex/ui-component-enforcement` 检出）` 及对应分支。不要从本目录直接覆盖部署，也不要覆盖这里已有的未发布修改。
 
 所有界面需求先读正式源码的 AGENTS.md、design.md、实际 index.css。使用 components/ui 的 Input（含日期）、SearchInput、Select、Button/IconButton、Field、Tag 和 WorkspaceDialog。不得复制验收页私有控件、使用浏览器原生日期/下拉或另写弹窗。搜索图标由 SearchInput 的 flex 布局留位，公共控件 CSS 必须在 layer 内。普通按钮使用标准变体，plain 仅用于导航、Tab、拖动、颜色选择及文本/列表动作。
 
