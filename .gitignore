@@ -32,3 +32,6 @@ dist-ssr
 # Large data exports — never commit to git
 releases/*.xlsx
 *.xlsx
+
+# Git worktree workspaces — keep branch checkouts inside the project
+.worktrees/
